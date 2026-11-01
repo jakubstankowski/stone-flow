@@ -1,6 +1,6 @@
 # Stone Flow — Design guide
 
-Wersja: 0.2 · Data: 01.11.2026 · Status: wytyczne do projektu interfejsu.
+Wersja: 0.3 · Data: 01.11.2026 · Status: wytyczne do projektu interfejsu.
 
 Zakres produktu określa [PRD](PRD-stone-flow.md). Obowiązkowa paleta pochodzi z [wymagań technologicznych](../documents/wymagania%20technologiczne.docx). Układ inspirowany jest [dashboardem referencyjnym](../documents/example-dashboard.webp). Rozmiary, typografia, odcienie pomocnicze i opisane komponenty są propozycją projektową, a nie dodatkowymi wymaganiami źródłowymi.
 
@@ -72,7 +72,7 @@ Propozycja desktopowa: szeroki panel na ciepłym tle, maksymalna szerokość obs
 
 Nagłówek zawiera nazwę produktu, nazwę bieżącej sekcji, stan synchronizacji i menu użytkownika. Wyszukiwanie umieszczać przy listach; globalna wyszukiwarka i przełącznik firm z referencji nie należą do potwierdzonego MVP.
 
-Główna nawigacja: **Pulpit, Zamówienia, Wydatki, Operacje**; **Integracja / Ustawienia**. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
+Główna nawigacja: **Pulpit, Zamówienia, Wydatki, Operacje, Historia zmian**; **Integracja / Ustawienia**. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
 
 Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telefonie nawigacja przechodzi w dostępne menu, a filtry w rozwijany panel.
 
@@ -80,18 +80,18 @@ Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telef
 
 ```text
 Nagłówek: Stone Flow | Pulpit | Aktualność danych | Użytkownik
-Nawigacja: Pulpit | Zamówienia | Wydatki | Operacje | Integracja
+Nawigacja: Pulpit | Zamówienia | Wydatki | Operacje | Historia zmian | Integracja
 Tytuł + widok [Sprzedaż / Przepływy pieniężne] + okres
 Komunikat o niekompletnych danych, jeżeli występuje
 KPI 1                  KPI 2                 KPI 3
-Wykres zmian w czasie                        Kategorie / kanały
-Tabela szczegółowa lub ostatnie operacje + przejście do pełnej listy
+Wykres zmian w czasie                        Sprzedaż: kategorie kosztów / kanały; Przepływy: wypływy według rodzaju
+Sprzedaż: zestawienie składników sprzedaży; Przepływy: ostatnie operacje + przejście do listy „Operacje”
 ```
 
 Przełącznik widoków jest wynikiem decyzji użytkownika zapisanej w PRD. Po zmianie widoku wszystkie KPI, wykresy i podpisy zmieniają podstawę jednocześnie.
 
-- Sprzedaż: wartość sprzedaży, koszty, wynik przed wypłatami i liczba zamówień, według definicji z PRD sekcja 8. Opis wyniku wymienia jego składniki.
-- Przepływy: wpływy, wypływy i zmiana środków w okresie. Karty prowadzą do listy „Operacje”. Saldo rachunku jest poza MVP.
+- Sprzedaż: wartość sprzedaży, koszty, wynik przed wypłatami i liczba zamówień, według definicji z PRD sekcja 8. Opis wyniku wymienia jego składniki. Zestawienie pod wykresami: data, rodzaj (zamówienie, zwrot sprzedaży, korekta sprzedaży), kwota ze znakiem i przejście do zamówienia; jego suma równa się karcie sprzedaży. Na wykresie kanałów zwrot i korekta pomniejszają kanał swojego zamówienia.
+- Przepływy: wpływy, wypływy i zmiana środków w okresie, wykres wpływów i wypływów w czasie oraz podział wypływów według rodzaju operacji. Karty prowadzą do listy „Operacje”. Saldo rachunku jest poza MVP.
 - Wypłaty właścicieli pokazywać tylko we wypływach, a podatki VAT i PPE jako kategorie kosztów.
 - Przy kwotach wskazać podstawę brutto, walutę i podstawę okresu. Drobna etykieta wyjaśnia znaczenie KPI.
 - Porównanie okresów według reguły z PRD sekcja 8. Gdy baza równa się zero lub zaczyna się przed datą uruchomienia, widok pokazuje „brak podstawy porównania”. Wzrost kosztów nie jest automatycznie sukcesem oznaczonym zielenią.
@@ -131,9 +131,11 @@ Formularz zamówienia grupuje dane klienta, wartość brutto, realizację oraz r
 
 Szczegóły zamówienia zawierają kwotę „Zapłacono”, listę wpłat i zwrotów z ich kwotami, datami i metodami oraz akcje „Dodaj wpłatę” i „Dodaj zwrot”; zwrot ma także powód i wymagany rodzaj bez wartości domyślnej: „Zwrot sprzedaży” albo „Zwrot pieniędzy”, z krótkim opisem wpływu każdego z nich na sprzedaż. Lista pokazuje rodzaj zwrotu. Dotyczy to również zamówień ze sklepu. Przy metodzie gotówka formularz wpłaty pokazuje opcjonalne pole „Przyjął”. Kwota wpłaty i zwrotu musi być większa od 0 zł, a zwrot nie może przekroczyć kwoty Zapłacono. Poprawka lub usunięcie, po którym Zapłacono spadłoby poniżej 0 zł, jest odrzucane z komunikatem, że najpierw trzeba poprawić lub usunąć zwrot.
 
+Szczegóły zamówienia mają też akcję „Dodaj korektę sprzedaży” z kwotą, datą i powodem, bez metody. Krótki opis wyjaśnia, że korekta służy do oddania towaru bez zwrotu pieniędzy: obniża sprzedaż, a nie tworzy wypływu ani nie zmienia kwoty Zapłacono. Korekty są pokazane osobno od wpłat i zwrotów, można je poprawić lub usunąć, a usunięcie wymaga potwierdzenia. Formularze zwrotu i korekty oraz korekta wartości odrzucają zmianę, po której suma zwrotów sprzedaży i korekt sprzedaży przekroczyłaby wartość zamówienia, z komunikatem podającym dostępną kwotę.
+
 Zamówień nie można usunąć, dostępna jest akcja „Anuluj zamówienie” z potwierdzeniem i ostrzeżeniem, jeżeli są wpłaty. Anulowane zamówienie ma akcję „Przywróć zamówienie” z potwierdzeniem, która ustawia status „W trakcie”. Dodanie wpłaty do anulowanego zamówienia pokazuje ostrzeżenie. Akcja „Anonimizuj dane klienta” jest dostępna po upływie okresu retencji; potwierdzenie mówi, że operacji nie można cofnąć, a kwoty i raporty pozostają bez zmian.
 
-Ostrzeżenia w szczegółach zamówienia: „Nadpłata X zł”, gdy Zapłacono przekracza wartość; „Do zwrotu X zł”, gdy anulowane zamówienie ma Zapłacono większe od 0 zł; „Zamówienie aktywne w sklepie”, gdy zamówienie jest anulowane w ERP, a w sklepie aktywne. Zamówienie usunięte w sklepie ma oznaczenie, że usunięto je w sklepie.
+Ostrzeżenia w szczegółach zamówienia: „Nadpłata X zł”, gdy Zapłacono przekracza wartość; „Do zwrotu X zł”, gdy anulowane zamówienie ma Zapłacono większe od 0 zł; „Obniżenia sprzedaży przekraczają wartość o X zł”, gdy synchronizacja obniżyła wartość poniżej sumy zwrotów sprzedaży i korekt sprzedaży; „Zamówienie aktywne w sklepie”, gdy zamówienie jest anulowane w ERP, a w sklepie aktywne. Zamówienie usunięte w sklepie ma oznaczenie, że usunięto je w sklepie.
 
 Formularz wydatku obejmuje kwotę brutto (wymaganą, różną od 0 zł), kwotę netto (opcjonalną), kategorię, daty, dokument i metodę. Ujemna kwota oznacza korektę lub zwrot od dostawcy; formularz i listy pokazują ją ze znakiem minus i opisem „Korekta / zwrot od dostawcy”. Opcja „Powtarzaj co miesiąc” ujawnia harmonogram, kwotę większą od 0 zł i podgląd następnego wystąpienia. Wystąpienie powstaje w dniu terminu, więc podgląd nie może sugerować, że można je wcześniej opłacić. Gdy początek definicji obejmuje minione terminy, formularz przed zapisem pokazuje, ile wystąpień powstanie od razu. Definicję można wstrzymać i wznowić, a komunikat wyjaśnia, że okresy z czasu wstrzymania pozostają puste. Data kosztu, termin i data zapłaty mają odrębne etykiety. Datę zapłaty można wpisać w formularzu albo później akcją „Oznacz jako opłacony”. Nie oznaczać planu jako opłaconego.
 
@@ -141,7 +143,7 @@ Formularz wypłaty właściciela obejmuje osobę, kwotę, datę i metodę. Otwie
 
 ### Tabele
 
-Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Zamówienia pending, failed i szkice ze sklepu są domyślnie ukryte i dostępne filtrem. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności. Operacje: data, rodzaj (wpłata, zwrot, opłacony wydatek, wypłata właściciela), opis z przejściem do źródła, kierunek, kwota i metoda, z filtrem okresu i rodzaju. Opłacony wydatek ujemny jest wypływem z kwotą ujemną. Suma listy przy tym samym okresie zgadza się z kartami przepływów.
+Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Zamówienia pending, failed i szkice ze sklepu są domyślnie ukryte i dostępne filtrem. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności. Operacje: data, rodzaj (wpłata, zwrot, opłacony wydatek, wypłata właściciela), opis z przejściem do źródła, kierunek, kwota i metoda, z filtrem okresu i rodzaju. Opłacony wydatek ujemny jest wypływem z kwotą ujemną. Suma listy przy tym samym okresie zgadza się z kartami przepływów. Korekty sprzedaży nie pojawiają się na tej liście. Historia zmian: czas, autor, obiekt z datą biznesową, operacja i zakres zmiany, z filtrem okresu zmiany i rodzaju obiektu; lista służy tylko do odczytu, wpis prowadzi do obiektu, a przy obiekcie usuniętym pokazuje ślad usunięcia.
 
 Filtry przy tabeli, jawne aktywne filtry i „Wyczyść filtry”. Sortowanie ma widoczny kierunek i dostępny stan. Paginacja podaje zakres oraz liczbę rekordów. Na telefonie najważniejsze kolumny przechodzą w karty lub tabela ma kontrolowane przewijanie z zachowanym kontekstem. Nie ucinać kwoty ani statusu bez możliwości odczytu.
 
