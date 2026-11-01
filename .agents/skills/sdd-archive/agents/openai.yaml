@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: archive"
+  short_description: "Move finished tasks to the archive"
+  default_prompt: "Use $sdd-archive to archive every finished task."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: spec"
+  short_description: "Turn a raw task into a specification"
+  default_prompt: "Use $sdd-spec to write the specification for PROJ-12."
+policy:
+  allow_implicit_invocation: true

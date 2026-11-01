@@ -1,0 +1,29 @@
+tasks_dir: docs/tasks
+archive_dir: docs/tasks/_archive
+project_dir: docs/tasks/_project
+prd: docs/PRD-stone-flow.md
+task_id_case: lower
+
+tracker:
+  type: youtrack
+  project: SF
+  issue_url: https://standev.youtrack.cloud/issue/{ISSUE_ID}
+
+context:
+  - .sdd/context/role.md
+  - .sdd/context/rules.md
+  - .sdd/context/conventions.md
+
+source_of_truth:
+  - docs/PRD-stone-flow.md
+  - docs/DESIGN-GUID-stone-flow.md
+
+invariants:
+  source: .sdd/context/rules.md
+  section: Non-negotiable invariants
+
+language:
+  conversation: auto
+  artifacts: pl
+
+base_branch: main

@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: scaffold"
+  short_description: "Build everything except business logic"
+  default_prompt: "Use $sdd-scaffold to scaffold PROJ-12 from its plan."
+policy:
+  allow_implicit_invocation: false

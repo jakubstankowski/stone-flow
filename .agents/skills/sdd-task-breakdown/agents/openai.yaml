@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: task breakdown"
+  short_description: "Split a reviewed PRD into a backlog"
+  default_prompt: "Use $sdd-task-breakdown to turn the reviewed PRD into a backlog ready for the tracker."
+policy:
+  allow_implicit_invocation: true

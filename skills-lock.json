@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "skills": {
+    "sdd": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd/SKILL.md",
+      "computedHash": "2542613cec8ec07f3d14b128e9caae82142fcdf9033f584d2290e48676501848"
+    },
+    "sdd-archive": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-archive/SKILL.md",
+      "computedHash": "3d925ffae69384dd0c1e9aa5ad453a6a509c85f8b3a26373fa6232993c6917fa"
+    },
+    "sdd-done": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-done/SKILL.md",
+      "computedHash": "3416381b65a63852e962f5fa7ac2a1a59beacbfdff1240ebc03aa1d8d976a989"
+    },
+    "sdd-fetch-tasks": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-fetch-tasks/SKILL.md",
+      "computedHash": "f458384fcc3883f1daf963091fd1f479259c0c06fc69240311784025e105f344"
+    },
+    "sdd-init": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-init/SKILL.md",
+      "computedHash": "a8e3a3639f1e3f1ea960457f8c7571c61c93410026386780254014d5cc3b8e1d"
+    },
+    "sdd-plan": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-plan/SKILL.md",
+      "computedHash": "76288bf273096570af9fc97801b25bad155b6677b2acedd1c26b1ae7e19581d2"
+    },
+    "sdd-project-review": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-project-review/SKILL.md",
+      "computedHash": "6b282e2875f00e6ed2d37035a0a946c3084b2d8c8b8dccc06e7668070a8c447b"
+    },
+    "sdd-review-code": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-review-code/SKILL.md",
+      "computedHash": "3ca4029f7c1919749635e684f9f49288552fa78b80816b678f6466094d67a1e5"
+    },
+    "sdd-review-spec": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-review-spec/SKILL.md",
+      "computedHash": "02bfbdea29108d23ea81875c500c5850df2b2b02a4a969c455d0d349d933ef25"
+    },
+    "sdd-scaffold": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-scaffold/SKILL.md",
+      "computedHash": "fe53b1add0dcc7f7da7e96d4af973d265be3faf4bbe330e8c3ad765efdbb5cad"
+    },
+    "sdd-spec": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-spec/SKILL.md",
+      "computedHash": "66fafc191007af9a3f23edbb5dd506aec0b11ff98e91dd157a23bbbf43d321e5"
+    },
+    "sdd-task-breakdown": {
+      "source": "jakubstankowski/standev-sdd",
+      "sourceType": "github",
+      "skillPath": "plugins/standev-sdd/skills/sdd-task-breakdown/SKILL.md",
+      "computedHash": "4e8205c84b231fa4847435d1d130bec12d1c1e524db7dc2ae904084badb39fa8"
+    }
+  }
+}

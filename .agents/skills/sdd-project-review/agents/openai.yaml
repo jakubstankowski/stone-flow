@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: project review"
+  short_description: "PASS/FAIL gate for a whole PRD"
+  default_prompt: "Use $sdd-project-review to check whether our PRD is ready to be split into tasks."
+policy:
+  allow_implicit_invocation: true

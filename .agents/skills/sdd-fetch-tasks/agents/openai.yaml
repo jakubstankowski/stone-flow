@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: fetch tasks"
+  short_description: "Pull tickets into the task folder"
+  default_prompt: "Use $sdd-fetch-tasks to fetch PROJ-12 from the tracker."
+policy:
+  allow_implicit_invocation: true

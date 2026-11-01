@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: init"
+  short_description: "Set up spec-driven development in a repo"
+  default_prompt: "Use $sdd-init to set up spec-driven development in this repository."
+policy:
+  allow_implicit_invocation: true

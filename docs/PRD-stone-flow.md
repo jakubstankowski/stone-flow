@@ -18,6 +18,8 @@ Dokumenty wymagań określają zakres. Arkusze pokazują praktykę pracy i probl
 
 **Decyzja użytkownika z 28.10.2026:** system ma udostępniać oba widoki: sprzedaż oraz przepływy pieniężne. Nie wolno utożsamiać wartości zamówienia z otrzymaną zapłatą.
 
+**Decyzja użytkownika z 01.11.2026:** wpłaty za zamówienia są osobnymi wpisami dodawanymi ręcznie, także dla zamówień z WooCommerce. Stan płatności zamówienia jest wyliczany z wpłat. Zapłatę wydatku wyznacza data zapłaty. Wypłaty właścicieli są osobnym rodzajem operacji.
+
 ## 2. Problem i cel produktu
 
 Obecna praca wymaga prowadzenia dwóch arkuszy, przepisywania zamówień i ręcznego zestawiania sprzedaży, wydatków i wypłat. Rozproszone dane utrudniają ustalenie wyniku oraz wykrycie nieopłaconych zamówień i brakujących kosztów.
@@ -26,13 +28,14 @@ Stone Flow ma zapewnić jedno miejsce do obsługi zamówień internetowych i rę
 
 ## 3. Użytkownicy i dostęp
 
-- Właściciel: kontroluje wyniki, wydatki, zamówienia i działanie integracji.
-- Upoważniony pracownik: obsługuje zamówienia i/lub finanse zgodnie z nadanymi uprawnieniami.
+- Właściciel: jedyna rola w systemie, z jednym kontem i pełnym dostępem do zamówień, finansów i integracji.
 - Integracja i zadania automatyczne: działają technicznie, bez przyznawania dostępu interaktywnego.
 
-Propozycja uprawnień: niezależne możliwości odczytu i edycji zamówień, odczytu i edycji finansów oraz zarządzania integracją i dostępem. Podział na konkretne role wymaga zatwierdzenia; nie zakładamy, że każdy pracownik widzi wynik finansowy. API egzekwuje każdą operację niezależnie od widoczności elementów UI. Należy obsłużyć wygaśnięcie sesji i odebranie dostępu.
+**Decyzja użytkownika z 01.11.2026 (D-05):** MVP ma jedną rolę i jedno konto. Jest to świadome zawężenie wymagań biznesowych, które przewidują także upoważnione osoby. W systemie nie ma zarządzania kontami, a audyt wskazuje to konto jako autora zmian.
 
-Wejście z panelu administracyjnego sklepu jest wymagane. Wspólne logowanie z WooCommerce jest preferencją wymagającą analizy bezpieczeństwa; sam link nie uwierzytelnia użytkownika.
+Logowanie odbywa się e-mailem i hasłem kontem ERP. Reset hasła działa przez jednorazowy link e-mail. Sesja wygasa po 60 minutach bezczynności, a wygaśnięcie nie ujawnia danych. API egzekwuje uwierzytelnienie przy każdej operacji niezależnie od widoczności elementów UI.
+
+Wejście z panelu administracyjnego sklepu jest wymagane i działa jako link do strony logowania ERP; sam link nie uwierzytelnia użytkownika. Wspólne logowanie z WooCommerce jest poza MVP i wymaga osobnej analizy bezpieczeństwa.
 
 ## 4. Zakres
 
@@ -49,21 +52,51 @@ Wejście z panelu administracyjnego sklepu jest wymagane. Wspólne logowanie z W
 
 Magazyn, fakturowanie, księgowość, deklaracje podatkowe, integracja KSeF, zakupy, CRM, portal klienta, prognozowanie sprzedaży i obsługa wielu firm. Numery faktur, dostawcy, zdjęcia z realizacji i opinie występują w danych, ale nie uzasadniają budowy osobnych modułów. Flagi zdjęć/opinii można zachować; przechowywanie plików i publikowanie opinii wymaga odrębnej decyzji.
 
-Migracja historii z Excela jest propozycją uruchomieniową, a nie potwierdzoną funkcją importu samoobsługowego.
+Migracja historii z Excela nie wchodzi do MVP ani do warunków odbioru (decyzja użytkownika z 01.11.2026, D-06). Raporty obejmują dane od daty uruchomienia, a arkusze pozostają archiwum. Saldo rachunku i saldo początkowe również są poza MVP.
 
 ## 5. Najważniejsze procesy
 
 ### Zamówienie ręczne
 
-Pracownik otwiera „Dodaj zamówienie”, wpisuje klienta, datę, kanał i wartość, uzupełnia dostępne dane realizacji oraz zapisuje. System waliduje dane i chroni przed ponownym wysłaniem. Zamówienie pojawia się na wspólnej liście. Zapis zamówienia sam w sobie nie oznacza otrzymania pieniędzy.
+Użytkownik otwiera „Dodaj zamówienie”, wpisuje klienta, datę, kanał i wartość, uzupełnia dostępne dane realizacji oraz zapisuje. System waliduje dane i chroni przed ponownym wysłaniem. Zamówienie pojawia się na wspólnej liście. Zapis zamówienia sam w sobie nie oznacza otrzymania pieniędzy.
 
 ### Zamówienie WooCommerce
 
-Backend pobiera zamówienie, identyfikuje je według źródła i zewnętrznego ID oraz tworzy lub aktualizuje istniejący rekord. Ponowne dostarczenie nie tworzy drugiego zamówienia. Pola operacyjne ERP pozostają zachowane zgodnie z uzgodnioną własnością pól. Błąd ma status, czas, kontekst i możliwość ponowienia. Po awarii system uzupełnia pominięte dane.
+Zamówienia docierają na bieżąco przez webhooki, których autentyczność backend weryfikuje. Raz dziennie o 23:00 Europe/Warsaw backend odpytuje WooCommerce REST API o zmiany od ostatniego sukcesu i uzupełnia luki. Pierwsze pobranie obejmuje zamówienia od daty uruchomienia; historię rozstrzyga D-06. Pominięty webhook może oznaczać opóźnienie do następnego uzupełniania, dlatego stan integracji jest widoczny przy wynikach.
+
+Backend identyfikuje zamówienie według źródła i zewnętrznego ID oraz tworzy lub aktualizuje istniejący rekord. Ponowne dostarczenie nie tworzy drugiego zamówienia. Do ERP trafiają wszystkie statusy sklepu. Zamówienia pending, failed i szkice są oznaczone statusem ze sklepu, nie liczą się do sprzedaży i domyślnie są ukryte na liście, ale dostępne filtrem; do sprzedaży wchodzą po zmianie statusu w sklepie.
+
+Własność pól: WooCommerce odpowiada za ID, datę, dane klienta i wartość; te pola są w ERP tylko do odczytu, a synchronizacja je aktualizuje. ERP odpowiada za status realizacji, dostawców, ZO, fakturę, flagi, uwagi i wpłaty; synchronizacja ich nie zmienia. Kanał zamówienia ze sklepu to „sklep”.
+
+Zmiany w sklepie po imporcie: anulowanie w sklepie oznacza zamówienie w ERP jako anulowane, więc wypada ono ze sprzedaży. Jeżeli ma wpłaty, użytkownik widzi ostrzeżenie, a wpłaty pozostają. Zwrot w sklepie jest informacją i nie tworzy automatycznie wypływu.
+
+Zamówienie w walucie innej niż PLN nie trafia do raportów, lecz do historii błędów synchronizacji.
+
+Błąd ma status, czas, kontekst i trafia do historii błędów. Kolejne uzupełnianie pobiera dane od ostatniego sukcesu, więc luki domykają się same, a użytkownik może też wywołać ponowienie ręcznie.
 
 ### Wydatek jednorazowy i miesięczny
 
-Użytkownik dodaje opis, kategorię, datę i kwoty. Przy wydatku miesięcznym definiuje również harmonogram i okres aktywności. Trwały mechanizm tworzy najwyżej jedno wystąpienie na definicję i okres, także po restarcie i ponowieniu. Planowany wydatek nie może automatycznie udawać potwierdzonego wypływu środków. Dokładna reguła księgowania wystąpienia wymaga decyzji D-04.
+Użytkownik dodaje opis, kategorię, datę i kwoty. Przy wydatku miesięcznym definiuje również harmonogram i okres aktywności. Trwały mechanizm tworzy najwyżej jedno wystąpienie na definicję i okres, także po restarcie i ponowieniu. Planowany wydatek nie może automatycznie udawać potwierdzonego wypływu środków.
+
+Wystąpienie jest zwykłym wydatkiem bez daty zapłaty, z datą kosztu równą terminowi. Liczy się do kosztów, a do wypływów dopiero po oznaczeniu jako opłacone. W krótszym miesiącu przypada na jego ostatni dzień. Po przerwie w działaniu system tworzy wszystkie zaległe wystąpienia. Zmiana kwoty w definicji dotyczy tylko wystąpień jeszcze nieutworzonych; utworzone można poprawić pojedynczo. Usunięte wystąpienie nie wraca przy uzupełnianiu, bo ślad usunięcia nadal blokuje parę definicja–okres; w razie pomyłki wydatek dodaje się ręcznie.
+
+### Rejestracja płatności
+
+Wpłata za zamówienie: użytkownik otwiera szczegóły zamówienia i dodaje wpłatę z kwotą, datą operacji i metodą. Dotyczy to zamówień ręcznych i z WooCommerce; integracja nie tworzy wpłat, a status opłacenia w WooCommerce nie potwierdza otrzymania pieniędzy. Zamówienie może mieć wiele wpłat, także zaliczki. Stan płatności zamówienia jest wyliczany z wpłat i nie jest ustawiany ręcznie: Nieopłacone, Częściowo opłacone albo Opłacone. Pobranie jest tylko metodą: wpłatę dodaje się dopiero po otrzymaniu środków, z datą ich otrzymania.
+
+Zapłata wydatku: wydatek ma datę kosztu, opcjonalny termin i datę zapłaty. Użytkownik wpisuje datę zapłaty w formularzu albo później, akcją „Oznacz jako opłacony”. Uzupełniona data zapłaty oznacza stan „Opłacony”; tylko taki wydatek trafia do wypływów, do okresu wyznaczonego tą datą.
+
+Wypłata właściciela: użytkownik dodaje wpis z osobą, kwotą, datą i metodą. Wypłata liczy się do wypływów w przepływach pieniężnych, ale nie do kosztów ani sprzedaży.
+
+### Anulowanie i zwrot
+
+Zamówień nie usuwa się. Błędne albo wycofane zamówienie, ręczne lub ze sklepu, otrzymuje status „Anulowane”, które wyłącza je ze sprzedaży i pozostawia audyt. Jeżeli zamówienie ma wpłaty, użytkownik widzi ostrzeżenie, a pieniądze rozlicza zwrotem.
+
+Zwrot dodaje ręcznie na zamówieniu użytkownik, podając kwotę, datę, metodę i powód. Zwrot liczy się do wypływów i obniża sprzedaż w okresie swojej daty, więc wcześniejsze miesiące się nie zmieniają.
+
+Korekta wartości: wartość zamówienia ręcznego poprawia się bezpośrednio, z audytem; zamówienie ze sklepu zmienia się przez synchronizację. W obu przypadkach sprzedaż zmienia się w okresie daty zamówienia, więc raport za ten okres może się zmienić.
+
+Błędny wpis: użytkownik poprawia lub usuwa wpłatę albo zwrot. Usunięcie wymaga potwierdzenia i zostawia ślad audytu.
 
 ### Analiza finansów
 
@@ -74,16 +107,24 @@ Użytkownik wybiera „Sprzedaż” albo „Przepływy pieniężne” i okres. K
 | ID źródłowe / projektowe | Wymaganie | Kryterium akceptacji |
 | --- | --- | --- |
 | ZAM-01, 03, 05 | Ręczne zamówienia i wspólna lista | Zamówienie ręczne oraz internetowe są widoczne razem; źródło techniczne i kanał sprzedaży są rozróżnione |
-| ZAM-02, 06 | Synchronizacja WooCommerce | Wielokrotne dostarczenie tego samego ID daje jeden rekord; błąd można rozpoznać i ponowić |
+| ZAM-02, 06 | Synchronizacja WooCommerce | Wielokrotne dostarczenie tego samego ID, webhookiem lub przez uzupełnianie, daje jeden rekord; pominięty webhook jest uzupełniany przez dzienne odpytanie REST API; synchronizacja nie zmienia pól ERP; błąd można rozpoznać i ponowić |
 | ZAM-04 | Szczegóły i edycja | Użytkownik poprawia dozwolone pola; równoczesna zmiana nie nadpisuje bez ostrzeżenia nowszych danych |
 | ZAM-07 | Dane zamówień w sprzedaży | Każda uwzględniona wartość pochodzi z identyfikowalnego zamówienia i zatwierdzonej reguły okresu |
 | WYD-01, 02 | Dodawanie, poprawianie i usuwanie błędnych wydatków | Zmiana aktualizuje raport; usunięcie wymaga potwierdzenia, pozostawia audyt i nie usuwa historii bez śladu |
-| WYD-03–06 | Wydatki miesięczne | Aktywny harmonogram tworzy jedno wystąpienie za okres; zatrzymanie blokuje kolejne; ponowienie nie duplikuje |
+| WYD-03–06 | Wydatki miesięczne | Aktywny harmonogram tworzy jedno wystąpienie za okres, także zaległe po przerwie; dzień 29–31 przypada w krótszym miesiącu na ostatni dzień; zatrzymanie blokuje kolejne; ponowienie nie duplikuje; zmiana kwoty nie zmienia utworzonych wystąpień; usunięte wystąpienie nie wraca |
 | WYD-07 | Wydatki w raportach | Wydatek jest liczony raz zgodnie z datą, kategorią i stanem rozliczenia |
-| FIN-01–04 | Pulpit i analiza w czasie | Zmiana okresu aktualizuje karty, wykresy i tabelę; wartości dostępne są również tekstowo |
+| FIN-01–04 | Pulpit i analiza w czasie | Widok sprzedaży pokazuje sprzedaż, koszty i wynik przed wypłatami za okres oraz ich zmiany w czasie; zmiana okresu aktualizuje karty, wykresy i tabelę; wartości dostępne są również tekstowo |
 | FIN-05, 06 | Spójne i wyjaśnione obliczenia | Raport obejmuje właściwe źródła i opisuje reguły; sumę można uzgodnić z listą operacji |
 | FIN-07, decyzja użytkownika | Dwa widoki finansowe | Nieopłacone zamówienie nie zwiększa rzeczywistych wpływów; wpłata nie tworzy drugiej sprzedaży |
-| DOST-01 | Kontrola dostępu | Bez sesji API odmawia dostępu; bez uprawnienia odmawia danej operacji i odczytu finansów |
+| PLAT-01 | Wpłaty za zamówienia | Dodana wpłata pojawia się na zamówieniu, zmienia wyliczony stan płatności i zwiększa wpływy w okresie daty operacji, a sprzedaży nie zmienia; synchronizacja WooCommerce nie tworzy wpłaty |
+| PLAT-02 | Zapłata wydatku | Wydatek bez daty zapłaty nie zwiększa wypływów; po jej uzupełnieniu jest opłacony i liczony w okresie tej daty |
+| PLAT-03 | Wypłaty właścicieli | Wpis zwiększa wypływy, nie zmienia kosztów ani sprzedaży |
+| PLAT-04 | Płatności częściowe i pobranie | Kilka wpłat sumuje się na zamówieniu, a stan zmienia się z Nieopłacone przez Częściowo opłacone na Opłacone; pobranie bez dodanej wpłaty pozostaje nieopłacone |
+| ZAM-08 | Anulowanie zamówienia | Zamówienia nie można usunąć; anulowane wypada ze sprzedaży, zostawia audyt i ostrzega o istniejących wpłatach |
+| PLAT-05 | Zwroty | Zwrot zwiększa wypływy i obniża sprzedaż w okresie swojej daty, bez zmiany wcześniejszych okresów i bez utraty historii zamówienia |
+| PLAT-06 | Korekty i błędne wpisy | Korekta wartości zmienia sprzedaż w okresie daty zamówienia i zostawia audyt; poprawa lub usunięcie wpłaty albo zwrotu aktualizuje stan płatności i raporty oraz zostawia audyt |
+| KWO-01 | Reguły kwot | Kwoty są zapisywane do grosza w PLN; suma raportu równa się sumie zapisanych kwot; zamówienie ze sklepu w innej walucie jest widoczne jako błąd synchronizacji i nie wchodzi do raportów |
+| DOST-01 | Kontrola dostępu | Bez ważnej sesji API odmawia każdego odczytu i zapisu; sesja wygasa po 60 minutach bezczynności; reset hasła działa przez jednorazowy link e-mail; link z panelu sklepu nie uwierzytelnia |
 | INT-01 | Stan integracji | UI pokazuje ostatnią udaną synchronizację, błąd i dostępną akcję; nie sugeruje kompletności przy awarii |
 
 ## 7. Model informacji wynikający z arkuszy
@@ -92,11 +133,13 @@ Poniższy model jest propozycją logiczną; nie narzuca tabel ani kontraktów AP
 
 | Obiekt | Dane i reguły |
 | --- | --- |
-| Zamówienie | ID ERP, źródło techniczne, ID WooCommerce, kanał, data zamówienia, klient, wartość zamówienia, status realizacji, komentarz |
+| Zamówienie | ID ERP, źródło techniczne, ID WooCommerce, kanał, data zamówienia, klient, wartość brutto (dla sklepu suma zamówienia z dostawą), status realizacji, status ze sklepu, stan płatności wyliczany z wpłat, komentarz |
 | Klient przy zamówieniu | Osoba lub firma, dane kontaktowe, adres, opcjonalny NIP; rozdzielone pola zamiast jednego bloku tekstu |
 | Dane operacyjne | Dostawca lub dostawcy, referencje ZO, numer faktury, flagi zdjęć i opinii, dodatkowe uwagi |
-| Rozliczenie / płatność | Powiązanie z zamówieniem, kwota, waluta, data rzeczywistej operacji, metoda, identyfikator źródłowy; szczegóły płatności częściowych w D-03 |
-| Wydatek | Opis, kategoria, kontrahent, data biznesowa, netto/brutto i podstawa VAT, referencja dokumentu, status płatności, metoda, płatnik, komentarz, opcjonalne powiązanie z zamówieniem |
+| Wpłata | Powiązanie z zamówieniem, kwota, data rzeczywistej operacji, metoda; zamówienie może mieć wiele wpłat |
+| Wydatek | Opis, kategoria, kontrahent, data kosztu, opcjonalny termin, data zapłaty wyznaczająca stan „Opłacony”, kwota brutto (wymagana) i netto (opcjonalna) przepisane z dokumentu, referencja dokumentu, metoda, płatnik, komentarz, opcjonalne powiązanie z zamówieniem |
+| Wypłata właściciela | Osoba, kwota, data, metoda; odrębna od wydatku |
+| Zwrot | Powiązanie z zamówieniem, kwota, data, metoda, powód; odrębny od wpłaty |
 | Definicja cykliczna | Kwota i kategoria, dzień miesiąca, początek i koniec, aktywność; wersjonowanie zmian przyszłych wystąpień |
 | Wystąpienie cykliczne | ID definicji, okres, termin, kwota, stan; unikalna para definicja–okres |
 | Synchronizacja | Źródło, zewnętrzne ID, stan, czas próby i sukcesu, bezpieczny opis błędu, identyfikator korelacji |
@@ -106,42 +149,48 @@ Poniższy model jest propozycją logiczną; nie narzuca tabel ani kontraktów AP
 
 - Kanały z arkusza: sklep, OLX, znajomy, inne. Telefon wynika z wymagań biznesowych. Kanał nie jest tym samym co źródło techniczne „ręczne / WooCommerce”.
 - Metody płatności: przelew, BLIK, gotówka, pobranie. „Nieopłacone” jest stanem płatności, a osoba przyjmująca gotówkę osobnym polem.
-- Statusy realizacji: w trakcie, zakończone, problem/reklamacja; mapowanie anulowań, zwrotów i statusów WooCommerce wymaga D-02/D-03.
+- Statusy realizacji: w trakcie, zakończone, problem/reklamacja, anulowane. Status realizacji należy do ERP; status ze sklepu jest osobnym polem i poza anulowaniem nie zmienia statusu realizacji. Reguły zwrotów i korekt wymagają D-03.
 - Kategorie kosztów: zakup materiału u dostawców, cięcie, transport HDS, marketing (Google Ads, OLX, SEO, media społecznościowe), pozostała działalność, podatki VAT i PPE. Podatek wpisany w ewidencji nie oznacza automatycznego wyliczania zobowiązania podatkowego.
-- Wypłaty właścicieli wymagają osobnej klasyfikacji. Nie należy automatycznie uznać ich za koszty działalności ani odejmować dwukrotnie.
+- Wypłaty właścicieli są osobnym rodzajem operacji (patrz „Rejestracja płatności”). Nie są kosztami działalności i nie wolno odejmować ich dwukrotnie.
 - Dostawca może być więcej niż jeden; numer ZO i numer faktury nie są jednym identyfikatorem. Flagi zdjęć i opinii nie oznaczają integracji z usługą opinii.
 
 ## 8. Raportowanie i zasady finansowe
 
 ### Uzgodnione
 
-Dostępne są dwa rozdzielone widoki: sprzedaż oraz przepływy pieniężne. Obliczenia wykonuje backend. Kwoty są typu decimal, z jawną precyzją, skalą i regułą zaokrąglania; nie wolno liczyć pieniędzy typami zmiennoprzecinkowymi. UI stosuje polskie formatowanie i podaje walutę.
+Dostępne są dwa rozdzielone widoki: sprzedaż oraz przepływy pieniężne. Obliczenia wykonuje backend. Nie wolno liczyć pieniędzy typami zmiennoprzecinkowymi. UI stosuje polskie formatowanie i podaje walutę.
 
-### Definicje robocze do zatwierdzenia w D-01
+Reguły kwot (decyzja użytkownika z 01.11.2026): kwoty są typu `decimal(18,2)`, zapisywane do grosza. Ewentualne zaokrąglenie odbywa się połową od zera (0,005 → 0,01). Sumy są sumami zapisanych kwot, bez ponownego zaokrąglania. MVP działa wyłącznie w PLN, bez kursów walut. Zamówienie ma tylko wartość brutto, bez netto i stawki VAT. Wydatek ma kwotę brutto i opcjonalną kwotę netto przepisane z dokumentu; system nie wylicza ich ze stawki i jej nie przechowuje. Raporty używają kwot brutto.
 
-| Widok | Znaczenie proponowane | Nierozstrzygnięte |
+### Definicje widoków
+
+Decyzja użytkownika z 01.11.2026 (D-01, D-03, D-04).
+
+| Widok | Znaczenie | Nierozstrzygnięte |
 | --- | --- | --- |
-| Sprzedaż | Wartość sprzedaży z kwalifikujących się zamówień po korektach, niezależna od wpłat | Netto/brutto, statusy kwalifikujące, data ujęcia, korekty i koszty przypisane do sprzedaży |
-| Przepływy pieniężne | Rzeczywiste wpływy minus rzeczywiste wypływy w okresie operacji pieniężnej | Potwierdzanie płatności, zwroty, wypłaty właścicieli i ewentualne saldo początkowe |
+| Sprzedaż | Wartość brutto zamówień wszystkich statusów poza anulowanymi oraz poza zamówieniami pending, failed i szkicami ze sklepu, przypisana do okresu według daty zamówienia, niezależna od wpłat, pomniejszona o zwroty w okresie daty zwrotu | Brak |
+| Koszty w widoku sprzedaży | Wszystkie zarejestrowane wydatki brutto, opłacone i nieopłacone, według daty kosztu; obejmują kategorie VAT i PPE. Wystąpienia cykliczne liczą się jak wydatki. System liczy wpisane kwoty i nie wylicza zobowiązania podatkowego | Brak |
+| Wynik przed wypłatami | Sprzedaż minus koszty w tym samym okresie; wypłaty właścicieli go nie obniżają. Pokazywany w widoku sprzedaży z opisem składników | Brak |
+| Przepływy pieniężne | Rzeczywiste wpływy (wpłaty) minus rzeczywiste wypływy (opłacone wydatki, wypłaty właścicieli, zwroty) w okresie operacji pieniężnej; bez salda rachunku | Brak |
 
-Nie nazywać zmiany środków „zyskiem”, a wartości sprzedaży „otrzymanymi wpłatami”. „Wynik zarządczy”, „wynik przed wypłatami” i „pozostało po wypłatach” można pokazać dopiero po zdefiniowaniu składowych. Nie prezentować salda rachunku na podstawie samych operacji bez salda początkowego.
+Nie nazywać zmiany środków „zyskiem”, a wartości sprzedaży „otrzymanymi wpłatami”. „Wynik zarządczy” i „pozostało po wypłatach” można pokazać dopiero po zdefiniowaniu składowych. Nie prezentować salda rachunku na podstawie samych operacji bez salda początkowego.
 
 Zabezpieczenia wymagane przy projektowaniu obliczeń:
 
 1. Wpływ z zamówienia i odpowiadający mu historyczny wpis przychodowy nie mogą być liczone dwa razy.
 2. Koszt powiązany z zamówieniem i wydatek w ewidencji muszą wskazywać jedno zdarzenie, jeżeli dotyczą tej samej operacji.
 3. Planowany wydatek i niezapłacone zamówienie nie zwiększają rzeczywistych przepływów.
-4. Kwota zwrotu jest odrębnym zdarzeniem, a nie utratą historii zamówienia. Reguły korekty sprzedaży wymagają zatwierdzenia.
+4. Kwota zwrotu jest odrębnym zdarzeniem, a nie utratą historii zamówienia (patrz „Anulowanie i zwrot”).
 5. Wartość zero, brak danych i niekompletne dane mają odmienne znaczenia.
 6. Nie przeliczać wszystkich kwot netto przez stałe dzielenie przez 1,23. Taki wzór występuje w DEMO, ale stawki i zasady VAT trzeba ustalić dla konkretnych operacji.
 
-Propozycja zakresu raportów: bieżący miesiąc, poprzedni miesiąc, rok i własny zakres; agregacja miesięczna oraz porównanie okresów. Kategorie i kanały powinny prowadzić do danych szczegółowych. Porównanie procentowe przy bazie równej zero pokazuje „brak podstawy porównania”. Liczba zamówień i liczba unikalnych klientów muszą mieć odrębne definicje.
+Zakres raportów w MVP: bieżący miesiąc, poprzedni miesiąc, rok i własny zakres; agregacja miesięczna oraz porównanie okresów. Kategorie i kanały powinny prowadzić do danych szczegółowych. Porównanie procentowe przy bazie równej zero pokazuje „brak podstawy porównania”. Liczba zamówień i liczba unikalnych klientów muszą mieć odrębne definicje.
 
 ## 9. Dane historyczne i jakość
 
 W źródłach występują: daty z lat niezgodnych z nazwą pliku, tekst „31.09.2026”, wpisy z innych miesięcy niż zakładka, różne zakresy SUMIF dla przychodów i kosztów, warianty nazw kategorii, wartości tekstowe w polach liczbowych oraz komentarze zastępujące strukturalne statusy. Miesięczne podsumowanie roczne zawiera także wartości ujemne, więc nie wolno bez analizy odrzucić wszystkich ujemnych kwot.
 
-Jeżeli migracja zostanie zatwierdzona:
+Jeżeli migracja zostanie zatwierdzona po MVP jako osobna decyzja:
 
 1. Zmapować kolumny wszystkich miesięcy; nagłówki są na różnych wierszach.
 2. Zachować plik, arkusz i wiersz pochodzenia; pomijać puste wiersze i techniczne formuły numeracji.
@@ -185,7 +234,7 @@ Dokument źródłowy wymienia .NET 10 LTS, Angular 22, Tailwind CSS 4 i daisyUI 
 - Oba widoki finansowe mają zatwierdzone definicje i uzgadniają się z rekordami źródłowymi. Scenariusze obejmują niezapłacone zamówienie, wpłatę w innym miesiącu, korektę, zwrot i wydatek planowany.
 - API odrzuca nieuprawniony odczyt i zapis; wygaśnięcie sesji nie ujawnia danych.
 - Kluczowe procesy mają testy E2E; reguły domenowe i finansowe testy jednostkowe, a zapis, autoryzacja i unikalność testy integracyjne.
-- CI przechodzi, oba hostingi są zweryfikowane, SPA działa po odświeżeniu podstrony, migracja i odtworzenie kopii zostały sprawdzone.
+- CI przechodzi, oba hostingi są zweryfikowane, SPA działa po odświeżeniu podstrony, migracja schematu bazy i odtworzenie kopii zostały sprawdzone.
 - UI spełnia [design guide](DESIGN-GUID-stone-flow.md), w tym kontrast, obsługę klawiatury i prezentację niekompletności danych.
 
 ## 12. Rejestr decyzji do doprecyzowania
@@ -194,15 +243,15 @@ Pytania nie blokują przygotowania dokumentacji, lecz odpowiednie reguły należ
 
 | ID | Decyzja / pytanie | Znaczenie |
 | --- | --- | --- |
-| D-01 | Dwa widoki są uzgodnione. Czy sprzedaż liczymy netto czy brutto, według jakiej daty i statusów? Jak przypisujemy koszty, podatki i wypłaty właścicieli? | Blokuje definicję KPI i zgodność raportów |
-| D-02 | Jakie statusy, okres historii i częstotliwość importu WooCommerce? Które pola aktualizuje integracja, które ERP? | Blokuje kontrakt synchronizacji |
-| D-03 | Czy MVP obejmuje zaliczki i płatności częściowe? Jak potwierdzamy pobrania, anulowania, zwroty i reklamacje? | Dwa widoki wymagają danych o rzeczywistych operacjach; status realizacji nie wystarcza |
-| D-04 | Czy wystąpienie cykliczne jest planem czy zaksięgowanym kosztem? Co z dniem 29–31, przerwą w działaniu i zmianą kwoty? | Propozycja: ostatni dzień krótszego miesiąca, uzupełnianie zaległych wystąpień, potwierdzanie faktycznej płatności osobno |
-| D-05 | Kto ma dostęp do pełnych finansów, usuwania danych i konfiguracji? Jak działa logowanie i ewentualne SSO? | Blokuje macierz dostępu |
-| D-06 | Czy importujemy historię, z jakiego okresu i który zapis rozstrzyga rozbieżności między arkuszami? | Blokuje migrację i bilans otwarcia |
+| D-01 | Rozstrzygnięte 01.11.2026, patrz „Definicje widoków” w sekcji 8. | Definiuje KPI i zgodność raportów |
+| D-02 | Rozstrzygnięte 01.11.2026, patrz „Zamówienie WooCommerce” w sekcji 5. Do sprawdzenia w sklepie: czy używa statusów innych niż standardowe. | Okres historii rozstrzyga D-06 |
+| D-03 | Rozstrzygnięte 01.11.2026, patrz „Rejestracja płatności” oraz „Anulowanie i zwrot” w sekcji 5. | Dwa widoki opierają się na zapisanych operacjach, nie na statusie realizacji |
+| D-04 | Rozstrzygnięte 01.11.2026, patrz „Wydatek jednorazowy i miesięczny” w sekcji 5. | Wystąpienie jest kosztem, a wypływem dopiero po zapłacie |
+| D-05 | Rozstrzygnięte 01.11.2026, patrz sekcja 3. Do potwierdzenia: dostawca wysyłki e-mail dla resetu hasła. | Kolejne role i wspólne logowanie są poza MVP |
+| D-06 | Rozstrzygnięte 01.11.2026, patrz sekcja 4: bez migracji historii i bez salda w MVP. | Migracja po MVP wymaga osobnej decyzji |
 | D-07 | Czy koszty zakupów, cięcia i transportu mają być wiązane z konkretnymi zamówieniami? | Wpływa na rentowność zamówienia i zapobieganie podwójnemu ujęciu |
-| D-08 | Jaki plan SMART ASP.NET i jakie parametry backupu, dostępności oraz wydajności? Czy poza PLN występują inne waluty? | Blokuje ostateczną konfigurację środowisk i reguły walutowe |
+| D-08 | Jaki plan SMART ASP.NET i jakie parametry backupu, dostępności oraz wydajności? | Blokuje ostateczną konfigurację środowisk |
 
 ## 13. Kolejność dalszych prac
 
-Najpierw uzgodnić D-01–D-05 i sprawdzić hosting. Następnie opisać model domenowy, własność pól i kontrakty API, przygotować środowiska i dostęp, wdrożyć zamówienia, wydatki oraz dwa widoki raportowania. Migrację historii wykonać po osobnej decyzji i uzgodnieniu danych. Uruchomienie produkcyjne wymaga odbioru scenariuszy z sekcji 11.
+D-01–D-06 są rozstrzygnięte. Najpierw uzgodnić D-07 i sprawdzić hosting (D-08). Następnie opisać model domenowy, własność pól i kontrakty API, przygotować środowiska i dostęp, wdrożyć zamówienia, wydatki oraz dwa widoki raportowania. Uruchomienie produkcyjne wymaga odbioru scenariuszy z sekcji 11.

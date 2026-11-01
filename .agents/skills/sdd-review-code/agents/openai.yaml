@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: review code"
+  short_description: "Review code against spec and plan"
+  default_prompt: "Use $sdd-review-code to review the implementation of PROJ-12."
+policy:
+  allow_implicit_invocation: true

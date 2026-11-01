@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: done"
+  short_description: "Record the delivery manifest"
+  default_prompt: "Use $sdd-done to record what was delivered for PROJ-12."
+policy:
+  allow_implicit_invocation: true

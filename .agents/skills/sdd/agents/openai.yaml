@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD"
+  short_description: "Spec-driven development pipeline"
+  default_prompt: "Use $sdd to take task PROJ-12 to the next stage of the spec-driven pipeline."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD: plan"
+  short_description: "Turn an approved spec into a plan"
+  default_prompt: "Use $sdd-plan to write the implementation plan for PROJ-12."
+policy:
+  allow_implicit_invocation: true
