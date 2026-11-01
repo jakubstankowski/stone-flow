@@ -1,6 +1,6 @@
 # Stone Flow — Design guide
 
-Wersja: 0.1 · Data: 28.10.2026 · Status: wytyczne do projektu interfejsu.
+Wersja: 0.2 · Data: 01.11.2026 · Status: wytyczne do projektu interfejsu.
 
 Zakres produktu określa [PRD](PRD-stone-flow.md). Obowiązkowa paleta pochodzi z [wymagań technologicznych](../documents/wymagania%20technologiczne.docx). Układ inspirowany jest [dashboardem referencyjnym](../documents/example-dashboard.webp). Rozmiary, typografia, odcienie pomocnicze i opisane komponenty są propozycją projektową, a nie dodatkowymi wymaganiami źródłowymi.
 
@@ -72,7 +72,7 @@ Propozycja desktopowa: szeroki panel na ciepłym tle, maksymalna szerokość obs
 
 Nagłówek zawiera nazwę produktu, nazwę bieżącej sekcji, stan synchronizacji i menu użytkownika. Wyszukiwanie umieszczać przy listach; globalna wyszukiwarka i przełącznik firm z referencji nie należą do potwierdzonego MVP.
 
-Główna nawigacja: **Pulpit, Zamówienia, Wydatki**; **Integracja / Ustawienia**. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
+Główna nawigacja: **Pulpit, Zamówienia, Wydatki, Operacje**; **Integracja / Ustawienia**. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
 
 Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telefonie nawigacja przechodzi w dostępne menu, a filtry w rozwijany panel.
 
@@ -80,7 +80,7 @@ Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telef
 
 ```text
 Nagłówek: Stone Flow | Pulpit | Aktualność danych | Użytkownik
-Nawigacja: Pulpit | Zamówienia | Wydatki | Integracja
+Nawigacja: Pulpit | Zamówienia | Wydatki | Operacje | Integracja
 Tytuł + widok [Sprzedaż / Przepływy pieniężne] + okres
 Komunikat o niekompletnych danych, jeżeli występuje
 KPI 1                  KPI 2                 KPI 3
@@ -91,10 +91,10 @@ Tabela szczegółowa lub ostatnie operacje + przejście do pełnej listy
 Przełącznik widoków jest wynikiem decyzji użytkownika zapisanej w PRD. Po zmianie widoku wszystkie KPI, wykresy i podpisy zmieniają podstawę jednocześnie.
 
 - Sprzedaż: wartość sprzedaży, koszty, wynik przed wypłatami i liczba zamówień, według definicji z PRD sekcja 8. Opis wyniku wymienia jego składniki.
-- Przepływy: wpływy, wypływy i zmiana środków w okresie. Saldo rachunku jest poza MVP.
+- Przepływy: wpływy, wypływy i zmiana środków w okresie. Karty prowadzą do listy „Operacje”. Saldo rachunku jest poza MVP.
 - Wypłaty właścicieli pokazywać tylko we wypływach, a podatki VAT i PPE jako kategorie kosztów.
 - Przy kwotach wskazać podstawę brutto, walutę i podstawę okresu. Drobna etykieta wyjaśnia znaczenie KPI.
-- Porównanie okresów tylko przy dostępnej i porównywalnej bazie. Wzrost kosztów nie jest automatycznie sukcesem oznaczonym zielenią.
+- Porównanie okresów według reguły z PRD sekcja 8. Gdy baza równa się zero lub zaczyna się przed datą uruchomienia, widok pokazuje „brak podstawy porównania”. Wzrost kosztów nie jest automatycznie sukcesem oznaczonym zielenią.
 
 Karta KPI ma małą ikonę na stonowanym tle, krótką etykietę, dużą wartość i opcjonalną informację o porównaniu. Klikalność musi wynikać z wyglądu i prowadzić do danych składających się na wartość.
 
@@ -127,15 +127,21 @@ Jedna dominująca akcja na sekcję: „Dodaj zamówienie”, „Dodaj wydatek”
 
 Etykiety zawsze nad polami; placeholder jest przykładem, nie zastępuje etykiety. Błąd znajduje się przy polu i w podsumowaniu, jeśli dotyczy wielu pól. Dane pozostają po błędzie API. Informacja o wymaganiu pola jest dostępna również czytnikowi ekranu. Walidacja obejmuje zarówno UI, jak i API.
 
-Formularz zamówienia grupuje dane klienta, wartość brutto, realizację oraz referencje/uwagi. Źródło techniczne i ID integracji nie są dowolnie edytowalne. Status realizacji jest polem, a stan płatności jest wyliczany z wpłat i tylko wyświetlany. Pola należące do WooCommerce (ID, data, dane klienta, wartość) są tylko do odczytu, mają oznaczenie źródła i wyjaśnienie ograniczeń edycji. Status ze sklepu jest pokazywany osobno od statusu realizacji.
+Formularz zamówienia grupuje dane klienta, wartość brutto, realizację oraz referencje/uwagi. Źródło techniczne i ID integracji nie są dowolnie edytowalne. Status realizacji jest polem, a stan płatności jest wyliczany z wpłat i zwrotów i tylko wyświetlany. Pola należące do WooCommerce (ID, data, dane klienta, wartość) są tylko do odczytu, mają oznaczenie źródła i wyjaśnienie ograniczeń edycji. Status ze sklepu jest pokazywany osobno od statusu realizacji.
 
-Szczegóły zamówienia zawierają listę wpłat i zwrotów z ich kwotami, datami i metodami oraz akcje „Dodaj wpłatę” i „Dodaj zwrot”; zwrot ma także powód. Dotyczy to również zamówień ze sklepu. Zamówień nie można usunąć, dostępna jest akcja „Anuluj zamówienie” z potwierdzeniem i ostrzeżeniem, jeżeli są wpłaty.
+Szczegóły zamówienia zawierają kwotę „Zapłacono”, listę wpłat i zwrotów z ich kwotami, datami i metodami oraz akcje „Dodaj wpłatę” i „Dodaj zwrot”; zwrot ma także powód i wymagany rodzaj bez wartości domyślnej: „Zwrot sprzedaży” albo „Zwrot pieniędzy”, z krótkim opisem wpływu każdego z nich na sprzedaż. Lista pokazuje rodzaj zwrotu. Dotyczy to również zamówień ze sklepu. Przy metodzie gotówka formularz wpłaty pokazuje opcjonalne pole „Przyjął”. Kwota wpłaty i zwrotu musi być większa od 0 zł, a zwrot nie może przekroczyć kwoty Zapłacono. Poprawka lub usunięcie, po którym Zapłacono spadłoby poniżej 0 zł, jest odrzucane z komunikatem, że najpierw trzeba poprawić lub usunąć zwrot.
 
-Formularz wydatku obejmuje kwotę brutto (wymaganą), kwotę netto (opcjonalną), kategorię, daty, dokument i metodę. Opcja „Powtarzaj co miesiąc” ujawnia harmonogram i podgląd następnego wystąpienia. Data kosztu, termin i data zapłaty mają odrębne etykiety. Datę zapłaty można wpisać w formularzu albo później akcją „Oznacz jako opłacony”. Nie oznaczać planu jako opłaconego.
+Zamówień nie można usunąć, dostępna jest akcja „Anuluj zamówienie” z potwierdzeniem i ostrzeżeniem, jeżeli są wpłaty. Anulowane zamówienie ma akcję „Przywróć zamówienie” z potwierdzeniem, która ustawia status „W trakcie”. Dodanie wpłaty do anulowanego zamówienia pokazuje ostrzeżenie. Akcja „Anonimizuj dane klienta” jest dostępna po upływie okresu retencji; potwierdzenie mówi, że operacji nie można cofnąć, a kwoty i raporty pozostają bez zmian.
+
+Ostrzeżenia w szczegółach zamówienia: „Nadpłata X zł”, gdy Zapłacono przekracza wartość; „Do zwrotu X zł”, gdy anulowane zamówienie ma Zapłacono większe od 0 zł; „Zamówienie aktywne w sklepie”, gdy zamówienie jest anulowane w ERP, a w sklepie aktywne. Zamówienie usunięte w sklepie ma oznaczenie, że usunięto je w sklepie.
+
+Formularz wydatku obejmuje kwotę brutto (wymaganą, różną od 0 zł), kwotę netto (opcjonalną), kategorię, daty, dokument i metodę. Ujemna kwota oznacza korektę lub zwrot od dostawcy; formularz i listy pokazują ją ze znakiem minus i opisem „Korekta / zwrot od dostawcy”. Opcja „Powtarzaj co miesiąc” ujawnia harmonogram, kwotę większą od 0 zł i podgląd następnego wystąpienia. Wystąpienie powstaje w dniu terminu, więc podgląd nie może sugerować, że można je wcześniej opłacić. Gdy początek definicji obejmuje minione terminy, formularz przed zapisem pokazuje, ile wystąpień powstanie od razu. Definicję można wstrzymać i wznowić, a komunikat wyjaśnia, że okresy z czasu wstrzymania pozostają puste. Data kosztu, termin i data zapłaty mają odrębne etykiety. Datę zapłaty można wpisać w formularzu albo później akcją „Oznacz jako opłacony”. Nie oznaczać planu jako opłaconego.
+
+Formularz wypłaty właściciela obejmuje osobę, kwotę, datę i metodę. Otwiera go akcja „Dodaj wypłatę” na liście „Operacje”. Wypłatę można poprawić lub usunąć; usunięcie wymaga potwierdzenia.
 
 ### Tabele
 
-Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Zamówienia pending, failed i szkice ze sklepu są domyślnie ukryte i dostępne filtrem. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności.
+Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Zamówienia pending, failed i szkice ze sklepu są domyślnie ukryte i dostępne filtrem. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności. Operacje: data, rodzaj (wpłata, zwrot, opłacony wydatek, wypłata właściciela), opis z przejściem do źródła, kierunek, kwota i metoda, z filtrem okresu i rodzaju. Opłacony wydatek ujemny jest wypływem z kwotą ujemną. Suma listy przy tym samym okresie zgadza się z kartami przepływów.
 
 Filtry przy tabeli, jawne aktywne filtry i „Wyczyść filtry”. Sortowanie ma widoczny kierunek i dostępny stan. Paginacja podaje zakres oraz liczbę rekordów. Na telefonie najważniejsze kolumny przechodzą w karty lub tabela ma kontrolowane przewijanie z zachowanym kontekstem. Nie ucinać kwoty ani statusu bez możliwości odczytu.
 
@@ -144,9 +150,9 @@ Filtry przy tabeli, jawne aktywne filtry i „Wyczyść filtry”. Sortowanie ma
 | Rodzaj | Przykłady | Reguła prezentacji |
 | --- | --- | --- |
 | Realizacja | W trakcie, Zakończone, Problem / reklamacja, Anulowane | Etykieta i opcjonalna ikona; nie oznacza stanu płatności |
-| Płatność | Nieopłacone, Częściowo opłacone, Opłacone | Wyliczana z wpłat; osobna etykieta i kwota; pobranie pozostaje metodą |
+| Płatność | Nieopłacone, Częściowo opłacone, Opłacone | Wyliczana z wpłat i zwrotów według PRD; osobna etykieta i kwota Zapłacono; zamówienie anulowane nie ma stanu; pobranie pozostaje metodą |
 | Wydatek | Planowany, Opłacony | Stan zgodny z regułami finansowymi i harmonogramem |
-| Synchronizacja | Aktualne, Synchronizacja trwa, Błąd, Dane niekompletne | Czas ostatniego sukcesu i dostępna akcja |
+| Synchronizacja | Aktualne, Synchronizacja trwa, Błąd, Dane niekompletne | Warunki stanów ustala PRD sekcja 5; zawsze „Ostatnia pełna kontrola” z czasem ostatniego sukcesu; akcje „Ponów” przy błędzie zamówienia i „Synchronizuj teraz” |
 
 Dokładny słownik statusów oraz mapowanie WooCommerce ustala PRD. Nie dodawać statusów biznesowych wyłącznie dla potrzeb koloru.
 
@@ -165,7 +171,7 @@ Formaty: `12 345,67 zł`, `28.10.2026`, `październik 2026`. MVP działa wyłąc
 - Ładowanie: skeleton zachowuje docelowe rozmiary; komunikat dostępny dla technologii asystujących. Nie pokazywać fikcyjnych zer.
 - Brak danych: „Brak wydatków w wybranym okresie” i właściwa akcja. Odróżnić pustą ewidencję od pustego wyniku filtrowania.
 - Błąd: wyjaśnienie skutku i akcja „Spróbuj ponownie”; bez stack trace i sekretów.
-- Niekompletna integracja: „Nie pobrano wszystkich zamówień. Wyniki mogą być niepełne”, czas ostatniego sukcesu i przejście do integracji.
+- Niekompletna integracja: „Nie pobrano wszystkich zamówień. Wyniki mogą być niepełne”, „Ostatnia pełna kontrola” z czasem ostatniego sukcesu i przejście do integracji.
 - Sukces: krótki komunikat „Wydatek zapisany”; krytyczna informacja nie może zniknąć wyłącznie w toast.
 - Konflikt edycji: informacja o nowszej wersji i możliwość ponownego odczytu, bez cichego nadpisania.
 - Wygaśnięcie sesji po 60 minutach bezczynności: czytelny komunikat i powrót do logowania; bez obietnicy zachowania formularza, jeśli mechanizm tego nie zapewnia.

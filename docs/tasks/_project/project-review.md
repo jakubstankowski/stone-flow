@@ -3,146 +3,177 @@ result: FAIL
 reviewed: 2026-11-01
 documents:
   - path: docs/PRD-stone-flow.md
-    fingerprint: 747a08bf3b30eadba3474a809a39551bd9ae6467
+    fingerprint: c9ed67b52ca45399ffbb51c94750941d28c88c73
   - path: docs/DESIGN-GUID-stone-flow.md
-    fingerprint: 08c09f6e4d2d88d1e854e77569b2ee30904f1cea
+    fingerprint: f0efc8f2556e9265ce0f50f88aa8dd810e277cc5
 ---
 
 # Przegląd dokumentacji projektu — Stone Flow
 
 ## Result: FAIL
 
-PRD jest uczciwy co do swoich luk, ale wiele kryteriów akceptacji zależy od reguł, których
-jeszcze nie ma. Ponadto widok „Przepływy pieniężne” nie ma procesu, który dostarczałby mu
-danych. Sam PRD (§12–13) wymaga uzgodnienia D-01–D-05 przed implementacją; ten przegląd
-wskazuje, co musi trafić do dokumentu przed podziałem na zadania.
+Trzy blokady z poprzedniego przeglądu są zamknięte, a dokument jest bardzo blisko gotowości. Zostały dwie
+nowe blokady, obie do usunięcia kilkoma zdaniami w PRD: zwrot sprzedaży nie ma górnego limitu ani drogi dla
+towaru oddanego bez zwrotu pieniędzy, a audyt, na którym opiera się decyzja o braku zamykania okresów, nie ma
+ekranu ani kryterium odbioru.
 
-Porównano PRD i design guide ze sobą, z oboma dokumentami wymagań oraz z kolumnami arkuszy DEMO.
+Porównano PRD i design guide ze sobą, z oboma dokumentami wymagań oraz z niezmiennikami z
+`.sdd/context/rules.md`. Arkuszy DEMO nie analizowano ponownie: wnioski o nich pochodzą z poprzedniego
+przeglądu. Twierdzenia o zachowaniu WooCommerce wynikają z wiedzy o produkcie i nie zostały sprawdzone na
+sklepie, dlatego są oznaczone „do sprawdzenia”.
+
+Wynik względem poprzedniego przeglądu: bez zmiany (FAIL → FAIL), ale wszystkie poprzednie blokady są
+zamknięte, a obie poniższe są nowe.
 
 ## ✅ Ready
 
-- Cel, użytkownicy i problem są jasne. Sekcja „poza zakresem” jest równie konkretna jak MVP.
-- Rozdzielenie sprzedaży od przepływów jest spójne w PRD i design guide, włącznie z nazewnictwem
-  i zabezpieczeniami przed podwójnym ujęciem (§8).
-- Identyfikatory ZAM, WYD i FIN są zgodne z wymaganiami biznesowymi. FIN-07, DOST-01 i INT-01 są
-  identyfikatorami projektowymi, co dopuszcza nagłówek tabeli w §6.
-- Wymagania techniczne (§10) wiernie oddają wymagania technologiczne, z jednym wyjątkiem opisanym
-  w punkcie 3 listy blokującej.
-- Podział źródła technicznego i kanału, słowniki i kategorie są opisane. Opisane w §9 problemy
-  jakości danych zgadzają się z charakterem arkuszy.
-- Żadna część dokumentów nie narusza skonfigurowanych niezmienników. Nazwa handlowa ani domena
-  sklepu nie występują w PRD ani design guide.
+- **Zamknięte blokady:** rodzaj zwrotu rozdziela zwrot sprzedaży od zwrotu pieniędzy, także dla zamówień poza
+  sprzedażą. Ujemny wydatek obsługuje korekty od dostawców, a wpływy spoza zamówień są świadomie poza MVP.
+  Definicja cykliczna ma jedną regułę dla minionych terminów, z podglądem liczby wystąpień.
+- **Zamknięte ryzyka z poprzedniego przeglądu:** kolejność dostaw (daty modyfikacji w sklepie), autor systemowy
+  w audycie, anonimizacja danych klienta, decyzja o niezamykaniu okresów, porządki w nagłówkach i w D-01–D-07.
+- Cel, użytkownicy, problem i sekcja „poza zakresem” są konkretne. Rezygnacja z wielu kont, migracji, salda i
+  powiązania wydatków z zamówieniami jest zapisana jako decyzja z datą.
+- Definicje sprzedaży, kosztów, wyniku przed wypłatami i przepływów są w jednym miejscu (§8) i zgodne z design
+  guide. Liczba zamówień, porównanie okresów i zakres „rok” są zdefiniowane.
+- Stan płatności, nadpłata, wartość 0 zł, anulowanie i przywracanie mają reguły oraz kryteria (§5, PLAT-04–06,
+  ZAM-08). Scenariusze przejść przez anulowanie i przywrócenie dają spójną sprzedaż.
+- Przełom uruchomienia jest kompletny dla zamówień, wydatków, wpłat, zwrotów i wystąpień (§4, URU-01, §11).
+- Synchronizacja ma definicję sukcesu, cztery stany w ustalonej kolejności i zakres ponowień (§5, INT-01).
+- Reguły kwot są pełne: `decimal(18,2)`, zaokrąglanie, PLN, brutto i netto.
+- ZAM-01–07, WYD-01–07 i FIN-01–06 mają pokrycie w PRD, podobnie warunki techniczne. Zawężenie do jednego konta
+  jest zapisane jako świadome odstępstwo od wymagań biznesowych.
 - Design guide ma mierzalne kryteria UI: tokeny, kontrast, formaty i stany.
+- Granice zadań są naturalne, a zależności można wskazać. D-08 otwiera prace (§13), a D-09 blokuje tylko DANE-01.
+
+| Niezmiennik | Wynik | Uwagi |
+| --- | --- | --- |
+| 1. Sales separate from cash | Zgodny | Rodzaj zwrotu usuwa poprzednie naruszenie |
+| 2. Backend decimal money | Zgodny | §8, KWO-01 |
+| 3. API-enforced access | Zgodny | DOST-01; wyjątki webhooka i health endpointu w ryzykach |
+| 4. Retries never duplicate | Zgodny | ZAM-02, WYD-03–06; anulowanie to jednorazowe przejście, nie nadpisanie przy ponowieniu |
+| 5. Financial audit trail | Zgodny | Zapis jest wymagany i ma autora systemowego; brak odczytu w blokadzie 2 |
+| 6. Secrets stay server-side | Zgodny | §10 |
+| 7. Module and layer boundaries | Zgodny | §10; właściciel danych audytu w ryzykach |
+| 8. No identifying data in docs | Zgodny dla PRD i design guide | Pliki DEMO w ryzykach |
 
 ## ❌ Blocking — fix before splitting into tasks
 
-1. **Brak procesu rejestrowania płatności:** MVP pkt 4 i FIN-07 wymagają rzeczywistych wpłat i
-   wypłat, ale §5 i §6 nie opisują, kto i jak zapisuje wpłatę za zamówienie ani zapłatę wydatku.
-   Nie wiadomo też, czy opłacone zamówienie WooCommerce tworzy wpłatę automatycznie. Model wydatku
-   (§7) ma jedną „datę biznesową” i status płatności, bez daty faktycznej zapłaty, choć przepływy
-   liczone są według daty operacji, a design guide (§6) rozróżnia datę kosztu, termin i datę
-   zapłaty. Model zamówienia nie ma też stanu płatności, który design guide pokazuje na liście.
-   Wypłaty właścicieli nie mają żadnego punktu wejścia do systemu. → Dodać do §5 proces „Rejestracja
-   płatności”, do §6 wymaganie z kryterium akceptacji, a do §7 pola: data zapłaty wydatku oraz stan
-   płatności zamówienia (zapisany lub wyliczany). Ustalić, czy wypłata właściciela jest wydatkiem
-   czy osobnym obiektem.
+1. **Zwrot sprzedaży nie ma górnego limitu ani drogi bez ruchu pieniędzy (§5 „Rejestracja płatności”,
+   „Anulowanie i zwrot”, PLAT-04, PLAT-05):** jedynym limitem zwrotu jest kwota Zapłacono, a ta dotyczy
+   pieniędzy, nie sprzedaży. Daje to błędny wynik w dwóch kierunkach:
+   - **Sprzedaż ujemna.** Zamówienie 1000 zł, wpłaty 1200 zł. Reguły pozwalają dodać „Zwrot sprzedaży” 1200 zł,
+     więc zamówienie wnosi do sprzedaży −200 zł. Powinno wnieść najwyżej 0 zł, a 200 zł to zwrot pieniędzy.
+     To samo zdarza się, gdy wartość obniżono po zwrocie sprzedaży.
+   - **Oddanego towaru nie da się ująć.** Zamówienie ze sklepu 1000 zł, zaliczka 300 zł, klient oddaje towar za
+     500 zł. Zwrot ma limit 300 zł, a wartość jest tylko do odczytu, więc sprzedaż nie spadnie poniżej 700 zł. Bez
+     wpłaty zwrotu nie ma w ogóle, a anulowanie obejmuje całe zamówienie. Problem nie znika przez synchronizację,
+     jeśli zwrot w WooCommerce nie zmienia sumy zamówienia (do sprawdzenia; dla zamówienia ręcznego wystarcza
+     korekta wartości).
 
-2. **Niezdefiniowane KPI i niejasny los „wyniku” w MVP (D-01):** FIN-02, FIN-04 i kryteria sukcesu
-   wymagają przychodów, kosztów i wyniku za okres. PRD §8 i design guide §4 dopuszczają koszty i
-   wynik dopiero po definicji, a kryterium FIN-01–04 w §6 w ogóle ich nie sprawdza. Nie da się dziś
-   stwierdzić, czy MVP spełnia FIN-02. Kryteria ZAM-07, WYD-07 i FIN-05, 06 opierają się na regułach,
-   których nie ma. → Rozstrzygnąć D-01: netto czy brutto, data ujęcia, statusy kwalifikujące, korekty,
-   klasyfikacja podatków i wypłat. Zapisać, czy wynik jest w MVP i jak jest liczony, a jeśli nie,
-   odnotować świadome odstępstwo od FIN-02. Zatwierdzić zakres okresów, który §8 nadal określa jako
-   propozycję.
+   → Dopisać w §5 i PLAT-05, że suma zwrotów sprzedaży nie może przekroczyć wartości zamówienia, oraz co się dzieje,
+   gdy wartość spadnie poniżej tej sumy. Zdecydować, jak obniżyć sprzedaż zamówienia ze sklepu bez ruchu pieniędzy,
+   na przykład dopuszczając zwrot sprzedaży bez wypływu albo świadomie uznając ten przypadek za niewspierany. Zmienić
+   formularz zwrotu w design guide i dodać scenariusz do §11.
 
-3. **Niepełny i niespójny kontrakt WooCommerce (D-02):** §5 mówi, że backend „pobiera” zamówienie,
-   §10 wymaga autentyczności webhooków bezwarunkowo, a wymagania technologiczne mówią „jeżeli użyte
-   zostaną webhooki”. D-02 nie pyta o mechanizm. Własność pól, która decyduje o niezmienniku
-   ponowień, nie jest określona. Brakuje reguł dla późniejszych zmian zamówienia w sklepie (w tym
-   anulowania), mapowania statusów, mapowania kanału, zakresu pierwszego pobrania, sposobu ponawiania
-   (automatycznie czy ręcznie) i okna uzupełniania luk. → Rozstrzygnąć D-02 i dodać do PRD tabelę
-   własności pól oraz wybrany mechanizm: odpytywanie, webhooki albo oba, ze wskazaniem, który
-   uzupełnia luki.
-
-4. **Korekty, zwroty i anulowania bez reguł (D-03):** §11 wymaga scenariuszy korekty i zwrotu, a
-   zaliczki, płatności częściowe, pobrania i reklamacje są nierozstrzygnięte. Od tego zależy model
-   płatności i słownik statusów. Nie opisano też, co zrobić z błędnym zamówieniem ręcznym: WYD-02
-   obejmuje usuwanie wydatków, ale dla zamówień nie ma odpowiednika. → Rozstrzygnąć D-03 i dopisać
-   kryteria dla każdego scenariusza oraz regułę anulowania lub usunięcia zamówienia.
-
-5. **Reguły wydatków cyklicznych (D-04):** kryteria WYD-03–06 są sprawdzalne tylko częściowo, bo nie
-   wiadomo, czy wystąpienie jest planem czy kosztem, ani jak traktować dni 29–31, zaległe okresy i
-   zmianę kwoty. Nie opisano przypadku krawędziowego: czy usunięte wystąpienie wraca przy uzupełnianiu
-   zaległości. → Zatwierdzić propozycję z D-04 i dopisać regułę dla usuniętego wystąpienia.
-
-6. **Macierz dostępu i cykl życia kont (D-05):** MVP pkt 1 nie ma kryterium, jakie role istnieją.
-   §3 podaje tylko propozycję uprawnień. Nie określono metody logowania, sposobu tworzenia i odbierania
-   kont, resetu hasła ani działania wejścia z panelu sklepu, które jest wymagane. Blokuje to kryterium
-   DOST-01 i widoczność finansów. → Zatwierdzić macierz, wybrać model logowania i opisać wejście z
-   panelu. Jeśli SSO wymaga analizy, zapisać rozwiązanie domyślne na MVP.
-
-7. **Brak reguł kwot:** §8 wymaga jawnej precyzji, skali i zaokrąglania, ale ich nie podaje. Zamówienie
-   w §7 ma jedną „wartość zamówienia”, bez netto, brutto, VAT i waluty, podczas gdy wydatek ma netto,
-   brutto i podstawę VAT, a płatność ma walutę. §8 zakazuje stałego przelicznika 1,23, lecz nie mówi,
-   skąd wziąć stawkę. Pytanie o waluty jest ukryte w D-08, razem z hostingiem. → Podać precyzję, skalę
-   i regułę zaokrąglania, źródło stawki VAT oraz pola kwot zamówienia. Rozstrzygnąć, czy MVP działa
-   wyłącznie w PLN.
-
-8. **Dwuznaczne słowo „migracja” w §11:** warunek „migracja i odtworzenie kopii zostały sprawdzone”
-   może oznaczać migrację schematu (jak w wymaganiach technologicznych) albo migrację historii, która
-   według §4 nie jest potwierdzonym zakresem. → Napisać „migracja schematu bazy” i rozstrzygnąć w D-06,
-   czy historia i bilans otwarcia są warunkiem odbioru MVP.
+2. **Odczyt audytu nie ma zakresu ani kryterium (§4, §6, §7, design §3, §6):** decyzja o niezamykaniu okresów
+   mówi, że raporty za przeszłość mogą się zmieniać, „a przyczynę zmiany pokazuje audyt”. Tymczasem audyt nie ma
+   żadnego wymagania w §6, pozycji w nawigacji, ekranu w design guide ani warunku w §11. Kryteria mówią tylko, że
+   operacje zostawiają ślad, a WYD-01, 02 wymaga tego wyłącznie przy usunięciu, choć niezmiennik 5 obejmuje każdą
+   zmianę. Bez tego nie wiadomo, czy podział ma zawierać zadanie na ekran audytu, czy tylko zapis w bazie, a
+   właściciel nie sprawdzi, dlaczego zmienił się raport za zamknięty miesiąc. → Zdecydować, gdzie właściciel czyta
+   audyt: osobna lista, historia przy obiekcie albo oba miejsca. Dodać wymaganie z kryterium odbioru obejmujące
+   zapis każdej zmiany finansowej (autor, czas UTC, obiekt, operacja, zakres) i jego odczyt, a w design guide
+   miejsce i wygląd. Jeśli odczyt nie wchodzi do MVP, zmienić zdanie w §4.
 
 ## ⚠️ Risky areas — tight oversight during implementation
 
-- **Obliczenia finansowe i dwa widoki (wysokie):** dane pieniężne. Błędna reguła fałszuje decyzje, a
-  arkusze nie są wzorcem kontrolnym. Sprzedażowy arkusz ma kolumnę „Zapłacona Kwota brutto”, więc nie
-  zawiera wprost wartości zamówienia, której wymaga model z §7.
-- **Płatności, zwroty i podwójne ujęcie (wysokie):** D-07 nie należy do listy D-01–D-05 w §13, lecz
-  zabezpieczenie 2 z §8 zależy od tej decyzji. Trzeba ją podjąć przed modułem wydatków powiązanych z
-  zamówieniami.
-- **Synchronizacja WooCommerce i webhooki (wysokie):** zmieniają zamówienia i dane klientów. Ryzyko
-  nadpisania pól ERP, duplikatów i cichej niekompletności raportów.
-- **Dane osobowe klientów (wysokie):** imiona, adresy, kontakty, NIP. PRD nie określa retencji ani
-  usuwania danych osobowych.
-- **Usuwanie danych i audyt (wysokie):** operacje trudne do odwrócenia. §7 ogranicza audyt do „zmiany
-  finansowej”, a edycja wartości zamówienia WooCommerce nie jest jednoznacznie opisana.
-- **Uwierzytelnianie i sesja między domenami (wysokie):** Vercel i osobne API, wymagany CORS oraz CSRF
-  przy cookies, a także przyszłe wejście z panelu sklepu.
-- **Hosting SMART ASP.NET (D-08) i zadania cykliczne (wysokie):** zgodność planu nie jest potwierdzona,
-  a od niej zależy mechanizm odporny na usypianie. Nie blokuje podziału, jeśli sprawdzenie hostingu
-  będzie pierwszym zadaniem, od którego zależą pozostałe.
-- **Migracje produkcyjne i odtwarzanie (wysokie):** operacje nieodwracalne. RPO, RTO, cele wydajnościowe
-  i wolumen danych nie mają wartości (§10), więc nie można ich odebrać. Muszą wynikać z zadania
-  hostingowego.
-- **Migracja historii (wysokie, jeśli zatwierdzona):** rozbieżności między arkuszami i ryzyko podwójnego
-  ujęcia.
-- **Współbieżna edycja (średnie):** wymagana w ZAM-04, ale bez reguły rozwiązywania konfliktu poza
-  ostrzeżeniem.
-- **Definicje liczników (niskie):** „liczba unikalnych klientów” nie ma definicji, a klient istnieje tylko
-  przy zamówieniu. §3 mówi o jednym właścicielu, §7 o wypłatach właścicieli, a arkusz rozlicza dwie
-  osoby: trzeba to doprecyzować przy macierzy dostępu.
+- **Obliczenia finansowe i dwa widoki (wysokie):** dane pieniężne, a arkusze nie są wzorcem kontrolnym.
+  - Kryterium uzgodnienia z listą dotyczy tylko przepływów (FIN-05, 06), a §11 wymaga uzgodnienia obu widoków.
+    Sprzedaży nie da się uzgodnić z listą zamówień, bo zawiera pozycje spoza sprzedaży i nie pokazuje zwrotów w ich
+    okresach. Specyfikacja raportu musi określić zestawienie składników sprzedaży.
+  - Lista „Operacje” przy okresie obejmującym datę uruchomienia musi pomijać kwoty sprzed tej daty, inaczej FIN-05,
+    06 nie będzie spełnione. PRD opisuje to dla raportów i roku, ale nie dla listy.
+  - FIN-01–04 nie opisuje kart ani wykresów przepływów, a design guide nie mówi, co pokazuje wykres
+    „Kategorie / kanały” w tym widoku.
+- **Wpłaty, zwroty i korekty (wysokie):**
+  - Użytkownik może obniżyć wartość zamówienia i dodać zwrot sprzedaży za to samo, co odejmie kwotę dwa razy. Formularz
+    powinien to wyjaśniać.
+  - Zamówienie po częściowym zwrocie sprzedaży jest trwale „Częściowo opłacone”, a po pełnym „Nieopłacone”. Tak
+    zapisano regułę, ale takie pozycje pojawią się przy szukaniu nieopłaconych zamówień (cel z §2).
+  - Nie ma walidacji dat przyszłych przy wpłatach, zwrotach i dacie zapłaty, kwoty wypłaty właściciela ani ujemnej
+    wartości zamówienia ręcznego.
+  - Raport za przeszłość zmienia się także, gdy zamówienie pending przechodzi do sprzedaży po terminie.
+- **Webhooki WooCommerce (wysokie):**
+  - Zdanie „przerwy w działaniu domykają się same” jest prawdopodobnie zbyt mocne dla usunięć (do sprawdzenia): trwale
+    usuniętego zamówienia REST API nie zwróci, więc utracony webhook zostawia je w sprzedaży bez błędu, przy
+    „Ostatniej pełnej kontroli” sugerującej kompletność. Wiadomość o usunięciu może też nie mieć daty modyfikacji, której
+    wymaga reguła pomijania starszych danych. Trzeba sprawdzić także widoczność kosza.
+  - Znacznik „od ostatniego sukcesu” musi oznaczać początek przebiegu, inaczej zmiany z czasu przebiegu przepadną.
+  - Nie opisano nakładania się „Synchronizuj teraz” z przebiegiem o 23:00 ani stanu przed pierwszym sukcesem.
+  - Błąd zamówienia, którego „Ponów” nie może zamknąć, bo zamówienia już nie ma, trzyma stan „Dane niekompletne” bez
+    końca. Nie wiadomo też, czy udany zapis z webhooka zamyka błąd.
+  - Trzeba sprawdzić, jak sklep reaguje na niedostępność lub uśpienie backendu, bo może wyłączyć webhook.
+  - Statusy „refunded” i „on-hold” liczą się do sprzedaży, a niestandardowe statusy z D-02 domyślnie też. Do ustalenia
+    mapowanie pól: adres, źródło NIP, strefa czasowa daty zamówienia na granicy miesiąca.
+- **Wydatki cykliczne (wysokie):** reguły wymagają rozróżnienia okresu wstrzymanego od przerwy w działaniu systemu oraz
+  zmiany początku bez tworzenia minionych wystąpień, a definicja ma tylko flagę aktywności i nie ma historii. Specyfikacja
+  musi zapisać, do którego okresu definicja została przetworzona. Otwarte są zmiana dnia miesiąca na termin, który już
+  minął, oraz wydłużenie zakończonej definicji. Wznowienie tworzy okres bieżący także przy minionym terminie, co jest
+  niezapisanym wyjątkiem od reguły o zaległych wystąpieniach.
+- **Awaria zadań cyklicznych (średnie):** INT-01 obejmuje tylko WooCommerce. Niepowodzenie tworzenia wystąpień nie jest
+  nigdzie widoczne, a koszty mogą być wtedy zaniżone bez ostrzeżenia.
+- **Dane osobowe klientów (wysokie):** imiona, adresy, kontakty, NIP. Zakres anonimizacji obejmuje zamówienie i audyt.
+  Otwarte są dane w historii błędów synchronizacji, logach, kopiach zapasowych i polach tekstowych (uwagi, powód zwrotu).
+  D-09 musi określić także moment, od którego liczy się retencja. Anonimizacja jest nieodwracalna.
+- **Usuwanie danych i audyt (wysokie):** ślad usunięcia blokuje parę definicja–okres, a usuwanie wydatków, wpłat i zwrotów
+  jest trudne do odwrócenia. §10 nie wskazuje właściciela danych audytu, a anonimizacja je zmienia. Jedno konto przy
+  kilku osobach rozliczanych nie pozwala wskazać, kto wykonał zmianę.
+- **Uwierzytelnianie i sesja między domenami (wysokie):** Vercel i osobne API, CORS oraz CSRF przy cookies. Brakuje
+  utworzenia pierwszego konta, czasu ważności linku resetu, ochrony przed zgadywaniem hasła, wylogowania i unieważnienia
+  sesji po resecie (wymagania techniczne: „odebranie dostępu”). Dostawca wysyłki e-mail nie jest wybrany. DOST-01 odrzuca
+  „każdy” zapis bez sesji, a webhook i health endpoint działają bez niej, więc specyfikacja musi wymienić te wyjątki.
+  Link z panelu sklepu jest wymagany, ale żadne kryterium nie sprawdza jego istnienia i nie wiadomo, kto go dodaje.
+- **Hosting SMART ASP.NET, D-08 (wysokie):** od planu zależy uruchamianie zadania o 23:00 i wydatków cyklicznych przy
+  usypianiu procesu. RPO, RTO, wolumen i cele wydajnościowe nie mają wartości, więc nie można ich odebrać. Muszą wynikać
+  z zadania hostingowego.
+- **Migracje produkcyjne i odtwarzanie (wysokie):** operacje nieodwracalne.
+- **Współbieżna edycja (średnie):** ZAM-04 wymaga ostrzeżenia, a design guide opisuje ponowny odczyt. Otwarte jest, co dzieje
+  się z równoczesnym zapisem użytkownika i synchronizacji oraz z dwoma zwrotami przekraczającymi łącznie limit.
+- **Pliki DEMO w repozytorium, niezmiennik 8 (średnie):** poprzedni przegląd wykazał w arkuszach firmy, adresy, ciągi o
+  formacie telefonu i NIP oraz imiona osób rozliczanych. Pliki są śledzone w git. Właściciel danych powinien potwierdzić,
+  że dane są fikcyjne.
+- **Porządki w dokumentach (niskie):**
+  - Stan wydatku bez daty zapłaty ma dwie nazwy: „planowany” i „nieopłacony”. Wystąpienia powstają dopiero w dniu terminu,
+    więc design guide oznaczy zaległy rachunek jako „Planowany”. Trzeba wybrać jedną etykietę w PRD.
+  - Anonimizacja i lista „Operacje” nie występują na liście MVP w §4, choć mają wymagania w §6 i §5.
+  - Przywrócenie w ERP zamówienia anulowanego w sklepie nie ma ostrzeżenia, choć odwrotne przypadki je mają.
+  - Słowniki nie mówią, czy lista jest stała, czy edytowalna, co dotyczy kategorii, metod i osób przy wypłacie. Arkusze mają
+    metodę „Płatność szybkim przelewem” i status „INNE”, których nie ma w słownikach. Pozycja „Ustawienia” nie ma zakresu.
+  - Model §7 używa dla zamówienia określeń „komentarz” i „dodatkowe uwagi” i nie ma pola na oznaczenie usunięcia w sklepie.
+    PRD nie przypisuje kanału zamówienia ze sklepu do żadnej strony własności pól.
+  - Design guide pokazuje trzy pola KPI, a wymienia cztery wartości sprzedaży.
+  - Porównanie bieżącego niepełnego miesiąca z pełnym poprzednim jest zgodne z regułą, ale wymaga opisu w UI.
 
 ## Suggested initial breakdown
 
 Punkt wyjścia, nie backlog. Kolejność pokazuje zależności.
 
-1. Weryfikacja hostingu i potwierdzenie wersji technologii.
+1. Weryfikacja hostingu, sposobu uruchamiania zadań i wersji technologii (D-08).
 2. Inicjalizacja monorepo, CI, szkielet modułów i motyw UI.
-3. Uwierzytelnianie, autoryzacja i wejście z panelu sklepu.
-4. Audyt zmian finansowych (część wspólna).
-5. Zamówienia ręczne i wspólna lista.
-6. Rejestracja płatności zamówień.
-7. Synchronizacja WooCommerce (zapewne dwa zadania: import i odporność, czyli ponowienia i uzupełnianie
-   luk).
-8. Stan integracji w UI.
-9. Wydatki jednorazowe.
-10. Wydatki cykliczne i trwały harmonogram.
-11. Widok sprzedaży.
-12. Widok przepływów pieniężnych.
-13. Kopie zapasowe, wdrożenia i odbiór operacyjny.
-14. Migracja historii, jeśli zostanie zatwierdzona.
+3. Logowanie, reset hasła, sesja, ochrona API i link z panelu sklepu.
+4. Audyt zmian finansowych (część wspólna, zapis i odczyt).
+5. Zamówienia ręczne, wspólna lista, anulowanie i przywracanie.
+6. Wpłaty, zwroty i wyliczany stan płatności.
+7. Import WooCommerce: webhooki, identyfikacja, własność pól, statusy i przejścia anulowania.
+8. Odporność WooCommerce: dzienne uzupełnianie, historia błędów, ponowienia.
+9. Stan integracji w UI.
+10. Wydatki jednorazowe i zapłata wydatku.
+11. Wydatki cykliczne i trwały harmonogram.
+12. Wypłaty właścicieli i lista „Operacje”.
+13. Reguły raportowe i widok sprzedaży.
+14. Widok przepływów pieniężnych.
+15. Kopie zapasowe, wdrożenia, odbiór operacyjny i przełom uruchomienia.
+16. Anonimizacja danych klienta (po rozstrzygnięciu D-09).
 
-Granice są naturalne, a zależności da się już wskazać. Zadania 5–12 nie mają jednak sprawdzalnego
-kryterium, dopóki punkty listy blokującej nie zostaną rozwiązane.
+Zadania 6 i 13 zależą od blokady 1, a zadanie 4 od blokady 2.

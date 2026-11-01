@@ -28,8 +28,8 @@
 - Read the relevant docs and decision records before planning anything.
 - Change only what the task needs.
 - Recorded decisions are binding. If a task requires contradicting one, stop and say so.
-- Do not implement an area blocked by an unapproved PRD decision (D-01 to D-08). Stop and
-  name the decision.
+- Do not implement an area blocked by an unapproved PRD decision (open: D-08, D-09). Stop
+  and name the decision.
 - Scope stops at the PRD's MVP. Inventory, invoicing, accounting, tax returns, KSeF,
   purchasing, CRM, customer portal, sales forecasting and multi-company support are out of
   confirmed scope.

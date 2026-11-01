@@ -42,7 +42,7 @@ financial correctness, results traceable to source records, and safe retries.
 - Zero, missing data and incomplete data mean three different things.
 - The Excel formulas show current practice, not a financial specification. In particular,
   do not divide every amount by 1.23 to get net.
-- Open decisions D-01 to D-08 in the PRD must be approved before implementing the area they
+- Open decisions in the PRD (D-08, D-09) must be approved before implementing the area they
   affect. Do not settle them in code.
 - There is one business; multi-company support is out of scope.
 
