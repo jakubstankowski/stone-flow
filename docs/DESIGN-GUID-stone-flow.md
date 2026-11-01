@@ -72,7 +72,7 @@ Propozycja desktopowa: szeroki panel na ciepłym tle, maksymalna szerokość obs
 
 Nagłówek zawiera nazwę produktu, nazwę bieżącej sekcji, stan synchronizacji i menu użytkownika. Wyszukiwanie umieszczać przy listach; globalna wyszukiwarka i przełącznik firm z referencji nie należą do potwierdzonego MVP.
 
-Główna nawigacja: **Pulpit, Zamówienia, Wydatki**; **Integracja / Ustawienia** tylko dla uprawnionych. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
+Główna nawigacja: **Pulpit, Zamówienia, Wydatki**; **Integracja / Ustawienia**. Wydatki cykliczne są podsekcją wydatków. Na szerokim ekranie preferowana jest pozioma nawigacja nawiązująca do obrazu. Opcjonalny lewy panel służy wyłącznie filtrom lub sekcjom bieżącego modułu, gdy rzeczywiście jest potrzebny.
 
 Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telefonie nawigacja przechodzi w dostępne menu, a filtry w rozwijany panel.
 
@@ -80,21 +80,20 @@ Aktywna pozycja ma wyraźne tło, tekst i oznaczenie bieżącej strony. Na telef
 
 ```text
 Nagłówek: Stone Flow | Pulpit | Aktualność danych | Użytkownik
-Nawigacja: Pulpit | Zamówienia | Wydatki | Integracja*
+Nawigacja: Pulpit | Zamówienia | Wydatki | Integracja
 Tytuł + widok [Sprzedaż / Przepływy pieniężne] + okres
 Komunikat o niekompletnych danych, jeżeli występuje
 KPI 1                  KPI 2                 KPI 3
 Wykres zmian w czasie                        Kategorie / kanały
 Tabela szczegółowa lub ostatnie operacje + przejście do pełnej listy
-* Zależnie od uprawnień
 ```
 
 Przełącznik widoków jest wynikiem decyzji użytkownika zapisanej w PRD. Po zmianie widoku wszystkie KPI, wykresy i podpisy zmieniają podstawę jednocześnie.
 
-- Sprzedaż: wartość sprzedaży i liczba zamówień; koszt lub wynik dopiero po zatwierdzeniu definicji w PRD D-01.
-- Przepływy: wpływy, wypływy i zmiana środków w okresie. Saldo tylko po ustaleniu salda początkowego.
-- Wypłaty właścicieli i podatki prezentować zgodnie z zatwierdzoną klasyfikacją, bez automatycznego utożsamiania ich z kosztem sprzedaży.
-- Przy kwotach wskazać netto/brutto, walutę i podstawę okresu. Drobna etykieta wyjaśnia znaczenie KPI.
+- Sprzedaż: wartość sprzedaży, koszty, wynik przed wypłatami i liczba zamówień, według definicji z PRD sekcja 8. Opis wyniku wymienia jego składniki.
+- Przepływy: wpływy, wypływy i zmiana środków w okresie. Saldo rachunku jest poza MVP.
+- Wypłaty właścicieli pokazywać tylko we wypływach, a podatki VAT i PPE jako kategorie kosztów.
+- Przy kwotach wskazać podstawę brutto, walutę i podstawę okresu. Drobna etykieta wyjaśnia znaczenie KPI.
 - Porównanie okresów tylko przy dostępnej i porównywalnej bazie. Wzrost kosztów nie jest automatycznie sukcesem oznaczonym zielenią.
 
 Karta KPI ma małą ikonę na stonowanym tle, krótką etykietę, dużą wartość i opcjonalną informację o porównaniu. Klikalność musi wynikać z wyglądu i prowadzić do danych składających się na wartość.
@@ -128,13 +127,15 @@ Jedna dominująca akcja na sekcję: „Dodaj zamówienie”, „Dodaj wydatek”
 
 Etykiety zawsze nad polami; placeholder jest przykładem, nie zastępuje etykiety. Błąd znajduje się przy polu i w podsumowaniu, jeśli dotyczy wielu pól. Dane pozostają po błędzie API. Informacja o wymaganiu pola jest dostępna również czytnikowi ekranu. Walidacja obejmuje zarówno UI, jak i API.
 
-Formularz zamówienia grupuje dane klienta, wartości i płatności, realizację oraz referencje/uwagi. Źródło techniczne i ID integracji nie są dowolnie edytowalne. Status realizacji, metoda płatności i status płatności są odrębnymi polami. Pola pobierane z WooCommerce mają oznaczenie źródła i wyjaśnienie ograniczeń edycji.
+Formularz zamówienia grupuje dane klienta, wartość brutto, realizację oraz referencje/uwagi. Źródło techniczne i ID integracji nie są dowolnie edytowalne. Status realizacji jest polem, a stan płatności jest wyliczany z wpłat i tylko wyświetlany. Pola należące do WooCommerce (ID, data, dane klienta, wartość) są tylko do odczytu, mają oznaczenie źródła i wyjaśnienie ograniczeń edycji. Status ze sklepu jest pokazywany osobno od statusu realizacji.
 
-Formularz wydatku obejmuje kwoty, kategorię, daty, dokument, metodę i stan płatności. Opcja „Powtarzaj co miesiąc” ujawnia harmonogram i podgląd następnego wystąpienia. Data kosztu, termin i data faktycznej zapłaty mają odrębne etykiety tam, gdzie są używane. Nie oznaczać planu jako opłaconego.
+Szczegóły zamówienia zawierają listę wpłat i zwrotów z ich kwotami, datami i metodami oraz akcje „Dodaj wpłatę” i „Dodaj zwrot”; zwrot ma także powód. Dotyczy to również zamówień ze sklepu. Zamówień nie można usunąć, dostępna jest akcja „Anuluj zamówienie” z potwierdzeniem i ostrzeżeniem, jeżeli są wpłaty.
+
+Formularz wydatku obejmuje kwotę brutto (wymaganą), kwotę netto (opcjonalną), kategorię, daty, dokument i metodę. Opcja „Powtarzaj co miesiąc” ujawnia harmonogram i podgląd następnego wystąpienia. Data kosztu, termin i data zapłaty mają odrębne etykiety. Datę zapłaty można wpisać w formularzu albo później akcją „Oznacz jako opłacony”. Nie oznaczać planu jako opłaconego.
 
 ### Tabele
 
-Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności.
+Zamówienia: numer, klient, data, kanał/źródło, wartość zamówienia, zapłacono, stan płatności, stan realizacji. Dostawcy, ZO, faktury i komentarze w szczegółach lub opcjonalnych kolumnach. Zamówienia pending, failed i szkice ze sklepu są domyślnie ukryte i dostępne filtrem. Wydatki: data, opis, kategoria, kwota z podstawą, stan płatności i oznaczenie cykliczności.
 
 Filtry przy tabeli, jawne aktywne filtry i „Wyczyść filtry”. Sortowanie ma widoczny kierunek i dostępny stan. Paginacja podaje zakres oraz liczbę rekordów. Na telefonie najważniejsze kolumny przechodzą w karty lub tabela ma kontrolowane przewijanie z zachowanym kontekstem. Nie ucinać kwoty ani statusu bez możliwości odczytu.
 
@@ -142,8 +143,8 @@ Filtry przy tabeli, jawne aktywne filtry i „Wyczyść filtry”. Sortowanie ma
 
 | Rodzaj | Przykłady | Reguła prezentacji |
 | --- | --- | --- |
-| Realizacja | W trakcie, Zakończone, Problem / reklamacja | Etykieta i opcjonalna ikona; nie oznacza stanu płatności |
-| Płatność | Nieopłacone, Opłacone; Częściowo opłacone po decyzji zakresowej | Osobna etykieta i kwota; pobranie pozostaje metodą |
+| Realizacja | W trakcie, Zakończone, Problem / reklamacja, Anulowane | Etykieta i opcjonalna ikona; nie oznacza stanu płatności |
+| Płatność | Nieopłacone, Częściowo opłacone, Opłacone | Wyliczana z wpłat; osobna etykieta i kwota; pobranie pozostaje metodą |
 | Wydatek | Planowany, Opłacony | Stan zgodny z regułami finansowymi i harmonogramem |
 | Synchronizacja | Aktualne, Synchronizacja trwa, Błąd, Dane niekompletne | Czas ostatniego sukcesu i dostępna akcja |
 
@@ -157,17 +158,17 @@ Sprzedaż lub wpływy mogą używać złotego brązu, koszty lub wypływy grafit
 
 Każdy wykres ma tytuł, okres, jednostkę, legendę i tekstowe wartości albo tabelę danych. Tooltip nie może być jedynym sposobem odczytu; musi być dostępny klawiaturą. Oś słupków zaczyna się od zera; ujemne wartości są obsługiwane. Przy wielu kategoriach pokazać czytelne zestawienie zamiast kilkudziesięciu kolorów.
 
-Formaty: `12 345,67 zł`, `28.10.2026`, `październik 2026`. W kontekście wielu walut użyć jawnych kodów walut i nie sumować ich bez zatwierdzonych reguł. Kwoty zerowe prezentować jako `0,00 zł`, brak wartości jako „Brak danych”. Techniczne czasy prezentować w Europe/Warsaw.
+Formaty: `12 345,67 zł`, `28.10.2026`, `październik 2026`. MVP działa wyłącznie w PLN. Kwoty zerowe prezentować jako `0,00 zł`, brak wartości jako „Brak danych”. Techniczne czasy prezentować w Europe/Warsaw.
 
 ## 8. Stany systemu i komunikaty
 
 - Ładowanie: skeleton zachowuje docelowe rozmiary; komunikat dostępny dla technologii asystujących. Nie pokazywać fikcyjnych zer.
 - Brak danych: „Brak wydatków w wybranym okresie” i właściwa akcja. Odróżnić pustą ewidencję od pustego wyniku filtrowania.
 - Błąd: wyjaśnienie skutku i akcja „Spróbuj ponownie”; bez stack trace i sekretów.
-- Niekompletna integracja: „Nie pobrano wszystkich zamówień. Wyniki mogą być niepełne”, czas ostatniego sukcesu i przejście do integracji dla uprawnionych.
+- Niekompletna integracja: „Nie pobrano wszystkich zamówień. Wyniki mogą być niepełne”, czas ostatniego sukcesu i przejście do integracji.
 - Sukces: krótki komunikat „Wydatek zapisany”; krytyczna informacja nie może zniknąć wyłącznie w toast.
 - Konflikt edycji: informacja o nowszej wersji i możliwość ponownego odczytu, bez cichego nadpisania.
-- Wygaśnięcie sesji: czytelny komunikat i powrót do logowania; bez obietnicy zachowania formularza, jeśli mechanizm tego nie zapewnia.
+- Wygaśnięcie sesji po 60 minutach bezczynności: czytelny komunikat i powrót do logowania; bez obietnicy zachowania formularza, jeśli mechanizm tego nie zapewnia.
 
 Mikroteksty po polsku, krótkie i konkretne. Nie używać etykiety „Dochód”, jeśli nie określono jej znaczenia w regułach finansowych.
 
@@ -184,7 +185,7 @@ Obsługa klawiaturą obejmuje nawigację, filtry, daty, menu, formularze i dialo
 - Widoki sprzedaży i przepływów wyraźnie różnią etykiety, podstawę oraz znaczenie kwot.
 - Kontrast wszystkich rzeczywiście użytych par spełnia wymagania; stany nie zależą wyłącznie od koloru.
 - Na telefonie i tablecie można odczytać kwoty, filtrować dane oraz zapisać formularz.
-- Każdy widok obsługuje ładowanie, pustkę, błąd, brak uprawnień i niekompletność danych, jeśli mogą wystąpić.
+- Każdy widok obsługuje ładowanie, pustkę, błąd, wygaśnięcie sesji i niekompletność danych, jeśli mogą wystąpić.
 - Podwójne kliknięcie zapisu nie tworzy dwóch rekordów; walidacja i błędy nie usuwają wpisanych danych.
 - Klawiatura, fokus, dialogi, etykiety i tekstowy odczyt wykresów są sprawdzone.
 - Przykłady i zrzuty nie ujawniają danych klientów, sekretów, nazwy handlowej ani domeny sklepu.
