@@ -296,7 +296,7 @@ Pytania nie blokują przygotowania dokumentacji, lecz odpowiednie reguły należ
 | D-05 | Rozstrzygnięte 01.11.2026, patrz sekcja 3. Do potwierdzenia: dostawca wysyłki e-mail dla resetu hasła. | Kolejne role i wspólne logowanie są poza MVP |
 | D-06 | Rozstrzygnięte 01.11.2026, patrz sekcja 4: bez migracji historii i bez salda w MVP. | Migracja po MVP wymaga osobnej decyzji |
 | D-07 | Rozstrzygnięte 01.11.2026: MVP nie wiąże wydatków z zamówieniami. Koszty zakupów, cięcia i transportu są ewidencjonowane według kategorii, a rentowność pojedynczego zamówienia jest poza MVP. | Powiązanie po MVP wymaga osobnej decyzji |
-| D-08 | Jaki plan SMART ASP.NET i jakie parametry backupu, dostępności oraz wydajności? | Blokuje ostateczną konfigurację środowisk |
+| D-08 | Częściowo rozstrzygnięte 02.11.2026: SmarterASP.NET .NET Premium W1050; codzienna kopia SQL w niezależnym miejscu, retencja 30 dni; cele RPO 24 h i RTO 8 h zaakceptowane przez właściciela. Jeden użytkownik, około 20–30 zamówień miesięcznie przez sklep. Pozostają potwierdzenie parametrów konta/runtime, bezpiecznego harmonogramu odpornego na restart i usypianie, celów wydajności oraz próba odtworzenia. Szczegóły: [SF-1](tasks/sf-1/01-weryfikacja.md). | Blokuje ostateczną konfigurację środowisk do zakończenia weryfikacji technicznej |
 | D-09 | Jaki okres retencji danych zamówień wynika z przepisów? Do potwierdzenia z księgowym lub prawnikiem. | Blokuje udostępnienie anonimizacji (DANE-01) |
 
 ## 13. Kolejność dalszych prac
