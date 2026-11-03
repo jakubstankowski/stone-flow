@@ -113,7 +113,10 @@ specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6. Before adding a new
   (`await dialog.open()`), naming the object and the effect.
 - Lists use `app-data-table`: it renders one page from the API and emits page, sort and filter
   events; it never sorts or pages locally. Filters are projected with the `tableFilters`
-  attribute.
+  attribute. A column shows text from `value(row)`, or any content (status, link to the object,
+  marker) from `<ng-template appTableCell="{key}" [appTableCellOf]="rows" let-row>`.
+- Headings of empty states and dialogs are passed as `heading`, never `title` (a `title` input
+  would leave a native tooltip on the host element).
 - Statuses use `app-status-badge` with visible text; the tone only reinforces it.
 - Amounts and dates are displayed only through `shared/format/` (`12 345,67 zł`, `28.10.2026`,
   `październik 2026`, technical times in Europe/Warsaw, missing values as „Brak danych”).

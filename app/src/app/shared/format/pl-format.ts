@@ -52,11 +52,17 @@ export function formatPln(value: AmountInput): string {
     return NO_DATA;
   }
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? amountFormat.format(value) : NO_DATA;
+    if (!Number.isFinite(value)) {
+      return NO_DATA;
+    }
+    return amountFormat.format(value === 0 ? 0 : value);
   }
   const trimmed = value.trim();
   if (!DECIMAL.test(trimmed)) {
     return NO_DATA;
+  }
+  if (Number(trimmed) === 0) {
+    return amountFormat.format(0);
   }
   // Intl.NumberFormat przyjmuje ciąg dziesiętny jako dokładną wartość (ES2023).
   return amountFormat.format(trimmed as `${number}`);
@@ -78,12 +84,16 @@ export function formatMonth(value: string | null | undefined): string {
   return date ? monthFormat.format(date) : NO_DATA;
 }
 
-/** Znacznik techniczny UTC (ISO 8601) → `28.10.2026, 14:05` w strefie Europe/Warsaw. */
+/**
+ * Znacznik techniczny UTC (ISO 8601) → `28.10.2026, 14:05` w strefie Europe/Warsaw.
+ * Znacznik bez strefy (np. `DateTimeKind.Unspecified` z .NET) jest traktowany jako UTC.
+ */
 export function formatDateTime(value: string | null | undefined): string {
   if (!value || !/^\d{4}-\d{2}-\d{2}T/.test(value)) {
     return NO_DATA;
   }
-  const date = new Date(value);
+  const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+  const date = new Date(hasZone ? value : `${value}Z`);
   return Number.isNaN(date.getTime()) ? NO_DATA : dateTimeFormat.format(date);
 }
 

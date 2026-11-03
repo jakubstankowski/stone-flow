@@ -33,6 +33,18 @@ export class MainNav {
     this.open.update((open) => !open);
   }
 
+  /**
+   * Wybór pozycji w rozwiniętym menu zwija je (także dla bieżącej sekcji, gdy nie ma
+   * nawigacji) i przenosi fokus do treści, bo kliknięty link przestaje być widoczny.
+   */
+  protected onLinkClick(): void {
+    if (!this.open()) {
+      return;
+    }
+    this.open.set(false);
+    document.getElementById('tresc')?.focus();
+  }
+
   protected closeAndFocusButton(): void {
     if (!this.open()) {
       return;

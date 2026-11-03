@@ -14,7 +14,7 @@ let nextId = 0;
   templateUrl: './confirm-dialog.html',
 })
 export class ConfirmDialog {
-  readonly title = input.required<string>();
+  readonly heading = input.required<string>();
   readonly confirmLabel = input.required<string>();
   readonly tone = input<'primary' | 'danger'>('danger');
 
@@ -44,15 +44,24 @@ export class ConfirmDialog {
     this.finish(false);
   }
 
+  /** Zamknięcie z zewnątrz (np. przez przeglądarkę) kończy oczekiwanie jak „Anuluj”. */
+  protected onClose(): void {
+    if (this.resolveResult) {
+      this.finish(false);
+    }
+  }
+
   protected finish(confirmed: boolean): void {
+    // Najpierw odpinamy oczekujący wynik: `close()` wywołuje zdarzenie `close`,
+    // które nie może już rozstrzygnąć go jako „Anuluj”.
+    const resolve = this.resolveResult;
+    this.resolveResult = null;
+
     const dialog = this.dialog().nativeElement;
     if (dialog.open) {
       dialog.close();
     }
     this.restoreFocus();
-
-    const resolve = this.resolveResult;
-    this.resolveResult = null;
     resolve?.(confirmed);
   }
 

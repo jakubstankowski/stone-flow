@@ -1,46 +1,33 @@
-import { Routes } from '@angular/router';
+import { Route, Routes } from '@angular/router';
+import { NAV_ITEMS } from './layout/nav-items';
 
-/** Sekcje z leniwym ładowaniem; kolejność i etykiety zgodne z `layout/nav-items.ts`. */
+/**
+ * Trasa sekcji: ścieżka, tytuł i nazwa w nagłówku pochodzą z `layout/nav-items.ts`.
+ * `loadComponent` pozostaje literałem, aby każda sekcja była osobnym, leniwym fragmentem.
+ */
+function section(path: string, loadComponent: Route['loadComponent']): Route {
+  const item = NAV_ITEMS.find((candidate) => candidate.path === path);
+  if (!item) {
+    throw new Error(`Brak sekcji „${path}” w NAV_ITEMS.`);
+  }
+  return { path, title: item.label, data: { section: item.label }, loadComponent };
+}
+
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'pulpit' },
-  {
-    path: 'pulpit',
-    title: 'Pulpit',
-    data: { section: 'Pulpit' },
-    loadComponent: () => import('./features/dashboard/dashboard-page').then((m) => m.DashboardPage),
-  },
-  {
-    path: 'zamowienia',
-    title: 'Zamówienia',
-    data: { section: 'Zamówienia' },
-    loadComponent: () => import('./features/orders/orders-page').then((m) => m.OrdersPage),
-  },
-  {
-    path: 'wydatki',
-    title: 'Wydatki',
-    data: { section: 'Wydatki' },
-    loadComponent: () => import('./features/expenses/expenses-page').then((m) => m.ExpensesPage),
-  },
-  {
-    path: 'operacje',
-    title: 'Operacje',
-    data: { section: 'Operacje' },
-    loadComponent: () =>
-      import('./features/operations/operations-page').then((m) => m.OperationsPage),
-  },
-  {
-    path: 'historia-zmian',
-    title: 'Historia zmian',
-    data: { section: 'Historia zmian' },
-    loadComponent: () =>
-      import('./features/change-history/change-history-page').then((m) => m.ChangeHistoryPage),
-  },
-  {
-    path: 'integracja',
-    title: 'Integracja',
-    data: { section: 'Integracja' },
-    loadComponent: () =>
-      import('./features/integration/integration-page').then((m) => m.IntegrationPage),
-  },
+  section('pulpit', () =>
+    import('./features/dashboard/dashboard-page').then((m) => m.DashboardPage),
+  ),
+  section('zamowienia', () => import('./features/orders/orders-page').then((m) => m.OrdersPage)),
+  section('wydatki', () => import('./features/expenses/expenses-page').then((m) => m.ExpensesPage)),
+  section('operacje', () =>
+    import('./features/operations/operations-page').then((m) => m.OperationsPage),
+  ),
+  section('historia-zmian', () =>
+    import('./features/change-history/change-history-page').then((m) => m.ChangeHistoryPage),
+  ),
+  section('integracja', () =>
+    import('./features/integration/integration-page').then((m) => m.IntegrationPage),
+  ),
   { path: '**', redirectTo: 'pulpit' },
 ];

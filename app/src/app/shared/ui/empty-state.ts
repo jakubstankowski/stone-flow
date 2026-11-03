@@ -6,7 +6,7 @@ import { Component, input } from '@angular/core';
   template: `<div
     class="flex flex-col items-start gap-3 rounded-box border border-dashed border-(--sf-border-strong) bg-base-100 p-6"
   >
-    <p class="text-lg font-semibold">{{ title() }}</p>
+    <p class="text-lg font-semibold">{{ heading() }}</p>
     @if (description()) {
       <p class="text-(--sf-muted)">{{ description() }}</p>
     }
@@ -14,6 +14,6 @@ import { Component, input } from '@angular/core';
   </div>`,
 })
 export class EmptyState {
-  readonly title = input.required<string>();
+  readonly heading = input.required<string>();
   readonly description = input<string | null>(null);
 }

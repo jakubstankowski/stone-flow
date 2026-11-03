@@ -71,3 +71,19 @@ describe('formatDateTime', () => {
     },
   );
 });
+
+describe('formatting edge cases from code review', () => {
+  it('shows negative zero as zero', () => {
+    expect(formatPln(-0)).toBe('0,00\u00a0zł');
+    expect(formatPln('-0.00')).toBe('0,00\u00a0zł');
+  });
+
+  it('treats a timestamp without a zone as UTC', () => {
+    expect(formatDateTime('2026-10-28T13:05:00')).toBe('28.10.2026, 14:05');
+    expect(formatDateTime('2026-10-28T13:05:00.1234567')).toBe('28.10.2026, 14:05');
+  });
+
+  it('respects an explicit offset', () => {
+    expect(formatDateTime('2026-10-28T14:05:00+01:00')).toBe('28.10.2026, 14:05');
+  });
+});

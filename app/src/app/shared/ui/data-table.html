@@ -46,11 +46,11 @@
   <app-error-state [message]="error() ?? ''" (retry)="retry.emit()" />
 } @else if (rows().length === 0) {
   @if (filters().length > 0) {
-    <app-empty-state [title]="filteredEmptyTitle()">
+    <app-empty-state [heading]="filteredEmptyTitle()">
       <app-button (pressed)="filtersClear.emit()">Wyczyść filtry</app-button>
     </app-empty-state>
   } @else {
-    <app-empty-state [title]="emptyTitle()" [description]="emptyDescription()" />
+    <app-empty-state [heading]="emptyTitle()" [description]="emptyDescription()" />
   }
 } @else {
   <div
@@ -118,7 +118,11 @@
                 [class.tabular-nums]="column.align === 'end'"
                 [class.whitespace-nowrap]="column.align === 'end'"
               >
-                {{ column.value(row) }}
+                @if (templates().get(column.key); as cell) {
+                  <ng-container *ngTemplateOutlet="cell; context: { $implicit: row }" />
+                } @else {
+                  {{ column.value?.(row) ?? '' }}
+                }
               </td>
             }
           </tr>
@@ -128,7 +132,10 @@
   </div>
 }
 
-<nav class="flex flex-wrap items-center justify-between gap-3" aria-label="Paginacja">
+<nav
+  class="flex flex-wrap items-center justify-between gap-3"
+  [attr.aria-label]="'Paginacja: ' + caption()"
+>
   <p class="text-sm text-(--sf-muted)" aria-live="polite">{{ rangeText() }}</p>
   <div class="flex gap-2">
     <app-button [disabled]="!hasPrevious() || loading()" (pressed)="goTo(page() - 1)">

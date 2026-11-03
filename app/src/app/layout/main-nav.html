@@ -33,6 +33,7 @@
           routerLinkActive="border-(--sf-accent)! bg-base-200 font-semibold text-(--sf-accent-text)!"
           ariaCurrentWhenActive="page"
           [routerLink]="['/', item.path]"
+          (click)="onLinkClick()"
         >
           {{ item.label }}
         </a>

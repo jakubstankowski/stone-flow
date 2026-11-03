@@ -8,7 +8,7 @@ import { ConfirmDialog } from './confirm-dialog';
     @if (showTrigger()) {
       <button id="wyzwalacz" type="button">Usuń wydatek</button>
     }
-    <app-confirm-dialog title="Usunąć wydatek?" confirmLabel="Usuń">
+    <app-confirm-dialog heading="Usunąć wydatek?" confirmLabel="Usuń">
       Wydatek zostanie usunięty z listy.
     </app-confirm-dialog>
   </main>`,
@@ -96,5 +96,21 @@ describe('ConfirmDialog', () => {
 
     await expect(result).resolves.toBe(true);
     expect(document.activeElement).toBe(element.querySelector('#tresc'));
+  });
+});
+
+describe('ConfirmDialog closed externally', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('resolves false when the dialog is closed without an action', async () => {
+    const { host, trigger, dialogElement } = await setup();
+    const result = host.dialog().open();
+
+    dialogElement.close();
+
+    await expect(result).resolves.toBe(false);
+    expect(document.activeElement).toBe(trigger);
   });
 });

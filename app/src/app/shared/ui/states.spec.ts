@@ -10,7 +10,7 @@ import { StatusBadge, StatusTone } from './status-badge';
   template: `
     <app-loading-state [rows]="4" />
     <app-empty-state
-      title="Brak wydatków w wybranym okresie."
+      heading="Brak wydatków w wybranym okresie."
       description="Dodaj pierwszy wydatek."
     >
       <button type="button">Dodaj wydatek</button>

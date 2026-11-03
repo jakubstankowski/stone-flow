@@ -5,13 +5,13 @@ import { TitleStrategy, provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { PageTitleStrategy } from './layout/page-title-strategy';
 
-registerLocaleData(localePl);
+registerLocaleData(localePl, 'pl-PL');
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    { provide: LOCALE_ID, useValue: 'pl' },
+    { provide: LOCALE_ID, useValue: 'pl-PL' },
     { provide: TitleStrategy, useClass: PageTitleStrategy },
   ],
 };

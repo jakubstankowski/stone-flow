@@ -88,15 +88,6 @@
     min-height: 100vh;
   }
 
-  :focus-visible {
-    outline: 2px solid var(--sf-text);
-    outline-offset: 2px;
-  }
-
-  [aria-invalid='true'] {
-    border-color: var(--sf-error);
-  }
-
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
@@ -111,4 +102,23 @@
       scroll-behavior: auto !important;
     }
   }
+}
+
+/*
+ * Poza warstwami, aby wygrać ze stylami komponentów daisyUI (@layer components):
+ * grafitowy fokus na każdej kontrolce i granice pól o kontraście >= 3:1.
+ */
+:focus-visible {
+  outline: 2px solid var(--sf-text);
+  outline-offset: 2px;
+}
+
+.input,
+.select,
+.textarea {
+  border-color: var(--sf-border-strong);
+}
+
+[aria-invalid='true'] {
+  border-color: var(--sf-error);
 }

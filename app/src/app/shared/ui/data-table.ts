@@ -1,15 +1,26 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  Component,
+  TemplateRef,
+  computed,
+  contentChildren,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { Button } from './button';
 import { EmptyState } from './empty-state';
 import { ErrorState } from './error-state';
 import { LoadingState } from './loading-state';
+import { TableCell, TableCellContext } from './table-cell';
 
 let nextId = 0;
 
 export interface DataTableColumn<T> {
   key: string;
   header: string;
-  value: (row: T) => string;
+  /** Tekst komórki; pomijany, gdy kolumna ma szablon `appTableCell`. */
+  value?: (row: T) => string;
   align?: 'start' | 'end';
   sortable?: boolean;
 }
@@ -29,11 +40,12 @@ export interface ActiveFilter {
 /**
  * Tabela prezentacyjna dla list modułów (design guide, sekcje 6 i 8). Nie pobiera,
  * nie sortuje i nie paginuje danych lokalnie — emituje zdarzenia do rodzica, który
- * pyta API. Filtry są projekcją z atrybutem `tableFilters`.
+ * pyta API. Filtry są projekcją z atrybutem `tableFilters`, a komórki inne niż tekst —
+ * szablonami `appTableCell`.
  */
 @Component({
   selector: 'app-data-table',
-  imports: [Button, EmptyState, ErrorState, LoadingState],
+  imports: [Button, EmptyState, ErrorState, LoadingState, NgTemplateOutlet],
   templateUrl: './data-table.html',
   host: { class: 'flex min-w-0 flex-col gap-4' },
 })
@@ -60,19 +72,30 @@ export class DataTable<T> {
   readonly filtersClear = output<void>();
   readonly retry = output<void>();
 
+  private readonly cellTemplates = contentChildren<TableCell<T>>(TableCell);
+  protected readonly templates = computed(() => {
+    const byKey = new Map<string, TemplateRef<TableCellContext<T>>>();
+    for (const cell of this.cellTemplates()) {
+      byKey.set(cell.appTableCell(), cell.template);
+    }
+    return byKey;
+  });
+
   protected readonly filtersOpen = signal(false);
   protected readonly filtersPanelId = `filtry-${nextId++}`;
 
+  private readonly size = computed(() => Math.max(1, Math.floor(this.pageSize())));
+
   protected readonly hasPrevious = computed(() => this.page() > 1);
-  protected readonly hasNext = computed(() => this.page() * this.pageSize() < this.total());
+  protected readonly hasNext = computed(() => this.page() * this.size() < this.total());
 
   protected readonly rangeText = computed(() => {
     const total = Math.max(0, this.total());
-    const from = (this.page() - 1) * this.pageSize() + 1;
+    const from = (this.page() - 1) * this.size() + 1;
     if (total === 0 || from > total || from < 1) {
       return `0 z ${total}`;
     }
-    const to = Math.min(this.page() * this.pageSize(), total);
+    const to = Math.min(this.page() * this.size(), total);
     return `${from}–${to} z ${total}`;
   });
 

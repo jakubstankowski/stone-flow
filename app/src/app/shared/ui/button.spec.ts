@@ -85,3 +85,20 @@ describe('Button', () => {
     expect(button.classList).toContain('bg-base-100');
   });
 });
+
+describe('Button busy state recovery', () => {
+  it('emits again once it is no longer busy', async () => {
+    const { fixture, host, button } = await setup();
+    host.busy.set(true);
+    await fixture.whenStable();
+    button.click();
+
+    host.busy.set(false);
+    await fixture.whenStable();
+    button.click();
+
+    expect(host.pressed).toBe(1);
+    expect(button.hasAttribute('aria-disabled')).toBe(false);
+    expect(button.textContent?.trim()).toBe('Zapisz');
+  });
+});

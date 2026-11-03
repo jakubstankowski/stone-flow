@@ -98,3 +98,33 @@ describe('MainNav', () => {
     expect(menuButton.getAttribute('aria-expanded')).toBe('false');
   });
 });
+
+describe('MainNav link selection', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [MainNav], providers: [provideRouter(routes)] });
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('closes the menu and moves focus to the content when the active item is chosen', async () => {
+    await RouterTestingHarness.create('/zamowienia');
+    const fixture = TestBed.createComponent(MainNav);
+    const main = document.createElement('main');
+    main.id = 'tresc';
+    main.tabIndex = -1;
+    document.body.append(fixture.nativeElement, main);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const menuButton = element.querySelector('button') as HTMLButtonElement;
+
+    menuButton.click();
+    await fixture.whenStable();
+    (element.querySelector('[aria-current="page"]') as HTMLAnchorElement).click();
+    await fixture.whenStable();
+
+    expect(menuButton.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(main);
+  });
+});

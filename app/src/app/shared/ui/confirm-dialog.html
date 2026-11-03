@@ -1,6 +1,12 @@
-<dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (cancel)="onCancel($event)">
+<dialog
+  #dialog
+  class="modal"
+  [attr.aria-labelledby]="titleId"
+  (cancel)="onCancel($event)"
+  (close)="onClose()"
+>
   <div class="modal-box flex max-w-lg flex-col gap-4 bg-base-100 p-6">
-    <h2 class="text-xl font-semibold" [id]="titleId">{{ title() }}</h2>
+    <h2 class="text-xl font-semibold" [id]="titleId">{{ heading() }}</h2>
     <div class="text-base">
       <ng-content />
     </div>
