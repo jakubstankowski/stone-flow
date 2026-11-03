@@ -1,0 +1,48 @@
+<Solution>
+  <Folder Name="/api/" />
+  <Folder Name="/api/src/">
+    <Project Path="api/src/StoneFlow.Api/StoneFlow.Api.csproj" />
+  </Folder>
+  <Folder Name="/api/src/Shared/">
+    <Project Path="api/src/Shared/StoneFlow.Shared.Kernel/StoneFlow.Shared.Kernel.csproj" />
+    <Project Path="api/src/Shared/StoneFlow.Shared.Application/StoneFlow.Shared.Application.csproj" />
+    <Project Path="api/src/Shared/StoneFlow.Shared.Infrastructure/StoneFlow.Shared.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/api/src/Modules/" />
+  <Folder Name="/api/src/Modules/Orders/">
+    <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Domain/StoneFlow.Orders.Domain.csproj" />
+    <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Application/StoneFlow.Orders.Application.csproj" />
+    <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Infrastructure/StoneFlow.Orders.Infrastructure.csproj" />
+    <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Api/StoneFlow.Orders.Api.csproj" />
+  </Folder>
+  <Folder Name="/api/src/Modules/Expenses/">
+    <Project Path="api/src/Modules/Expenses/StoneFlow.Expenses.Domain/StoneFlow.Expenses.Domain.csproj" />
+    <Project Path="api/src/Modules/Expenses/StoneFlow.Expenses.Application/StoneFlow.Expenses.Application.csproj" />
+    <Project Path="api/src/Modules/Expenses/StoneFlow.Expenses.Infrastructure/StoneFlow.Expenses.Infrastructure.csproj" />
+    <Project Path="api/src/Modules/Expenses/StoneFlow.Expenses.Api/StoneFlow.Expenses.Api.csproj" />
+  </Folder>
+  <Folder Name="/api/src/Modules/Reporting/">
+    <Project Path="api/src/Modules/Reporting/StoneFlow.Reporting.Domain/StoneFlow.Reporting.Domain.csproj" />
+    <Project Path="api/src/Modules/Reporting/StoneFlow.Reporting.Application/StoneFlow.Reporting.Application.csproj" />
+    <Project Path="api/src/Modules/Reporting/StoneFlow.Reporting.Infrastructure/StoneFlow.Reporting.Infrastructure.csproj" />
+    <Project Path="api/src/Modules/Reporting/StoneFlow.Reporting.Api/StoneFlow.Reporting.Api.csproj" />
+  </Folder>
+  <Folder Name="/api/src/Modules/Integrations/">
+    <Project Path="api/src/Modules/Integrations/StoneFlow.Integrations.Domain/StoneFlow.Integrations.Domain.csproj" />
+    <Project Path="api/src/Modules/Integrations/StoneFlow.Integrations.Application/StoneFlow.Integrations.Application.csproj" />
+    <Project Path="api/src/Modules/Integrations/StoneFlow.Integrations.Infrastructure/StoneFlow.Integrations.Infrastructure.csproj" />
+    <Project Path="api/src/Modules/Integrations/StoneFlow.Integrations.Api/StoneFlow.Integrations.Api.csproj" />
+  </Folder>
+  <Folder Name="/api/tests/">
+    <Project Path="api/tests/StoneFlow.Architecture.Tests/StoneFlow.Architecture.Tests.csproj" />
+    <Project Path="api/tests/StoneFlow.Shared.Tests/StoneFlow.Shared.Tests.csproj" />
+    <Project Path="api/tests/StoneFlow.Api.IntegrationTests/StoneFlow.Api.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+  </Folder>
+</Solution>

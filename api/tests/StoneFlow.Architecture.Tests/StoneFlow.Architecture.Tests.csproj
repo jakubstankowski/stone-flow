@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StoneFlow.Api\StoneFlow.Api.csproj" />
+    <ProjectReference Include="..\..\src\Shared\StoneFlow.Shared.Kernel\StoneFlow.Shared.Kernel.csproj" />
+    <ProjectReference Include="..\..\src\Shared\StoneFlow.Shared.Application\StoneFlow.Shared.Application.csproj" />
+    <ProjectReference Include="..\..\src\Shared\StoneFlow.Shared.Infrastructure\StoneFlow.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Domain\StoneFlow.Orders.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Application\StoneFlow.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Infrastructure\StoneFlow.Orders.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Api\StoneFlow.Orders.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Domain\StoneFlow.Expenses.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Application\StoneFlow.Expenses.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Infrastructure\StoneFlow.Expenses.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Api\StoneFlow.Expenses.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Domain\StoneFlow.Reporting.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Application\StoneFlow.Reporting.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Infrastructure\StoneFlow.Reporting.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Api\StoneFlow.Reporting.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Integrations\StoneFlow.Integrations.Domain\StoneFlow.Integrations.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Integrations\StoneFlow.Integrations.Application\StoneFlow.Integrations.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Integrations\StoneFlow.Integrations.Infrastructure\StoneFlow.Integrations.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Integrations\StoneFlow.Integrations.Api\StoneFlow.Integrations.Api.csproj" />
+  </ItemGroup>
+
+</Project>

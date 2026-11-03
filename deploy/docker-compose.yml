@@ -1,0 +1,17 @@
+# Lokalny SQL Server do pracy deweloperskiej. Nie służy do wdrożeń produkcyjnych.
+# Uruchomienie: docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+    container_name: stone-flow-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Ustaw MSSQL_SA_PASSWORD w deploy/.env}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - stone-flow-sqlserver-data:/var/opt/mssql
+
+volumes:
+  stone-flow-sqlserver-data:

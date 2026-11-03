@@ -3,8 +3,7 @@
 How code in this repository is structured and named. Plans are written in these terms
 and reviews check against them.
 
-No application code exists yet. Everything here comes from the PRD and the requirements
-documents; update this file when the projects are initialised.
+The repository skeleton was created in SF-3. Update this file when a task changes a convention.
 
 ## Repository layout
 
@@ -15,13 +14,22 @@ configuration.
 |---|---|---|
 | `docs/` | PRD, design guide, task artifacts | Markdown |
 | `documents/` | Source requirements, DEMO workbooks, reference dashboard | docx, xlsx, webp |
-| TODO: confirm | Frontend application | Angular, Tailwind CSS, daisyUI |
-| TODO: confirm | Backend application | ASP.NET Core, EF Core |
-| TODO: confirm | Tests | TODO: confirm |
-| TODO: confirm | Deployment configuration | Vercel, SMART ASP.NET |
+| `app/` | Frontend application | Angular, Tailwind CSS, daisyUI |
+| `api/src/` | Backend application | ASP.NET Core, EF Core |
+| `api/tests/` | Backend tests; frontend unit tests live next to the code in `app/src` | xUnit v3 (Microsoft.Testing.Platform), NetArchTest, Testcontainers; Vitest |
+| `deploy/` | Deployment configuration (in SF-3 only the local SQL Server and example variables) | Vercel, SMART ASP.NET |
+| `stone-flow.slnx` | Solution for Visual Studio and the `dotnet` CLI | |
 
 Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 `global.json` and central .NET package versions.
+
+| What | Where |
+|---|---|
+| .NET SDK 10.0.403 (runtime 10.0.14) | `global.json`; runtime checked in CI (`DOTNET_RUNTIME_VERSION`) |
+| NuGet package versions | `Directory.Packages.props` (transitive pinning on), `packages.lock.json` per project |
+| `dotnet-ef` | `.config/dotnet-tools.json` |
+| Node 24.21.0, npm 11 | `app/.nvmrc`, `engines` + `packageManager` in `app/package.json`, `app/.npmrc` (`engine-strict`) |
+| npm dependencies | exact versions in `app/package.json`, `app/package-lock.json` |
 
 ## Backend
 
@@ -30,11 +38,28 @@ Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 Modular monolith, with initial modules for orders, expenses, reporting and integrations.
 Onion layers: domain (business rules), application (use cases), infrastructure (data access
 and external services), API (HTTP). The shared part stays small and holds no module logic.
-TODO: confirm the example path for a new feature.
+A module lives in `api/src/Modules/{Module}/` as four projects:
+
+| Project | Holds | References |
+|---|---|---|
+| `StoneFlow.{Module}.Domain` | entities and business rules | `StoneFlow.Shared.Kernel` only |
+| `StoneFlow.{Module}.Application` | commands, queries and their handlers | own Domain, `StoneFlow.Shared.Application` |
+| `StoneFlow.{Module}.Infrastructure` | `{Module}DbContext`, entity configurations and migrations in `Persistence/`, DI registration | own Application, `StoneFlow.Shared.Infrastructure` |
+| `StoneFlow.{Module}.Api` | endpoint registration (`{Module}Module`) | own Application |
+
+The host `api/src/StoneFlow.Api` composes the modules. `api/src/Shared/` holds the CQRS
+abstractions and dispatcher, the launch date (`ILaunchDate`) and the shared EF Core provider
+setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Architecture.Tests`.
 
 ### Naming
 
-TODO: confirm files, types, functions and routes.
+- Projects and namespaces: `StoneFlow.{Module}.{Layer}`; shared code `StoneFlow.Shared.{Kernel|Application|Infrastructure}`.
+- SQL schema = module name in lower case (`orders`, `expenses`, `reporting`, `integrations`);
+  each module keeps its migration history in `{schema}.__EFMigrationsHistory`.
+- Private fields `_camelCase`, constants and `static readonly` fields `PascalCase`, interfaces
+  `I`-prefixed (`.editorconfig`).
+- TODO: confirm routes and the endpoint style (controllers or Minimal API) — decided by the
+  first task with a module endpoint (SF-6).
 
 ### Data access
 
@@ -59,8 +84,9 @@ correlation ID, without passwords, tokens or unnecessary personal data.
 
 ### Structure and naming
 
-Strict TypeScript, standalone components, feature areas, lazy-loaded routes. TODO: confirm
-file and folder naming.
+Strict TypeScript, standalone components, feature areas, lazy-loaded routes. File naming
+follows the Angular CLI 22 style guide (`start-page.ts`, no `.component` suffix). Feature areas
+live in `app/src/app/features/{area}/` and are loaded with `loadComponent`/`loadChildren`.
 
 ### Components
 
@@ -69,7 +95,8 @@ specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6.
 
 ### State and data fetching
 
-TODO: confirm the approach. The frontend presents results; it does not calculate finances.
+TODO: confirm the approach in the first task that fetches data. The frontend presents results;
+it does not calculate finances.
 Forms show validation, save state and protection against double submission. Lists handle
 loading, empty and error states.
 
@@ -93,10 +120,24 @@ section 13.
 
 ## Verification
 
+Backend, from the repository root:
+
 ```
-TODO: confirm build command
-TODO: confirm test command
-TODO: confirm lint and format command
+dotnet restore stone-flow.slnx --locked-mode
+dotnet format stone-flow.slnx --verify-no-changes --no-restore
+dotnet build stone-flow.slnx -c Release --no-restore
+dotnet test --solution stone-flow.slnx -c Release --no-build   # database tests need Docker
+```
+
+Frontend, from `app/`:
+
+```
+npm ci
+npm run format:check
+npm run lint
+npm run typecheck
+npm run build
+npm test -- --watch=false
 ```
 
 CI must check builds of both applications, types, formatting and the relevant tests.
