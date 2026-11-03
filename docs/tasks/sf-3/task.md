@@ -1,12 +1,12 @@
 ---
 id: SF-3
 title: Monorepo, CI i szkielet modułów backendu
-status: planned
+status: done
 risk: medium
 depends_on: [SF-1]
 parts: [a, b, c]
 spec_review: PASS WITH ISSUES
-code_review: null
+code_review: PASS WITH ISSUES
 source: https://standev.youtrack.cloud/issue/SF-3
 created: 2026-11-03
 updated: 2026-11-03
