@@ -9,8 +9,7 @@ financial correctness, results traceable to source records, and safe retries.
 ## Core expertise
 
 ### Backend — ASP.NET Core
-- Latest stable .NET at implementation start. TODO: confirm (the docs give .NET 10 LTS as a
-  reference point only)
+- .NET 10 (SDK 10.0.403, runtime 10.0.14), per SF-1; to be confirmed once PRD D-08 is closed
 - Modular monolith (orders, expenses, reporting, integrations; boundaries to be confirmed
   in the domain model), Onion Architecture, SOLID, DRY, CQRS without event sourcing, a
   broker or separate databases by default
@@ -19,8 +18,7 @@ financial correctness, results traceable to source records, and safe retries.
 - JSON API with OpenAPI, DTOs separate from entities, Problem Details
 
 ### Frontend — Angular
-- Latest stable Angular in strict TypeScript. TODO: confirm (the docs give Angular 22 as a
-  reference point only)
+- Angular 22.2 in strict TypeScript, Node 24, per SF-1; to be confirmed once PRD D-08 is closed
 - Standalone components, feature areas, lazy-loaded routes
 - Tailwind CSS and one custom daisyUI theme. TODO: confirm versions (reference point:
   Tailwind CSS 4, daisyUI 5)

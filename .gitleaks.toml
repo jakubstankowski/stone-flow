@@ -1,0 +1,6 @@
+# Konfiguracja skanu sekretów (gitleaks). Rozszerza domyślne reguły; wyjątki dodawać wąsko,
+# tylko dla konkretnych ścieżek z placeholderami, nigdy dla całych katalogów kodu.
+title = "Stone Flow"
+
+[extend]
+useDefault = true
