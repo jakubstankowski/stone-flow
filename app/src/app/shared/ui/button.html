@@ -1,0 +1,14 @@
+<button
+  [type]="type()"
+  [class]="classes()"
+  [disabled]="disabled()"
+  [attr.aria-disabled]="busy() || null"
+  [attr.aria-busy]="busy() || null"
+  (click)="onClick($event)"
+>
+  @if (busy()) {
+    <span class="loading loading-spinner loading-sm" aria-hidden="true"></span>
+    <span>{{ busyLabel() }}</span>
+  }
+  <span class="contents" [hidden]="busy()"><ng-content /></span>
+</button>

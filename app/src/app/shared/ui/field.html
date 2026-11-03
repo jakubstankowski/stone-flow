@@ -1,0 +1,13 @@
+<label class="text-base font-medium" [for]="fieldId()">
+  {{ label() }}
+  @if (required()) {
+    <span class="font-normal text-(--sf-muted)">(wymagane)</span>
+  }
+</label>
+<ng-content />
+@if (hint()) {
+  <p class="text-sm text-(--sf-muted)" [id]="hintId()">{{ hint() }}</p>
+}
+@if (error()) {
+  <p class="text-sm font-medium text-(--sf-error)" [id]="errorId()">{{ error() }}</p>
+}

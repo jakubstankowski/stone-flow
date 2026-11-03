@@ -1,0 +1,12 @@
+<dialog #dialog class="modal" [attr.aria-labelledby]="titleId" (cancel)="onCancel($event)">
+  <div class="modal-box flex max-w-lg flex-col gap-4 bg-base-100 p-6">
+    <h2 class="text-xl font-semibold" [id]="titleId">{{ title() }}</h2>
+    <div class="text-base">
+      <ng-content />
+    </div>
+    <div #actions class="flex flex-wrap justify-end gap-3">
+      <app-button variant="secondary" (pressed)="finish(false)">Anuluj</app-button>
+      <app-button [variant]="tone()" (pressed)="finish(true)">{{ confirmLabel() }}</app-button>
+    </div>
+  </div>
+</dialog>

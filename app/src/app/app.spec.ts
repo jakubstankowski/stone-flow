@@ -3,17 +3,16 @@ import { provideRouter } from '@angular/router';
 import { App } from './app';
 
 describe('App', () => {
-  beforeEach(async () => {
+  it('renders the application shell', async () => {
     await TestBed.configureTestingModule({
       imports: [App],
       providers: [provideRouter([])],
     }).compileComponents();
-  });
 
-  it('renders the router outlet', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('router-outlet')).not.toBeNull();
+
+    expect(element.querySelector('app-shell main#tresc router-outlet')).not.toBeNull();
   });
 });

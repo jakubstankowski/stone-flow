@@ -20,8 +20,8 @@ financial correctness, results traceable to source records, and safe retries.
 ### Frontend — Angular
 - Angular 22.2 in strict TypeScript, Node 24, per SF-1; to be confirmed once PRD D-08 is closed
 - Standalone components, feature areas, lazy-loaded routes
-- Tailwind CSS and one custom daisyUI theme. TODO: confirm versions (reference point:
-  Tailwind CSS 4, daisyUI 5)
+- Tailwind CSS 4.3.4 (via `@tailwindcss/postcss`) and daisyUI 5.7.50 with one custom light
+  theme `stone-flow`, per SF-5
 
 ### Hosting
 - Frontend on Vercel, backend on SMART ASP.NET. Plan compatibility with .NET, SQL Server

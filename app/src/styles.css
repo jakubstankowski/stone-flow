@@ -1,1 +1,114 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Jedyne miejsce w aplikacji z literałami kolorów (design guide, sekcja 2).
+ * Komponenty używają tokenów --sf-* albo klas semantycznych motywu daisyUI.
+ */
+@import 'tailwindcss';
+
+@plugin "daisyui" {
+  themes: false;
+}
+
+:root {
+  /* Paleta obowiązkowa */
+  --sf-bg: #ebe8e5;
+  --sf-text: #323135;
+  --sf-accent: #9b6e2b;
+  --sf-secondary: #b4a091;
+
+  /* Tokeny uzupełniające */
+  --sf-surface: #ffffff;
+  --sf-surface-soft: #f5f2ef;
+  --sf-muted: #656168;
+  --sf-border-strong: #82786f;
+  --sf-accent-text: #79531e;
+  --sf-accent-hover: #865e24;
+  --sf-success: #2f6b45;
+  --sf-warning: #805300;
+  --sf-error: #a33434;
+  --sf-info: #365d7d;
+  --sf-on-strong: #ffffff;
+
+  /* Tło strony: daisyUI maluje korzeń kolorem --root-bg (domyślnie base-100). */
+  --root-bg: var(--sf-bg);
+
+  --sf-shadow: 0 6px 24px rgb(50 49 53 / 6%);
+  --sf-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+@plugin "daisyui/theme" {
+  name: 'stone-flow';
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+
+  --color-base-100: var(--sf-surface);
+  --color-base-200: var(--sf-surface-soft);
+  --color-base-300: var(--sf-bg);
+  --color-base-content: var(--sf-text);
+  --color-primary: var(--sf-accent);
+  --color-primary-content: var(--sf-on-strong);
+  --color-secondary: var(--sf-secondary);
+  --color-secondary-content: var(--sf-text);
+  --color-accent: var(--sf-accent);
+  --color-accent-content: var(--sf-on-strong);
+  --color-neutral: var(--sf-text);
+  --color-neutral-content: var(--sf-on-strong);
+  --color-info: var(--sf-info);
+  --color-info-content: var(--sf-on-strong);
+  --color-success: var(--sf-success);
+  --color-success-content: var(--sf-on-strong);
+  --color-warning: var(--sf-warning);
+  --color-warning-content: var(--sf-on-strong);
+  --color-error: var(--sf-error);
+  --color-error-content: var(--sf-on-strong);
+
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --font-sans: var(--sf-font);
+}
+
+@layer base {
+  html {
+    background-color: var(--sf-bg);
+    color: var(--sf-text);
+    font-family: var(--sf-font);
+    line-height: 1.5;
+  }
+
+  body {
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--sf-text);
+    outline-offset: 2px;
+  }
+
+  [aria-invalid='true'] {
+    border-color: var(--sf-error);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
