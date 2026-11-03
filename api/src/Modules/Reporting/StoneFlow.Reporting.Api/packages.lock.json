@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "stoneflow.reporting.application": {
+        "type": "Project",
+        "dependencies": {
+          "StoneFlow.Reporting.Domain": "[1.0.0, )",
+          "StoneFlow.Shared.Application": "[1.0.0, )"
+        }
+      },
+      "stoneflow.reporting.domain": {
+        "type": "Project",
+        "dependencies": {
+          "StoneFlow.Shared.Kernel": "[1.0.0, )"
+        }
+      },
+      "stoneflow.shared.application": {
+        "type": "Project",
+        "dependencies": {
+          "StoneFlow.Shared.Kernel": "[1.0.0, )"
+        }
+      },
+      "stoneflow.shared.kernel": {
+        "type": "Project"
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\StoneFlow.Orders.Application\StoneFlow.Orders.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\StoneFlow.Shared.Infrastructure\StoneFlow.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

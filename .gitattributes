@@ -1,0 +1,8 @@
+# Jednolite końce linii (LF) niezależnie od core.autocrlf; wymagane przez dotnet format i Prettier.
+* text=auto eol=lf
+*.ico binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.docx binary
+*.xlsx binary
