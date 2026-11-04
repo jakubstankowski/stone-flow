@@ -5,6 +5,35 @@ and reviews check against them.
 
 The repository skeleton was created in SF-3. Update this file when a task changes a convention.
 
+## Engineering principles
+
+Project invariants (`.sdd/context/rules.md`) and recorded decisions take precedence over every
+rule below. Each rule is meant to be checked in review.
+
+- **KISS:** the simplest solution that meets the current requirements and invariants. A plain
+  CRUD use case needs no artificial aggregate, service layer or pipeline.
+- **YAGNI:** no abstraction, configuration switch, generic parameter or extension point for a
+  hypothetical caller. The need must exist in the current task or an accepted document; a second
+  real caller is a reason to evaluate sharing, not an automatic extraction rule.
+- **DRY:** share the same business knowledge (a rule, a calculation, a definition) and stable
+  behaviour, not similar-looking syntax. Small duplication is acceptable when a shared
+  abstraction would couple independent features or modules.
+- **SRP:** a class or method has one coherent responsibility and one reason to change. A handler
+  that also holds domain rules, mapping and I/O details has several.
+- **OCP:** extensibility follows a real need; no strategy hierarchies or plugin points in advance.
+- **LSP:** an implementation honours its contract, including the meaning of the result, the
+  errors it reports and cancellation (a port documented as returning `null` when nothing is
+  found does not throw for that case).
+- **ISP:** small, cohesive contracts; a port groups operations used together (`IAccountService`)
+  and is not split into one-method interfaces without a reason.
+- **DIP:** dependencies point inwards. Application defines the ports it needs; Infrastructure
+  implements them (`Application/Abstractions/Ports.cs` → `Infrastructure/`).
+- Prefer composition; inheritance only where the subtype is truly substitutable.
+- Create an interface for an architectural boundary (port), an interchangeable implementation or
+  a useful test seam — not for every class.
+- Change only what the task needs; improve touched code only when correctness or clarity
+  requires it.
+
 ## Repository layout
 
 Monorepo that clearly separates frontend, backend, tests, documentation and deployment
@@ -52,6 +81,88 @@ The host `api/src/StoneFlow.Api` composes the modules. `api/src/Shared/` holds t
 abstractions and dispatcher, the launch date (`ILaunchDate`) and the shared EF Core provider
 setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Architecture.Tests`.
 
+### Layer responsibilities
+
+| Layer | Responsible for | Not responsible for |
+|---|---|---|
+| Api | binding, reading the identity (account id from claims), HTTP specifics (cookies, status codes), calling `IDispatcher`, mapping the result to `TypedResults` / Problem Details | business decisions, data access |
+| Application | orchestrating one use case: input validation, authorisation of the operation and of the concrete resource, calling the domain and ports, the transaction boundary | business rules and calculations owned by the domain; EF Core, HTTP |
+| Domain | business rules, invariants, calculations, allowed state transitions, policies (`PasswordPolicy`, `LockoutPolicy`) | I/O, HTTP, EF Core, hosting |
+| Infrastructure | EF Core (`{Module}DbContext`, configurations, migrations), Identity, port implementations, e-mail, external HTTP, DI registration; translating provider errors into port results | business rules, use-case orchestration |
+
+- A handler does not take over domain rules: a rule that decides an outcome (status transition,
+  amount, eligibility) lives in a domain type or domain operation and is unit-tested there.
+- Application references neither EF Core nor HTTP (architecture tests). Projections, paging and
+  transactions are expressed through ports defined in Application (e.g. `IAccessUnitOfWork`, a
+  read port returning DTOs) and implemented in Infrastructure.
+- A contract used by more than one module lives in `StoneFlow.Shared.Application` (project
+  reference rules allow nothing else); a module never references another module.
+
+### Application organisation
+
+- Application is organised by feature / use case, as in `Access.Application`: `Login/`,
+  `PasswordReset/`, `Session/`; ports in `Abstractions/`.
+- The command or query, its handler, validation and result stay together in the feature folder.
+  Small related types may share one file (`Login/Login.cs` holds `LoginCommand`, `LoginResult`
+  and `LoginHandler`).
+- No global `Commands/`, `Queries/`, `Handlers/`, `Services/` or `Repositories/` folders.
+- Existing names and structure are not migrated as part of an unrelated task.
+
+### CQRS
+
+`ICommand<TResult>`, `IQuery<TResult>`, their handlers and `IDispatcher` live in
+`StoneFlow.Shared.Application/Cqrs`; endpoints call only `IDispatcher`. Handlers are registered
+per module assembly (`AddHandlersFromAssembly` in the module's `DependencyInjection.cs`).
+
+- A command expresses a business intent (`ConfirmPasswordReset`, later e.g. cancelling an order),
+  not a generic "update entity properties".
+- One handler runs one use case. It may read the data it needs to validate, authorise and apply
+  the change.
+- A command returns the minimum the client needs: an id, an outcome/status, validation errors or
+  the data the screen needs next. There is no non-generic `ICommand`; a command with nothing
+  meaningful to return uses a simple result (`LogoutCommand` → `bool`).
+- A query does not change business state and starts no business operation. Technical logging is
+  allowed.
+- A query returns a DTO or projection; EF entities, `DbContext` and `IQueryable` never leave
+  Infrastructure — ports return records shaped for the use case (`AccountInfo`).
+- CQRS here needs no separate databases, read models, event sourcing or broker.
+- The dispatcher only resolves and invokes the handler — it adds **no** validation,
+  authorisation, transaction or retry. The handler (or a port it calls) owns each explicitly:
+  - input validation: in the handler, returned as a result (`FieldErrors` → `ValidationProblem`),
+    not thrown;
+  - authentication: the fallback policy in the host; **authorisation of the concrete resource**
+    (does the record exist and may this account act on it): in the handler — being logged in
+    does not replace it;
+  - transaction: one `SaveChanges` per use case is already atomic; several writes that must
+    succeed together go through the module's unit-of-work port (`IAccessUnitOfWork`).
+- Handlers do not call other handlers through the dispatcher. When use cases share behaviour,
+  extract a module-local operation (a domain method or an Application helper used by both) and
+  state who owns validation, the transaction, retries and side effects. No global service layer.
+
+### C# and .NET
+
+Formatting and naming style live in `.editorconfig` and are enforced in the build
+(`EnforceCodeStyleInBuild`, warnings as errors); they are not repeated here.
+
+- Nullable reference types are on (`Directory.Build.props`); optional values are explicit
+  (`T?`). Use `!` only where an invariant is already established — never to skip validation.
+- Dependencies are explicit constructor parameters resolved by DI. No service locator in
+  business logic; the dispatcher and the composition root (`DependencyInjection.cs`,
+  `Program.cs`) are the accepted infrastructure exceptions.
+- Respect DI lifetimes: a singleton never captures a scoped `DbContext` or request state.
+- Async for all I/O, with `CancellationToken` propagated to EF Core, HTTP, SMTP and ports. No
+  `.Result`, `.Wait()`, `async void` (except event handlers that require it) or `Task.Run`
+  around ordinary async I/O.
+- Do not swallow cancellation or errors. Catch an exception only to recover, to translate it at
+  a boundary (e.g. a known constraint violation into a result) or to add useful context.
+- Dispose only what the code owns (`await using` for a transaction it opened); never dispose
+  dependencies owned by DI.
+- Time-dependent behaviour uses the injected `TimeProvider` (`LoginHandler`,
+  `ConfirmPasswordResetHandler`), never `DateTime.Now`/`UtcNow`, so tests control time.
+- Structured logging with the correlation id; what must never be logged is defined in
+  `rules.md` (invariant 6) and in the security rules below.
+- No generic repositories, base handlers or internal frameworks without a demonstrated need.
+
 ### Naming
 
 - Projects and namespaces: `StoneFlow.{Module}.{Layer}`; shared code `StoneFlow.Shared.{Kernel|Application|Infrastructure}`.
@@ -80,22 +191,35 @@ setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Archit
 - The current account id comes from `ClaimTypes.NameIdentifier`; handlers receive it as a command
   parameter, never read `HttpContext`.
 - Problem Details: user-facing text in `detail`, a stable machine code in the `code` extension;
-  `detail` is removed only for unhandled exceptions outside Development. A database exception →
-  503.
+  `detail` is removed only for unhandled exceptions outside Development. Error classes and the
+  current handling of database exceptions: see "Errors and validation".
 - Security events are logged with the account id only — never e-mail, password or token.
 
 ### Data access
 
-- CQRS: a command is one use case with its validation, authorisation and transaction
-  boundary; a query returns data shaped for a view or report.
 - EF Core with SQL Server and versioned migrations. Each table has one owning module;
   schemas per module are recommended.
 - Keys, constraints, transactions and concurrency control wherever concurrent edits could
   overwrite data.
 - Business dates are separate from technical timestamps. Timestamps are stored in UTC and
   presented in Europe/Warsaw.
-- I/O is asynchronous and supports request cancellation.
-- Lists filter, sort and paginate through the API.
+- Read only the columns needed and project to the DTO before materialising (`Select`). Use
+  `AsNoTracking` when entities are read without being changed; a pure DTO projection needs no
+  extra tracking control.
+- Lists filter, sort and paginate in the database, with a maximum page size and a stable sort
+  (a unique tie-breaker such as the id).
+- No N+1 queries or uncontrolled loading of relations.
+- A `DbContext` is not thread-safe: no parallel operations on one instance.
+- One `SaveChanges` is already a transaction for its changes; add an explicit transaction only
+  when several writes, or a read followed by writes, must be atomic.
+- Keep external calls (WooCommerce, SMTP) outside a long database transaction where possible.
+- Retries must not duplicate business effects; uniqueness is enforced by database constraints,
+  and an application pre-check does not replace a unique constraint.
+- Concurrency tokens and constraints wherever they protect an invariant; a lost update is
+  reported as a conflict, never silently overwritten.
+- No outbox by default. A durable coordination mechanism is required only where a use case must
+  survive a crash between the database write and an external effect.
+- Money, audit and idempotency follow `rules.md` invariants 2, 4 and 5 as written.
 - Migrations run before the new code is published (SF-4), so every migration must work with the
   previous API version (expand/contract: add first, remove in a later deployment). Never edit an
   applied migration; fix forward. A new module with a database is appended to
@@ -108,6 +232,23 @@ setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Archit
 Validation and authorisation run in the API independently of the UI. Errors use Problem
 Details with consistent HTTP codes and expose no secrets or production details. Logs carry a
 correlation ID, without passwords, tokens or unnecessary personal data.
+
+Error classes — each is decided where it is known, never by parsing message text:
+
+| Class | Where it is decided | Response |
+|---|---|---|
+| Input validation | handler result with field errors | `400` `ValidationProblem` |
+| Business conflict (a rule or the current state forbids the operation) | domain / handler result | `409` or `422` Problem with `code` |
+| Concurrency conflict | Infrastructure catches `DbUpdateConcurrencyException`; the port returns a conflict result | `409` Problem with `code` |
+| Known constraint violation (e.g. duplicate) | Infrastructure, by SQL error number (`2601`, `2627`, as in `AccessUserStore`), translated to a result | `409` Problem with `code`, or the idempotent outcome |
+| Infrastructure unavailable (no connection, timeout) | exception handler | `503`, no details |
+| Unexpected program error | exception handler | `500`, no details outside Development |
+
+**Discrepancy with the code (not changed yet):** `SecuritySetup.SelectStatusCode` maps **every**
+exception with a `DbException` in its chain to `503`, so an untranslated constraint violation
+(`DbUpdateException` → `SqlException`) also becomes `503`, while `DbUpdateConcurrencyException`
+becomes `500`. Until a separate task narrows the fallback, each use case translates its known
+constraint and concurrency cases in Infrastructure, with a test asserting the resulting status.
 
 ## Frontend
 
@@ -198,13 +339,25 @@ colour alone.
 
 ## Business logic for `sdd-scaffold`
 
-TODO: confirm what the developer writes by hand. The requirements place business logic in
-the domain and application layers, not in controllers or components.
+Business logic lives in the domain and application layers, never in endpoints or components
+(`rules.md`). `sdd-scaffold` has not been used so far: SF-3 to SF-6 were implemented in full,
+and `rules.md` allows `TODO` only in stubs produced by `sdd-scaffold`. What the stubs leave to
+the developer is an open decision (see "Open decisions").
 
 ## Implementation order
 
-TODO: confirm if it differs from the default in `sdd-plan`. Project-level order is in PRD
-section 13.
+The `sdd-plan` default (dependencies, logic, wiring, UI) applies, in this repository's terms:
+
+1. Domain types and rules, with unit tests.
+2. Application: ports, commands/queries, handlers and results.
+3. Infrastructure: entity configuration, port implementations, DI and the migration (a new
+   module is also appended to `deploy/scripts/contexts.sh`).
+4. Api: endpoints, request/response DTOs, `EndpointSecurityTests` entries.
+5. Integration tests: authorisation, persistence, constraints, concurrency.
+6. Frontend: `*-api.ts` client, state service, pages and routes.
+
+Project-level order (which task comes first) is in PRD section 13 and
+`docs/tasks/_project/task-breakdown.md`.
 
 ## Verification
 
@@ -233,6 +386,27 @@ npm test -- --watch=false
 ```
 
 CI must check builds of both applications, types, formatting and the relevant tests.
+
+## Review checklist
+
+1. Is the use case one coherent intent, with each responsibility in the right layer?
+2. Does every query stay a read and return a DTO (no entity, `DbContext` or `IQueryable`)?
+3. Does each business rule have one owner (the domain), without copies in handlers or the UI?
+4. Is the concrete resource authorised in the handler, not only "logged in"?
+5. Do transactions, constraints, concurrency tokens and retries protect the invariants?
+6. Does all I/O propagate `CancellationToken` and respect DI lifetimes?
+7. Is every error in the right class (see "Errors and validation"), without parsing message
+   text or leaking details?
+8. Does every new abstraction serve a current, real need?
+9. Do tests cover behaviour, failures and the relevant boundaries (authorisation, database
+   constraints, invariants) — not private methods or a coverage percentage?
+
+## Open decisions
+
+- What `sdd-scaffold` stubs leave to the developer (domain rules, handler bodies, tests) —
+  owner to decide before the first use of `sdd-scaffold`.
+- Narrowing the `DbException` → `503` fallback (see "Errors and validation") — a separate code
+  task with tests.
 
 ## Do not
 
