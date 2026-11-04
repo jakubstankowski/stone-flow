@@ -23,9 +23,17 @@ internal static class SecuritySetup
         return services;
     }
 
-    /// <summary>Niedostępna baza (wyjątek bazy w łańcuchu przyczyn) → 503, pozostałe błędy → 500.</summary>
+    /// <summary>
+    /// Błędne żądanie (np. nieczytelny JSON) → jego status 4xx; niedostępna baza (wyjątek bazy w
+    /// łańcuchu przyczyn) → 503; pozostałe błędy → 500.
+    /// </summary>
     public static int SelectStatusCode(Exception exception)
     {
+        if (exception is BadHttpRequestException badRequest)
+        {
+            return badRequest.StatusCode;
+        }
+
         for (var current = exception; current is not null; current = current.InnerException)
         {
             if (current is DbException)

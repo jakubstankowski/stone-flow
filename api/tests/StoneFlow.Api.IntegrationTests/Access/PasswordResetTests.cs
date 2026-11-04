@@ -152,6 +152,24 @@ public sealed class PasswordResetTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task Malformed_json_returns_400_not_500()
+    {
+        await using var factory = await CreateAsync();
+        using var client = AuthClient.Create(factory);
+        (await client.GetCsrfAsync()).Dispose();
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/auth/password-reset/confirm", UriKind.Relative))
+        {
+            Content = new StringContent("{\"accountId\":\"x\\\"token\":1}", System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-XSRF-TOKEN", client.XsrfToken);
+
+        using var response = await client.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task Weak_password_returns_field_error_and_keeps_the_link_valid()
     {
         await using var factory = await CreateAsync();
