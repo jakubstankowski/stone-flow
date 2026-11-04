@@ -43,6 +43,7 @@
     <Project Path="api/tests/StoneFlow.Architecture.Tests/StoneFlow.Architecture.Tests.csproj" />
     <Project Path="api/tests/StoneFlow.Shared.Tests/StoneFlow.Shared.Tests.csproj" />
     <Project Path="api/tests/StoneFlow.Access.Tests/StoneFlow.Access.Tests.csproj" />
+    <Project Path="api/tests/StoneFlow.Reporting.Tests/StoneFlow.Reporting.Tests.csproj" />
     <Project Path="api/tests/StoneFlow.Api.IntegrationTests/StoneFlow.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
