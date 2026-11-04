@@ -35,7 +35,8 @@ Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 
 ### Structure
 
-Modular monolith, with initial modules for orders, expenses, reporting and integrations.
+Modular monolith, with modules for access (accounts and sessions, SF-6), orders, expenses,
+reporting and integrations.
 Onion layers: domain (business rules), application (use cases), infrastructure (data access
 and external services), API (HTTP). The shared part stays small and holds no module logic.
 A module lives in `api/src/Modules/{Module}/` as four projects:
@@ -54,12 +55,33 @@ setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Archit
 ### Naming
 
 - Projects and namespaces: `StoneFlow.{Module}.{Layer}`; shared code `StoneFlow.Shared.{Kernel|Application|Infrastructure}`.
-- SQL schema = module name in lower case (`orders`, `expenses`, `reporting`, `integrations`);
+- SQL schema = module name in lower case (`access`, `orders`, `expenses`, `reporting`, `integrations`);
   each module keeps its migration history in `{schema}.__EFMigrationsHistory`.
 - Private fields `_camelCase`, constants and `static readonly` fields `PascalCase`, interfaces
   `I`-prefixed (`.editorconfig`).
-- TODO: confirm routes and the endpoint style (controllers or Minimal API) — decided by the
-  first task with a module endpoint (SF-6).
+- Endpoints (decided in SF-6): Minimal API in `StoneFlow.{Module}.Api`; `Map{Module}Endpoints`
+  maps one route group `MapGroup("/api/{area}")` per file `Endpoints/*Endpoints.cs`, request and
+  response DTOs next to it. Handlers use `TypedResults`, call only `IDispatcher` and map the result
+  to HTTP — no business logic. Names `.WithName("{Module}.{Action}")`.
+- All API routes start with `/api` (except `/health`), so the frontend proxy forwards one branch.
+
+### Access and security (SF-6)
+
+- Module `Access` (schema `access`) owns the single owner account (ASP.NET Core Identity with
+  its own one-table store), password reset tokens (SHA-256 hashes) and Data Protection keys.
+- Every endpoint requires a session by default (fallback authorization policy, also for paths
+  without an endpoint → 401). A new anonymous endpoint needs `.AllowAnonymous()` **and** an entry in
+  the allowed list of `EndpointSecurityTests` plus the reason in the task spec.
+- Every `POST`/`PUT`/`PATCH`/`DELETE` under `/api` is CSRF-checked globally
+  (`CsrfValidationMiddleware`, header `X-XSRF-TOKEN`); endpoints add nothing for it.
+- Pipeline order in `Program.cs`: correlation → exception handler → status pages → routing → CORS
+  (no origins allowed) → rate limiter → authentication → authorization → CSRF → endpoints.
+- The current account id comes from `ClaimTypes.NameIdentifier`; handlers receive it as a command
+  parameter, never read `HttpContext`.
+- Problem Details: user-facing text in `detail`, a stable machine code in the `code` extension;
+  `detail` is removed only for unhandled exceptions outside Development. A database exception →
+  503.
+- Security events are logged with the account id only — never e-mail, password or token.
 
 ### Data access
 
@@ -124,10 +146,34 @@ specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6. Before adding a new
 
 ### State and data fetching
 
-TODO: confirm the approach in the first task that fetches data. The frontend presents results;
-it does not calculate finances.
-Forms show validation, save state and protection against double submission. Lists handle
-loading, empty and error states.
+Decided in SF-6. The frontend presents results; it does not calculate finances.
+
+- The API is called only through `HttpClient` provided by `provideAppHttp()`
+  (`core/http/app-http.ts`), with **relative** URLs `/api/...` — never an absolute API address in
+  the bundle. Locally `app/proxy.conf.mjs` forwards `/api` to the API
+  (`STONEFLOW_API_URL`, default `http://localhost:5080`); in production the hosting rewrite does
+  the same (SF-4).
+- One client per area (`*-api.ts`) returns `Observable`s of typed DTOs; state lives in services
+  with signals (no state library). Flows that orchestrate several calls live in the service, not
+  in components.
+- Errors are mapped with `toApiError()` (`network` for status 0 and 5xx, `validation` for
+  `ValidationProblemDetails`, `problem` with `detail` and `code`); screens branch on `code`, not on
+  the text.
+- XSRF is automatic (`XSRF-TOKEN` cookie → `X-XSRF-TOKEN` header on state-changing requests);
+  before a state-changing auth request the session service fetches `GET /api/auth/csrf`.
+- Any `401` (except the login call) is handled by the global interceptor: the session becomes
+  anonymous and the user goes to `/logowanie` with „Sesja wygasła…”. Route guards are a
+  convenience; the API enforces access.
+- Forms use Signal Forms (`@angular/forms/signals`) with `app-field` (`#control` + `[formField]`)
+  and `novalidate`; validation runs in the UI and again in the API.
+- Forms show validation, save state and protection against double submission. Lists handle
+  loading, empty and error states.
+
+| Path in `app/src/app/` | Holds |
+|---|---|
+| `core/http/` | `provideAppHttp()`, `toApiError()` |
+| `core/auth/` | session service, auth API client, guards, 401 interceptor, safe return URL |
+| `features/auth/` | `/logowanie`, `/reset-hasla`, `/reset-hasla/nowe` (outside the shell, `layout/auth-layout`) |
 
 ### Styling
 
@@ -160,8 +206,12 @@ Backend, from the repository root:
 dotnet restore stone-flow.slnx --locked-mode
 dotnet format stone-flow.slnx --verify-no-changes --no-restore
 dotnet build stone-flow.slnx -c Release --no-restore
-dotnet test --solution stone-flow.slnx -c Release --no-build   # database tests need Docker
+dotnet test --solution stone-flow.slnx -c Release --no-build
 ```
+
+Database tests use SQL Server in a container (Docker, CI) or, when `STONEFLOW_TEST_SQLSERVER` is set
+to a server connection string (e.g. `Server=(localdb)\MSSQLLocalDB;Integrated Security=True;TrustServerCertificate=True`),
+that server; each test class gets its own database.
 
 Frontend, from `app/`:
 

@@ -46,6 +46,8 @@ projekcie; zależności npm są przypięte dokładnie w `app/package.json` i `ap
    ```
    dotnet tool restore
    dotnet user-secrets set "ConnectionStrings:StoneFlow" "Server=localhost,1433;Database=StoneFlow;User Id=sa;Password=<hasło z deploy/.env>;TrustServerCertificate=True" --project api/src/StoneFlow.Api
+   dotnet user-secrets set "StoneFlow:Owner:Email" "<twój adres e-mail>" --project api/src/StoneFlow.Api
+   dotnet ef database update --project api/src/Modules/Access/StoneFlow.Access.Infrastructure --startup-project api/src/StoneFlow.Api --context AccessDbContext
    dotnet ef database update --project api/src/Modules/Orders/StoneFlow.Orders.Infrastructure --startup-project api/src/StoneFlow.Api --context OrdersDbContext
    dotnet ef database update --project api/src/Modules/Expenses/StoneFlow.Expenses.Infrastructure --startup-project api/src/StoneFlow.Api --context ExpensesDbContext
    dotnet ef database update --project api/src/Modules/Reporting/StoneFlow.Reporting.Infrastructure --startup-project api/src/StoneFlow.Api --context ReportingDbContext
@@ -63,7 +65,34 @@ projekcie; zależności npm są przypięte dokładnie w `app/package.json` i `ap
    npm start
    ```
 
-   Aplikacja działa pod `http://localhost:4200`.
+   Aplikacja działa pod `http://localhost:4200`. Serwer deweloperski przekazuje `/api/*` do API
+   (`app/proxy.conf.mjs`; inny adres API: zmienna `STONEFLOW_API_URL`), więc przeglądarka
+   rozmawia z jednym originem i ciasteczko sesji jest ciasteczkiem pierwszej strony.
+
+4. Pierwsze logowanie: na `http://localhost:4200/reset-hasla` podaj adres z
+   `StoneFlow:Owner:Email`. W Development wiadomość nie jest wysyłana — link do ustawienia hasła
+   jest w logu API (`[Development] Wiadomość e-mail niewysłana`). Po ustawieniu hasła zaloguj się
+   na `/logowanie`.
+
+## Logowanie i sesja
+
+- Jest jedno konto: właściciela. Powstaje przy pierwszej prośbie o reset hasła dla adresu
+  `StoneFlow:Owner:Email`, tylko gdy w bazie nie ma jeszcze żadnego konta (zmiana tego klucza
+  później nie tworzy drugiego konta). Rejestracji nie ma, hasła nie ma w konfiguracji.
+- Hasło: co najmniej 12 znaków. Po 5 nieudanych próbach logowanie jest blokowane na 15 minut;
+  reset hasła odblokowuje konto.
+- Sesja wygasa po 60 minutach bezczynności i najpóźniej 12 godzin po zalogowaniu.
+  „Wyloguj” oraz ustawienie nowego hasła kończą sesje na **wszystkich** urządzeniach.
+- Link resetu jest ważny 30 minut, działa raz, a nowa prośba unieważnia poprzedni link.
+- API bez sesji odpowiada `401` na każdy odczyt i zapis. Wyjątki: `GET /health`,
+  `GET /api/auth/csrf`, `POST /api/auth/login`, `POST /api/auth/password-reset/request`,
+  `POST /api/auth/password-reset/confirm` oraz OpenAPI w Development.
+
+### Link z panelu sklepu
+
+Link do ERP dodaje właściciel ręcznie w panelu administracyjnym sklepu (np. jako własny link w
+menu lub widżet), wskazując adres `https://<adres-aplikacji>/logowanie`. Link prowadzi tylko do
+ekranu logowania i niczego nie uwierzytelnia; ERP nie zmienia niczego w sklepie.
 
 ## Konfiguracja API
 
@@ -71,6 +100,13 @@ projekcie; zależności npm są przypięte dokładnie w `app/package.json` i `ap
 |---|---|---|
 | `ConnectionStrings:StoneFlow` | `ConnectionStrings__StoneFlow` | połączenie z SQL Server; lokalnie przez `dotnet user-secrets`, na środowiskach przez konfigurację wdrożenia |
 | `StoneFlow:LaunchDate` | `StoneFlow__LaunchDate` | data uruchomienia w formacie `yyyy-MM-dd` (PRD sekcja 4, „Przełom uruchomienia”) |
+| `StoneFlow:Owner:Email` | `StoneFlow__Owner__Email` | adres właściciela; tylko dla niego może powstać konto |
+| `StoneFlow:App:BaseUrl` | `StoneFlow__App__BaseUrl` | adres aplikacji używany w linku resetu hasła |
+| `StoneFlow:Email:Mode` | `StoneFlow__Email__Mode` | `Smtp` albo `Log` (`Log` tylko w Development: treść wiadomości w logu) |
+| `StoneFlow:Email:Smtp:*` | `StoneFlow__Email__Smtp__*` | `Host`, `Port`, `UseStartTls`, `UserName`, `Password` (tylko sekrety), `FromAddress`, `FromName` |
+
+- Brak lub błąd konfiguracji właściciela, adresu aplikacji albo SMTP zatrzymuje start API
+  (komunikat wskazuje klucz, bez wartości). Dostawca SMTP nie jest jeszcze wybrany (PRD D-05).
 
 - Data uruchomienia jest ustawiana wyłącznie w konfiguracji wdrożenia i nie ma jej w
   `appsettings.json`. Brak albo zły format zatrzymuje start API. Środowisko Development ma
@@ -98,9 +134,16 @@ dotnet build stone-flow.slnx -c Release --no-restore
 dotnet test --solution stone-flow.slnx -c Release --no-build
 ```
 
-Testy w `StoneFlow.Api.IntegrationTests.DatabaseTests` uruchamiają SQL Server w kontenerze i
-wymagają Dockera. Bez Dockera można je wyłączyć:
-`dotnet test --solution stone-flow.slnx --filter-not-class "StoneFlow.Api.IntegrationTests.DatabaseTests"`.
+Testy bazy danych (kolekcja „SQL Server” w `StoneFlow.Api.IntegrationTests`) uruchamiają SQL
+Server w kontenerze i wymagają Dockera. Bez Dockera można wskazać istniejący serwer, np. LocalDB
+(PowerShell):
+
+```
+$env:STONEFLOW_TEST_SQLSERVER = 'Server=(localdb)\MSSQLLocalDB;Integrated Security=True;TrustServerCertificate=True'
+dotnet test --solution stone-flow.slnx -c Release --no-build
+```
+
+Każda klasa testów dostaje własną bazę, usuwaną po zakończeniu testów.
 
 Frontend (z katalogu `app/`):
 
