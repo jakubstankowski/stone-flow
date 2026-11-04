@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Testing;
 
 namespace StoneFlow.Api.IntegrationTests.Infrastructure;
 
@@ -21,6 +22,12 @@ public sealed class StoneFlowApiFactory : WebApplicationFactory<Program>
 
     public string Environment { get; init; } = "Production";
 
+    /// <summary>
+    /// Logi hosta zbierane przez kolektor należący do fabryki: przeżywają zwolnienie hosta,
+    /// więc pozwalają odczytać błąd startu także wtedy, gdy host zdążył się już zamknąć.
+    /// </summary>
+    public FakeLogCollector Logs { get; } = new();
+
     public StoneFlowApiFactory With(string key, string? value)
     {
         _settings[key] = value;
@@ -37,7 +44,11 @@ public sealed class StoneFlowApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment(Environment);
         builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(_settings));
-        builder.ConfigureLogging(logging => logging.AddFakeLogging());
+        builder.ConfigureLogging(logging =>
+        {
+            logging.Services.AddSingleton(Logs);
+            logging.AddProvider(new FakeLoggerProvider(Logs));
+        });
         builder.ConfigureServices(services => services.AddTransient<IStartupFilter, ThrowingEndpointStartupFilter>());
     }
 }

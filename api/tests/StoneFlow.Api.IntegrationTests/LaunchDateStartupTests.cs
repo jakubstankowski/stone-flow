@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
 using StoneFlow.Shared.Application.LaunchDate;
 
@@ -13,9 +12,7 @@ public sealed class LaunchDateStartupTests
     {
         await using var factory = new StoneFlowApiFactory().Without("StoneFlow:LaunchDate");
 
-        var exception = Record.Exception(() => factory.CreateClient());
-
-        AssertValidationFailure(exception);
+        StartupFailure.AssertOptionsValidation(factory, "StoneFlow:LaunchDate");
     }
 
     [Theory]
@@ -26,9 +23,7 @@ public sealed class LaunchDateStartupTests
     {
         await using var factory = new StoneFlowApiFactory().With("StoneFlow:LaunchDate", value);
 
-        var exception = Record.Exception(() => factory.CreateClient());
-
-        AssertValidationFailure(exception);
+        StartupFailure.AssertOptionsValidation(factory, "StoneFlow:LaunchDate", forbiddenValue: value);
     }
 
     [Fact]
@@ -53,24 +48,4 @@ public sealed class LaunchDateStartupTests
         Assert.False(hasLaunchDate, "Data uruchomienia należy do konfiguracji wdrożenia, nie do appsettings.json.");
     }
 
-    private static void AssertValidationFailure(Exception? exception)
-    {
-        Assert.NotNull(exception);
-        var validation = Unwrap(exception).OfType<OptionsValidationException>().FirstOrDefault();
-        Assert.NotNull(validation);
-        Assert.Contains("StoneFlow:LaunchDate", validation.Message, StringComparison.Ordinal);
-    }
-
-    private static IEnumerable<Exception> Unwrap(Exception exception)
-    {
-        yield return exception;
-
-        var inner = exception is AggregateException aggregate
-            ? aggregate.InnerExceptions.ToList()
-            : exception.InnerException is { } single ? [single] : [];
-        foreach (var child in inner.SelectMany(Unwrap))
-        {
-            yield return child;
-        }
-    }
 }
