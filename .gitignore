@@ -14,3 +14,6 @@ deploy/*.env
 
 # Narzędzia lokalne
 .claude/
+
+# Vercel CLI (konfiguracja projektu i wynik budowy)
+.vercel/

@@ -17,7 +17,7 @@ configuration.
 | `app/` | Frontend application | Angular, Tailwind CSS, daisyUI |
 | `api/src/` | Backend application | ASP.NET Core, EF Core |
 | `api/tests/` | Backend tests; frontend unit tests live next to the code in `app/src` | xUnit v3 (Microsoft.Testing.Platform), NetArchTest, Testcontainers; Vitest |
-| `deploy/` | Deployment configuration (in SF-3 only the local SQL Server and example variables) | Vercel, SMART ASP.NET |
+| `deploy/` | Local SQL Server, example variables, deployment scripts (`deploy/scripts/`, SF-4); procedure in `docs/wdrozenia.md` | bash, GitHub Actions, Vercel, SmarterASP.NET |
 | `stone-flow.slnx` | Solution for Visual Studio and the `dotnet` CLI | |
 
 Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
@@ -74,7 +74,8 @@ setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Archit
   the allowed list of `EndpointSecurityTests` plus the reason in the task spec.
 - Every `POST`/`PUT`/`PATCH`/`DELETE` under `/api` is CSRF-checked globally
   (`CsrfValidationMiddleware`, header `X-XSRF-TOKEN`); endpoints add nothing for it.
-- Pipeline order in `Program.cs`: correlation → exception handler → status pages → routing → CORS
+- Pipeline order in `Program.cs`: correlation → exception handler → status pages → HSTS + HTTPS
+  redirection (outside Development, SF-4) → routing → CORS
   (no origins allowed) → rate limiter → authentication → authorization → CSRF → endpoints.
 - The current account id comes from `ClaimTypes.NameIdentifier`; handlers receive it as a command
   parameter, never read `HttpContext`.
@@ -95,6 +96,12 @@ setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Archit
   presented in Europe/Warsaw.
 - I/O is asynchronous and supports request cancellation.
 - Lists filter, sort and paginate through the API.
+- Migrations run before the new code is published (SF-4), so every migration must work with the
+  previous API version (expand/contract: add first, remove in a later deployment). Never edit an
+  applied migration; fix forward. A new module with a database is appended to
+  `deploy/scripts/contexts.sh`.
+- The backend is published before the frontend, so an API change must keep the previous frontend
+  working within one deployment.
 
 ### Errors and validation
 

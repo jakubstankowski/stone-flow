@@ -22,6 +22,7 @@ builder.Services.AddStoneFlowProblemDetails(builder.Environment);
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks().AddCheck<SqlServerHealthCheck>("sql");
 builder.Services.AddStoneFlowSecurity();
+builder.Services.AddStoneFlowHttps();
 
 builder.Services.AddSharedInfrastructure();
 builder.Services
@@ -37,6 +38,7 @@ var app = builder.Build();
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseExceptionHandler(new ExceptionHandlerOptions { StatusCodeSelector = SecuritySetup.SelectStatusCode });
 app.UseStatusCodePages();
+app.UseStoneFlowHttps();
 app.UseRouting();
 app.UseCors();
 app.UseRateLimiter();
