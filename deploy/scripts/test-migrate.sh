@@ -25,9 +25,16 @@ sql() { # sql <baza> <zapytanie> → wynik bez nagłówków
 }
 
 connection_for() { # connection string do wskazanej bazy (zastępuje/dodaje Database=)
-  local base
-  base="$(printf '%s' "$STONEFLOW_TEST_SQLSERVER" | sed -E 's/(^|;)[[:space:]]*(Database|Initial Catalog)=[^;]*//Ig')"
-  printf '%s;Database=%s' "${base%;}" "$1"
+  local part key result=""
+  local -a parts
+  IFS=';' read -ra parts <<<"$STONEFLOW_TEST_SQLSERVER"
+  for part in "${parts[@]}"; do
+    key="${part%%=*}"
+    key="$(printf '%s' "$key" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+    [[ -z "$key" || "$key" == "database" || "$key" == "initialcatalog" ]] && continue
+    result+="${part};"
+  done
+  printf '%sDatabase=%s' "$result" "$1"
 }
 
 cleanup() {

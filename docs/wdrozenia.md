@@ -44,7 +44,8 @@ Workflow `.github/workflows/deploy.yml` (push na `main`, także ręcznie):
    1. generuje produkcyjny `vercel.json` (`app/scripts/vercel-config.mjs`) z przepisaniem
       `/api/*` na `STONEFLOW_API_ORIGIN`;
    2. `vercel pull`, `vercel build --prod`, skan gitleaks pakietu, `vercel deploy --prebuilt --prod`;
-   3. kontrola `/`, `/logowanie` (odświeżenie podstrony) i `/api/auth/csrf` (przepisanie do API).
+   3. kontrola `/` i `/logowanie` (odświeżenie podstrony) — `200`, oraz `/api/auth/csrf`
+      (przepisanie do API) — `204`.
 
 Publikacje nie biegną równolegle i nie są przerywane w trakcie. Przy kilku szybkich pushach
 GitHub zostawia w kolejce tylko najnowszy oczekujący przebieg (pośrednie są anulowane przed
@@ -75,7 +76,9 @@ nieosiągalny serwer.
 **Ograniczone uprawnienia:**
 
 - workflow mają tylko `contents: read`; sekrety są przekazywane wyłącznie krokom, które ich
-  potrzebują, a połączenie SQL i hasło FTP przez zmienne środowiskowe (nie argumenty);
+  potrzebują; połączenie SQL i hasło FTP przez zmienne środowiskowe (nie argumenty), token
+  Vercel jako argument `--token` (zgodnie z dokumentacją Vercel CLI; maskowany w logach,
+  runner jest jednorazowy);
 - `DEPLOY_ENABLED`, environment i sekrety może zmieniać tylko administrator repozytorium;
 - osobny login SQL do migracji (prawa DDL w bazie Stone Flow) i login aplikacji tylko z
   odczytem i zapisem danych (`db_datareader`, `db_datawriter`), jeśli hosting pozwala na kilka

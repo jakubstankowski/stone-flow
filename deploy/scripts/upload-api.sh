@@ -26,6 +26,8 @@ set net:timeout 30
 cd "${API_FTP_PATH}"
 mkdir -pf logs
 put "${root}/deploy/app_offline.htm" -o app_offline.htm
+# ANCM zatrzymuje aplikację asynchronicznie; bez przerwy zablokowane DLL dają błąd 550.
+sleep 20
 mirror --reverse --delete --verbose=1 --exclude-glob appsettings.Production.json --exclude-glob app_offline.htm --exclude ^logs/ "${package}" .
 rm app_offline.htm
 bye

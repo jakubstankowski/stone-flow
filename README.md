@@ -188,7 +188,7 @@ kontroli muszą już istnieć).
 
 W ustawieniach repozytorium: *Settings → Branches → Add branch ruleset* (lub *branch protection
 rule*) dla `main`: wymagane kontrole `backend`, `frontend`, `secrets`, `deploy-dry-run` i aktualna gałąź przed
-merge (po pierwszym przebiegu także `deploy-dry-run`). Alternatywnie poleceniem:
+merge. Alternatywnie poleceniem:
 
 ```
 gh api -X PUT "repos/{owner}/{repo}/branches/main/protection" --input - <<'EOF'

@@ -12,6 +12,11 @@ cd "$root"
 # shellcheck source=contexts.sh
 source deploy/scripts/contexts.sh
 
+# dotnet ef bez ustawionego środowiska przyjmuje Development (user secrets,
+# appsettings.Development.json). Migracje produkcyjne budują host jak w Production.
+export ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Production}"
+export DOTNET_ENVIRONMENT="${DOTNET_ENVIRONMENT:-Production}"
+
 if [[ -z "${ConnectionStrings__StoneFlow:-}" ]]; then
   echo "::error::Brak zmiennej ConnectionStrings__StoneFlow — migracje nie zostały uruchomione."
   exit 2

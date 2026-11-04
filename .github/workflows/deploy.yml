@@ -81,7 +81,7 @@ jobs:
       - name: Kontrola /health
         env:
           API_ORIGIN: ${{ vars.STONEFLOW_API_ORIGIN }}
-        run: deploy/scripts/wait-for-url.sh "${API_ORIGIN}/health"
+        run: deploy/scripts/wait-for-url.sh "${API_ORIGIN%/}/health"
 
   frontend:
     name: frontend
@@ -136,6 +136,8 @@ jobs:
         env:
           APP_URL: ${{ vars.STONEFLOW_APP_URL }}
         run: |
-          deploy/scripts/wait-for-url.sh "${APP_URL}/"
-          deploy/scripts/wait-for-url.sh "${APP_URL}/logowanie"
-          deploy/scripts/wait-for-url.sh "${APP_URL}/api/auth/csrf"
+          app_url="${APP_URL%/}"
+          deploy/scripts/wait-for-url.sh "${app_url}/"
+          deploy/scripts/wait-for-url.sh "${app_url}/logowanie"
+          # GET /api/auth/csrf odpowiada 204 (token w ciasteczku) — dowód przepisania do API.
+          deploy/scripts/wait-for-url.sh "${app_url}/api/auth/csrf" 204
