@@ -1,0 +1,8 @@
+# Wyjątki skanu sekretów: fikcyjne hasła testowe w testach SF-6 (reguła generic-api-key).
+# Każdy wpis to dokładny odcisk commit:plik:reguła:linia — nowe znalezisko nadal zatrzymuje CI.
+b3cbc23252c0b7d9971ca5e53a034a00f576d0e5:api/tests/StoneFlow.Api.IntegrationTests/Infrastructure/AuthClient.cs:generic-api-key:13
+b3cbc23252c0b7d9971ca5e53a034a00f576d0e5:api/tests/StoneFlow.Api.IntegrationTests/Access/PasswordResetTests.cs:generic-api-key:93
+e573b1ef3f35d0b32a4823e4da251bf31e7391ea:api/tests/StoneFlow.Access.Tests/Application/PasswordResetHandlerTests.cs:generic-api-key:172
+e573b1ef3f35d0b32a4823e4da251bf31e7391ea:api/tests/StoneFlow.Access.Tests/Application/PasswordResetHandlerTests.cs:generic-api-key:173
+c9f09a540d32350dfeaff096002df422faf3d4f1:api/tests/StoneFlow.Access.Tests/Application/LoginLogoutHandlerTests.cs:generic-api-key:20
+c9f09a540d32350dfeaff096002df422faf3d4f1:api/tests/StoneFlow.Access.Tests/Application/LoginLogoutHandlerTests.cs:generic-api-key:32
