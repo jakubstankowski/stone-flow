@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -31,9 +33,13 @@ public static class DependencyInjection
 
     public static IServiceCollection AddAccessInfrastructure(this IServiceCollection services)
     {
-        services.AddDbContext<AccessDbContext>((serviceProvider, options) => options.UseModuleSqlServer<AccessDbContext>(
-            serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ModuleDbContextOptions.ConnectionStringName),
-            AccessDbContext.Schema));
+        services.AddDbContext<AccessDbContext>((serviceProvider, options) => options
+            .UseModuleSqlServer<AccessDbContext>(
+                serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString(ModuleDbContextOptions.ConnectionStringName),
+                AccessDbContext.Schema)
+            // Błąd zapisu (np. duplikat unikalnego e-maila przy równoczesnym tworzeniu konta) zawiera
+            // wartość klucza; wyjątek obsługuje magazyn, więc EF nie loguje go z danymi osobowymi.
+            .ConfigureWarnings(warnings => warnings.Ignore(CoreEventId.SaveChangesFailed)));
 
         services.TryAddSingleton(TimeProvider.System);
         AddOptions(services);
@@ -73,8 +79,12 @@ public static class DependencyInjection
         {
             var owner = serviceProvider.GetRequiredService<IOptions<OwnerOptions>>().Value;
             var app = serviceProvider.GetRequiredService<IOptions<AppOptions>>().Value;
-            AppOptionsValidator.TryParse(app.BaseUrl, out var baseUrl);
-            return new AccessSettings(owner.Email ?? string.Empty, baseUrl);
+            if (string.IsNullOrWhiteSpace(owner.Email) || !AppOptionsValidator.TryParse(app.BaseUrl, out var baseUrl))
+            {
+                throw new InvalidOperationException("Konfiguracja modułu Access nie przeszła walidacji.");
+            }
+
+            return new AccessSettings(owner.Email, baseUrl);
         });
     }
 

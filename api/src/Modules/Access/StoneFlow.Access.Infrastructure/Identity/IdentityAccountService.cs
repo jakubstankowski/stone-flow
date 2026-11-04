@@ -60,6 +60,12 @@ internal sealed class IdentityAccountService(
         }
 
         var wasLockedOut = await userManager.IsLockedOutAsync(user);
+        if (wasLockedOut && user.PasswordHash is not null)
+        {
+            // Przy blokadzie Identity nie sprawdza hasła — wyrównujemy czas, aby nie zdradzić istnienia konta.
+            SpendHashingTime(password);
+        }
+
         var result = await signInManager.CheckPasswordSignInAsync(user, password, lockoutOnFailure: true);
         if (result.Succeeded)
         {
@@ -98,9 +104,16 @@ internal sealed class IdentityAccountService(
     public async Task RotateSecurityStampAsync(Guid accountId, CancellationToken cancellationToken)
     {
         var user = await context.Users.SingleOrDefaultAsync(u => u.Id == accountId, cancellationToken);
-        if (user is not null)
+        if (user is null)
         {
-            await userManager.UpdateSecurityStampAsync(user);
+            return;
+        }
+
+        // Bez nowego znacznika skopiowane ciasteczko pozostałoby ważne — błąd przerywa wylogowanie (fail closed).
+        var result = await userManager.UpdateSecurityStampAsync(user);
+        if (!result.Succeeded)
+        {
+            throw new InvalidOperationException("Nie udało się unieważnić sesji konta.");
         }
     }
 

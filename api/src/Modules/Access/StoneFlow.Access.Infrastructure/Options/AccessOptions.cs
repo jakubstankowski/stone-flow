@@ -49,6 +49,7 @@ public sealed class SmtpOptions
 
     public int Port { get; set; } = 587;
 
+    /// <summary><c>true</c>: STARTTLS (wymagany); <c>false</c>: TLS od początku połączenia. Bez szyfrowania nigdy.</summary>
     public bool UseStartTls { get; set; } = true;
 
     public string? UserName { get; set; }

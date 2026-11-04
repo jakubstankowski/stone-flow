@@ -223,7 +223,6 @@ public sealed class PasswordResetTests(SqlServerFixture sqlServer)
         (await resetClient.RequestResetAsync()).Dispose();
         var link = factory.Emails.LastLink();
         using var confirm = await resetClient.ConfirmResetAsync(link.AccountId, link.Token, "zupelnie-nowe-haslo");
-        await Task.Delay(10, TestContext.Current.CancellationToken);
         using var oldSession = await browser.GetSessionAsync();
         using var noSession = await resetClient.GetSessionAsync();
         using var login = await resetClient.LoginAsync(password: "zupelnie-nowe-haslo");

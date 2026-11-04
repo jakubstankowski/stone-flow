@@ -66,6 +66,44 @@ public sealed class LoginAndSessionTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task Expired_lockout_allows_login_and_success_resets_the_counter()
+    {
+        await using var factory = await CreateAsync();
+        using var client = AuthClient.Create(factory);
+        await client.SetUpOwnerAsync(factory);
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            (await client.LoginAsync(password: "zle-haslo-numer-" + attempt)).Dispose();
+        }
+
+        await TestDatabase.QueryAsync(factory, db => db.Users.ExecuteUpdateAsync(
+            set => set.SetProperty(u => u.LockoutEndUtc, DateTime.UtcNow.AddMinutes(-1)),
+            TestContext.Current.CancellationToken));
+        using var login = await client.LoginAsync();
+        var failedCount = await TestDatabase.QueryAsync(factory, db => db.Users.Select(u => u.AccessFailedCount).SingleAsync());
+
+        Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
+        Assert.Equal(0, failedCount);
+    }
+
+    [Fact]
+    public async Task Development_cookies_have_no_host_prefix()
+    {
+        await using var factory = await CreateAsync(environment: "Development");
+        using var client = AuthClient.Create(factory);
+        await client.SetUpOwnerAsync(factory);
+        using var fresh = AuthClient.Create(factory);
+
+        using var csrf = await fresh.GetCsrfAsync();
+        using var login = await client.LoginAsync();
+        var cookies = csrf.Headers.GetValues("Set-Cookie").Concat(login.Headers.GetValues("Set-Cookie")).ToArray();
+
+        Assert.Contains(cookies, c => c.StartsWith("sf_session=", StringComparison.Ordinal));
+        Assert.Contains(cookies, c => c.StartsWith("sf_af=", StringComparison.Ordinal));
+        Assert.DoesNotContain(cookies, c => c.StartsWith("__Host-", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Missing_fields_return_validation_problem()
     {
         await using var factory = await CreateAsync();
@@ -250,9 +288,9 @@ public sealed class LoginAndSessionTests(SqlServerFixture sqlServer)
         Assert.DoesNotContain(token, text, StringComparison.Ordinal);
     }
 
-    private async Task<StoneFlowApiFactory> CreateAsync(FakeTimeProvider? time = null)
+    private async Task<StoneFlowApiFactory> CreateAsync(FakeTimeProvider? time = null, string environment = "Production")
     {
-        var factory = new StoneFlowApiFactory { Time = time }.WithDatabase(sqlServer.NewDatabase("login"));
+        var factory = new StoneFlowApiFactory { Time = time, Environment = environment }.WithDatabase(sqlServer.NewDatabase("login"));
         await TestDatabase.MigrateAsync(factory);
         return factory;
     }

@@ -95,6 +95,20 @@ public sealed class EndpointSecurityTests
     }
 
     [Fact]
+    public async Task Unknown_api_post_is_also_csrf_validated()
+    {
+        await using var factory = new StoneFlowApiFactory();
+        using var client = factory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/nie-ma", UriKind.Relative));
+        request.Headers.Add(TestRequestStartupFilter.AccountHeader, Guid.NewGuid().ToString("D"));
+
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(AuthProblems.CsrfInvalidCode, (await AuthClient.ProblemAsync(response)).GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task Cross_origin_requests_get_no_cors_headers()
     {
         await using var factory = new StoneFlowApiFactory();

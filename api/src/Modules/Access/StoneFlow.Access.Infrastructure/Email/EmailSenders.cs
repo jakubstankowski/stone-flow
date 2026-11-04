@@ -34,7 +34,8 @@ internal sealed partial class SmtpEmailSender(IOptions<EmailOptions> options, IL
             await client.ConnectAsync(
                 host,
                 smtp.Port,
-                smtp.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto,
+                // Zawsze szyfrowane: STARTTLS (wymagany) albo TLS od początku połączenia (np. port 465).
+                smtp.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.SslOnConnect,
                 cancellationToken);
             if (!string.IsNullOrEmpty(smtp.UserName) && smtp.Password is { } password)
             {

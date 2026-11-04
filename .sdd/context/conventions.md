@@ -153,7 +153,8 @@ Decided in SF-6. The frontend presents results; it does not calculate finances.
   the bundle. Locally `app/proxy.conf.mjs` forwards `/api` to the API
   (`STONEFLOW_API_URL`, default `http://localhost:5080`); in production the hosting rewrite does
   the same (SF-4).
-- One client per area (`*-api.ts`) returns `Observable`s of typed DTOs; state lives in services
+- One client per area (`*-api.ts`) exposes async methods returning Promises of typed DTOs
+  (`firstValueFrom` over `HttpClient`); state lives in services
   with signals (no state library). Flows that orchestrate several calls live in the service, not
   in components.
 - Errors are mapped with `toApiError()` (`network` for status 0 and 5xx, `validation` for

@@ -103,7 +103,7 @@ ekranu logowania i niczego nie uwierzytelnia; ERP nie zmienia niczego w sklepie.
 | `StoneFlow:Owner:Email` | `StoneFlow__Owner__Email` | adres właściciela; tylko dla niego może powstać konto |
 | `StoneFlow:App:BaseUrl` | `StoneFlow__App__BaseUrl` | adres aplikacji używany w linku resetu hasła |
 | `StoneFlow:Email:Mode` | `StoneFlow__Email__Mode` | `Smtp` albo `Log` (`Log` tylko w Development: treść wiadomości w logu) |
-| `StoneFlow:Email:Smtp:*` | `StoneFlow__Email__Smtp__*` | `Host`, `Port`, `UseStartTls`, `UserName`, `Password` (tylko sekrety), `FromAddress`, `FromName` |
+| `StoneFlow:Email:Smtp:*` | `StoneFlow__Email__Smtp__*` | `Host`, `Port`, `UseStartTls` (`true`: STARTTLS, `false`: TLS od początku połączenia, np. port 465 — nigdy bez szyfrowania), `UserName`, `Password` (tylko sekrety), `FromAddress`, `FromName` |
 
 - Brak lub błąd konfiguracji właściciela, adresu aplikacji albo SMTP zatrzymuje start API
   (komunikat wskazuje klucz, bez wartości). Dostawca SMTP nie jest jeszcze wybrany (PRD D-05).
