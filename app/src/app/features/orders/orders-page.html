@@ -1,4 +1,14 @@
 <section class="flex flex-col gap-6">
   <h1 class="text-3xl font-bold">Zamówienia</h1>
-  <app-empty-state heading="Ten widok powstanie w kolejnych etapach." />
+  <app-data-table
+    caption="Zamówienia — październik 2026"
+    [columns]="columns"
+    [rows]="rows"
+    [rowKey]="rowKey"
+    [total]="rows.length"
+  >
+    <ng-template appTableCell="status" [appTableCellOf]="rows" let-row>
+      <app-status-badge [label]="row.status" [tone]="statusTones[row.status]" />
+    </ng-template>
+  </app-data-table>
 </section>

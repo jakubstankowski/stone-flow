@@ -12,7 +12,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideAppHttp(),
+    // TRYB DEMO: backend udawany w przeglądarce (demo/demo-backend.ts).
+    provideAppHttp({ demo: true }),
     { provide: LOCALE_ID, useValue: 'pl-PL' },
     { provide: TitleStrategy, useClass: PageTitleStrategy },
   ],

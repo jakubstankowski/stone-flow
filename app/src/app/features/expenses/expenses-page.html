@@ -1,4 +1,44 @@
 <section class="flex flex-col gap-6">
-  <h1 class="text-3xl font-bold">Wydatki</h1>
-  <app-empty-state heading="Ten widok powstanie w kolejnych etapach." />
+  <header>
+    <h1 class="text-3xl font-bold">Wydatki</h1>
+    <p class="text-(--sf-muted)">{{ month | plMonth }}</p>
+  </header>
+
+  <div class="grid gap-4 sm:grid-cols-3">
+    <article class="card bg-base-100 shadow-(--sf-shadow)">
+      <div class="card-body gap-1 p-5">
+        <h2 class="text-sm font-medium text-(--sf-muted)">Razem w miesiącu</h2>
+        <p class="text-2xl font-bold tabular-nums">{{ total | plnAmount }}</p>
+      </div>
+    </article>
+    <article class="card bg-base-100 shadow-(--sf-shadow)">
+      <div class="card-body gap-1 p-5">
+        <h2 class="text-sm font-medium text-(--sf-muted)">Wydatki miesięczne</h2>
+        <p class="text-2xl font-bold tabular-nums">{{ recurringTotal | plnAmount }}</p>
+      </div>
+    </article>
+    <article class="card bg-base-100 shadow-(--sf-shadow)">
+      <div class="card-body gap-1 p-5">
+        <h2 class="text-sm font-medium text-(--sf-muted)">Do zapłaty</h2>
+        <p class="text-2xl font-bold tabular-nums text-(--sf-warning)">
+          {{ unpaidTotal | plnAmount }}
+        </p>
+      </div>
+    </article>
+  </div>
+
+  <app-data-table
+    caption="Wydatki — październik 2026"
+    [columns]="columns"
+    [rows]="rows"
+    [rowKey]="rowKey"
+    [total]="rows.length"
+  >
+    <ng-template appTableCell="paid" [appTableCellOf]="rows" let-row>
+      <app-status-badge
+        [label]="row.paid ? 'Zapłacony' : 'Planowany'"
+        [tone]="row.paid ? 'success' : 'warning'"
+      />
+    </ng-template>
+  </app-data-table>
 </section>

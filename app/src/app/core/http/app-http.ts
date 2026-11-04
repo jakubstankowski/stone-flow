@@ -1,5 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { provideHttpClient, withInterceptors, withXsrfConfiguration } from '@angular/common/http';
+import { demoBackendInterceptor } from '../../demo/demo-backend';
 import { unauthorizedInterceptor } from '../auth/unauthorized-interceptor';
 
 /**
@@ -7,9 +8,12 @@ import { unauthorizedInterceptor } from '../auth/unauthorized-interceptor';
  * Angular dokleja nagłówek `X-XSRF-TOKEN` z ciasteczka `XSRF-TOKEN` do żądań zmieniających
  * stan. Adresy w kodzie muszą być względne: na obcy origin nagłówek nie jest wysyłany.
  */
-export function provideAppHttp(): EnvironmentProviders {
+export function provideAppHttp(options: { demo?: boolean } = {}): EnvironmentProviders {
   return provideHttpClient(
     withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }),
-    withInterceptors([unauthorizedInterceptor]),
+    // TRYB DEMO: demoBackendInterceptor udaje API (gałąź demo-teaser).
+    withInterceptors(
+      options.demo ? [unauthorizedInterceptor, demoBackendInterceptor] : [unauthorizedInterceptor],
+    ),
   );
 }
