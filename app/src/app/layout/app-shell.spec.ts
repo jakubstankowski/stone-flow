@@ -1,13 +1,21 @@
+import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { routes } from '../app.routes';
+import { provideTestHttp, signIn } from '../../testing/auth-testing';
+import { sectionRoutes } from '../app.routes';
 import { AppShell } from './app-shell';
 
 describe('AppShell', () => {
-  beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [AppShell], providers: [provideRouter(routes)] });
+  beforeEach(async () => {
+    TestBed.configureTestingModule({
+      imports: [AppShell],
+      providers: [provideRouter(sectionRoutes), provideTestHttp()],
+    });
+    await signIn('owner@example.com');
   });
+
+  afterEach(() => TestBed.inject(HttpTestingController).verify());
 
   async function render(url: string) {
     await RouterTestingHarness.create(url);
@@ -55,5 +63,19 @@ describe('AppShell', () => {
     await TestBed.inject(Router).navigateByUrl('/operacje');
     await fixture.whenStable();
     expect(header.textContent).toContain('Operacje');
+  });
+
+  it('shows the user menu after the navigation in the header', async () => {
+    const { element } = await render('/pulpit');
+    const header = element.querySelector('header') as HTMLElement;
+    const menu = header.querySelector('app-user-menu') as HTMLElement;
+    const focusable = Array.from(header.querySelectorAll('a, button')).map((node) =>
+      node.textContent?.trim(),
+    );
+
+    expect(menu.textContent).toContain('owner@example.com');
+    expect(focusable[0]).toBe('Stone Flow');
+    expect(focusable[1]).toBe('Menu');
+    expect(focusable.at(-1)).toBe('Wyloguj');
   });
 });

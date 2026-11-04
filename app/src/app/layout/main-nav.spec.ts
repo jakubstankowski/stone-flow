@@ -1,12 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { routes } from '../app.routes';
+import { sectionRoutes } from '../app.routes';
 import { MainNav } from './main-nav';
 
 describe('MainNav', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [MainNav], providers: [provideRouter(routes)] });
+    TestBed.configureTestingModule({
+      imports: [MainNav],
+      providers: [provideRouter(sectionRoutes)],
+    });
   });
 
   afterEach(() => {
@@ -101,7 +104,10 @@ describe('MainNav', () => {
 
 describe('MainNav link selection', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [MainNav], providers: [provideRouter(routes)] });
+    TestBed.configureTestingModule({
+      imports: [MainNav],
+      providers: [provideRouter(sectionRoutes)],
+    });
   });
 
   afterEach(() => {
