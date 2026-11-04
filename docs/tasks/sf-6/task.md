@@ -1,7 +1,7 @@
 ---
 id: SF-6
 title: Logowanie, reset hasła, sesja i ochrona API
-status: code_reviewed
+status: done
 risk: high
 depends_on: [SF-3, SF-4, SF-5]
 parts: []
