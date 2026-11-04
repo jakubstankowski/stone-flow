@@ -24,6 +24,7 @@ public sealed class OpenApiTests
     {
         await using var factory = new StoneFlowApiFactory();
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestRequestStartupFilter.AccountHeader, Guid.NewGuid().ToString("D"));
 
         using var response = await client.GetAsync(DocumentUri, TestContext.Current.CancellationToken);
 

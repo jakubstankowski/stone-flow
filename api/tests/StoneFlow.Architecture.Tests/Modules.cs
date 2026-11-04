@@ -5,7 +5,7 @@ namespace StoneFlow.Architecture.Tests;
 /// <summary>Zestawy modułów i części wspólnej sprawdzane przez testy architektury.</summary>
 internal static class Modules
 {
-    public static readonly string[] Names = ["Orders", "Expenses", "Reporting", "Integrations"];
+    public static readonly string[] Names = ["Access", "Orders", "Expenses", "Reporting", "Integrations"];
 
     public static readonly string[] Layers = ["Domain", "Application", "Infrastructure", "Api"];
 
@@ -24,6 +24,7 @@ internal static class Modules
 
     private static Assembly DomainAssembly(string module) => module switch
     {
+        "Access" => Access.Domain.AssemblyReference.Assembly,
         "Orders" => Orders.Domain.AssemblyReference.Assembly,
         "Expenses" => Expenses.Domain.AssemblyReference.Assembly,
         "Reporting" => Reporting.Domain.AssemblyReference.Assembly,
@@ -33,6 +34,7 @@ internal static class Modules
 
     private static Assembly ApplicationAssembly(string module) => module switch
     {
+        "Access" => Access.Application.AssemblyReference.Assembly,
         "Orders" => Orders.Application.AssemblyReference.Assembly,
         "Expenses" => Expenses.Application.AssemblyReference.Assembly,
         "Reporting" => Reporting.Application.AssemblyReference.Assembly,
@@ -42,6 +44,7 @@ internal static class Modules
 
     private static Assembly InfrastructureAssembly(string module) => module switch
     {
+        "Access" => Access.Infrastructure.AssemblyReference.Assembly,
         "Orders" => Orders.Infrastructure.AssemblyReference.Assembly,
         "Expenses" => Expenses.Infrastructure.AssemblyReference.Assembly,
         "Reporting" => Reporting.Infrastructure.AssemblyReference.Assembly,
@@ -51,6 +54,7 @@ internal static class Modules
 
     private static Assembly ApiAssembly(string module) => module switch
     {
+        "Access" => Access.Api.AssemblyReference.Assembly,
         "Orders" => Orders.Api.AssemblyReference.Assembly,
         "Expenses" => Expenses.Api.AssemblyReference.Assembly,
         "Reporting" => Reporting.Api.AssemblyReference.Assembly,

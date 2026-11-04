@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <!-- Identity (UserManager, SignInManager), uwierzytelnianie ciasteczkiem i HttpContext. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StoneFlow.Access.Application\StoneFlow.Access.Application.csproj" />
+    <ProjectReference Include="..\..\..\Shared\StoneFlow.Shared.Infrastructure\StoneFlow.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

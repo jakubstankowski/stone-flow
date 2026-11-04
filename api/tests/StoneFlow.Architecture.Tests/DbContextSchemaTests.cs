@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StoneFlow.Access.Infrastructure;
+using StoneFlow.Access.Infrastructure.Persistence;
 using StoneFlow.Expenses.Infrastructure;
 using StoneFlow.Expenses.Infrastructure.Persistence;
 using StoneFlow.Integrations.Infrastructure;
@@ -57,6 +59,7 @@ public sealed class DbContextSchemaTests
 
     private static (Action<IServiceCollection> Register, Type ContextType, string Schema) Module(string module) => module switch
     {
+        "Access" => (s => s.AddAccessInfrastructure(), typeof(AccessDbContext), AccessDbContext.Schema),
         "Orders" => (s => s.AddOrdersInfrastructure(), typeof(OrdersDbContext), OrdersDbContext.Schema),
         "Expenses" => (s => s.AddExpensesInfrastructure(), typeof(ExpensesDbContext), ExpensesDbContext.Schema),
         "Reporting" => (s => s.AddReportingInfrastructure(), typeof(ReportingDbContext), ReportingDbContext.Schema),

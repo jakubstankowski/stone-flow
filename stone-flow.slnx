@@ -9,6 +9,12 @@
     <Project Path="api/src/Shared/StoneFlow.Shared.Infrastructure/StoneFlow.Shared.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/api/src/Modules/" />
+  <Folder Name="/api/src/Modules/Access/">
+    <Project Path="api/src/Modules/Access/StoneFlow.Access.Domain/StoneFlow.Access.Domain.csproj" />
+    <Project Path="api/src/Modules/Access/StoneFlow.Access.Application/StoneFlow.Access.Application.csproj" />
+    <Project Path="api/src/Modules/Access/StoneFlow.Access.Infrastructure/StoneFlow.Access.Infrastructure.csproj" />
+    <Project Path="api/src/Modules/Access/StoneFlow.Access.Api/StoneFlow.Access.Api.csproj" />
+  </Folder>
   <Folder Name="/api/src/Modules/Orders/">
     <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Domain/StoneFlow.Orders.Domain.csproj" />
     <Project Path="api/src/Modules/Orders/StoneFlow.Orders.Application/StoneFlow.Orders.Application.csproj" />
@@ -36,6 +42,7 @@
   <Folder Name="/api/tests/">
     <Project Path="api/tests/StoneFlow.Architecture.Tests/StoneFlow.Architecture.Tests.csproj" />
     <Project Path="api/tests/StoneFlow.Shared.Tests/StoneFlow.Shared.Tests.csproj" />
+    <Project Path="api/tests/StoneFlow.Access.Tests/StoneFlow.Access.Tests.csproj" />
     <Project Path="api/tests/StoneFlow.Api.IntegrationTests/StoneFlow.Api.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
