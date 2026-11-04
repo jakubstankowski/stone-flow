@@ -1,20 +1,15 @@
 using System.Net;
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
-using StoneFlow.Expenses.Infrastructure.Persistence;
-using StoneFlow.Integrations.Infrastructure.Persistence;
-using StoneFlow.Orders.Infrastructure.Persistence;
-using StoneFlow.Reporting.Infrastructure.Persistence;
 
 namespace StoneFlow.Api.IntegrationTests;
 
-/// <summary>Testy wymagające SQL Server w kontenerze (Docker).</summary>
+/// <summary>Testy wymagające SQL Server (kontener w CI albo serwer z STONEFLOW_TEST_SQLSERVER).</summary>
 [Collection(SqlServerCollection.Name)]
 public sealed class DatabaseTests(SqlServerFixture sqlServer)
 {
-    private static readonly string[] Schemas = ["orders", "expenses", "reporting", "integrations"];
+    private static readonly string[] Schemas = ["access", "orders", "expenses", "reporting", "integrations"];
 
     [Fact]
     public async Task Health_is_healthy_when_database_available()
@@ -32,41 +27,41 @@ public sealed class DatabaseTests(SqlServerFixture sqlServer)
     public async Task All_module_migrations_apply_to_empty_database()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var connectionString = new SqlConnectionStringBuilder(sqlServer.ConnectionString)
-        {
-            InitialCatalog = $"StoneFlowMigrations_{Guid.NewGuid():N}",
-        }.ConnectionString;
+        var connectionString = sqlServer.NewDatabase("migrations");
 
-        await using var factory = new StoneFlowApiFactory().With("ConnectionStrings:StoneFlow", connectionString);
-        using (var scope = factory.Services.CreateScope())
-        {
-            DbContext[] contexts =
-            [
-                scope.ServiceProvider.GetRequiredService<OrdersDbContext>(),
-                scope.ServiceProvider.GetRequiredService<ExpensesDbContext>(),
-                scope.ServiceProvider.GetRequiredService<ReportingDbContext>(),
-                scope.ServiceProvider.GetRequiredService<IntegrationsDbContext>(),
-            ];
-
-            foreach (var context in contexts)
-            {
-                await context.Database.MigrateAsync(cancellationToken);
-            }
-        }
+        await using var factory = new StoneFlowApiFactory().WithDatabase(connectionString);
+        await TestDatabase.MigrateAsync(factory);
 
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
         foreach (var schema in Schemas)
         {
-            await using var command = connection.CreateCommand();
-            command.CommandText =
-                "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id " +
-                "WHERE s.name = @schema AND t.name = '__EFMigrationsHistory'";
-            command.Parameters.AddWithValue("@schema", schema);
-
-            var historyTables = (int)(await command.ExecuteScalarAsync(cancellationToken))!;
-            Assert.Equal(1, historyTables);
+            Assert.Equal(1, await CountTablesAsync(connection, schema, "__EFMigrationsHistory", cancellationToken));
         }
+
+        // Moduł Access: tylko tabele konta, tokenów resetu i kluczy — bez ról, claimów, loginów i tokenów Identity.
+        var accessTables = await TablesAsync(connection, "access", cancellationToken);
+        Assert.Equal(["DataProtectionKeys", "PasswordResetTokens", "Users", "__EFMigrationsHistory"], accessTables);
+    }
+
+    private static async Task<int> CountTablesAsync(SqlConnection connection, string schema, string table, CancellationToken cancellationToken) =>
+        (await TablesAsync(connection, schema, cancellationToken)).Count(name => name == table);
+
+    private static async Task<string[]> TablesAsync(SqlConnection connection, string schema, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = @schema";
+        command.Parameters.AddWithValue("@schema", schema);
+
+        var names = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return [.. names.Order(StringComparer.Ordinal)];
     }
 }

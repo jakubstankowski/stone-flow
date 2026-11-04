@@ -1,3 +1,4 @@
+using System.Reflection;
 using StoneFlow.Shared.Application.Cqrs;
 
 namespace StoneFlow.Shared.Infrastructure.Cqrs;
@@ -38,6 +39,11 @@ internal sealed class Dispatcher(IServiceProvider serviceProvider) : IDispatcher
         var method = handlerType.GetMethod("HandleAsync")
             ?? throw new InvalidOperationException($"Typ '{handlerType.FullName}' nie ma metody HandleAsync.");
 
-        return (Task<TResult>)method.Invoke(handler, [request, cancellationToken])!;
+        // DoNotWrapExceptions: wyjątek rzucony synchronicznie przez handler dociera do wywołującego
+        // bez opakowania w TargetInvocationException, z zachowanym śladem stosu.
+        var result = method.Invoke(handler, BindingFlags.DoNotWrapExceptions, binder: null, [request, cancellationToken], culture: null);
+
+        return result as Task<TResult>
+            ?? throw new InvalidOperationException($"Handler '{handler.GetType().FullName}' nie zwrócił zadania.");
     }
 }

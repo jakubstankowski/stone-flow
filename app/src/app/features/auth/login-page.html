@@ -1,0 +1,48 @@
+<section class="flex flex-col gap-6">
+  <h1 class="text-2xl font-bold">Logowanie</h1>
+  @if (notice; as current) {
+    <p
+      [attr.role]="current.role"
+      [class]="
+        current.role === 'alert'
+          ? 'font-medium text-(--sf-error)'
+          : 'font-medium text-(--sf-success)'
+      "
+    >
+      {{ current.text }}
+    </p>
+  }
+  <form novalidate class="flex flex-col gap-4" (submit)="onSubmit($event)">
+    <app-field label="E-mail" fieldId="logowanie-email" [required]="true" [error]="emailError()">
+      <input
+        #control
+        class="input w-full"
+        type="email"
+        autocomplete="username"
+        autocapitalize="none"
+        spellcheck="false"
+        [formField]="form.email"
+      />
+    </app-field>
+    <app-field label="Hasło" fieldId="logowanie-haslo" [required]="true" [error]="passwordError()">
+      <input
+        #control
+        class="input w-full"
+        type="password"
+        autocomplete="current-password"
+        [formField]="form.password"
+      />
+    </app-field>
+    @if (formError(); as message) {
+      <p #formMessage role="alert" tabindex="-1" class="font-medium text-(--sf-error)">
+        {{ message }}
+      </p>
+    }
+    <app-button variant="primary" type="submit" [busy]="busy()" busyLabel="Logowanie…">
+      Zaloguj
+    </app-button>
+  </form>
+  <a class="link inline-flex min-h-11 items-center self-start" routerLink="/reset-hasla"
+    >Nie pamiętam hasła</a
+  >
+</section>

@@ -1,0 +1,7 @@
+<span class="min-w-0 flex-1 truncate lg:flex-none">{{ email() }}</span>
+<app-button variant="secondary" [busy]="busy()" busyLabel="Wylogowywanie…" (pressed)="logout()">
+  Wyloguj
+</app-button>
+@if (error(); as message) {
+  <p role="alert" class="basis-full text-sm font-medium text-(--sf-error)">{{ message }}</p>
+}
