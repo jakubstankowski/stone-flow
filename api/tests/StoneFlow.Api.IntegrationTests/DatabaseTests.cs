@@ -10,7 +10,7 @@ using StoneFlow.Reporting.Infrastructure.Persistence;
 
 namespace StoneFlow.Api.IntegrationTests;
 
-/// <summary>Testy wymagające SQL Server w kontenerze (Docker).</summary>
+/// <summary>Testy wymagające SQL Server (kontener w CI albo serwer z STONEFLOW_TEST_SQLSERVER).</summary>
 [Collection(SqlServerCollection.Name)]
 public sealed class DatabaseTests(SqlServerFixture sqlServer)
 {
@@ -32,10 +32,7 @@ public sealed class DatabaseTests(SqlServerFixture sqlServer)
     public async Task All_module_migrations_apply_to_empty_database()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var connectionString = new SqlConnectionStringBuilder(sqlServer.ConnectionString)
-        {
-            InitialCatalog = $"StoneFlowMigrations_{Guid.NewGuid():N}",
-        }.ConnectionString;
+        var connectionString = sqlServer.NewDatabase("migrations");
 
         await using var factory = new StoneFlowApiFactory().With("ConnectionStrings:StoneFlow", connectionString);
         using (var scope = factory.Services.CreateScope())
