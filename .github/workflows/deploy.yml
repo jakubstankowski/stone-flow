@@ -1,0 +1,141 @@
+name: Deploy
+
+# Publikacja produkcyjna (SF-4): CI → backend (migracje → API → /health) → frontend (Vercel).
+# Wyłączona, dopóki zmienna repozytorium DEPLOY_ENABLED nie ma wartości "true"; wolno ją ustawić
+# dopiero po spełnieniu warunków z docs/wdrozenia.md (m.in. zamknięte D-08). Bez niej workflow
+# uruchamia tylko CI.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Publikacje nigdy nie biegną równolegle ani nie są przerywane w trakcie (migracje).
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  VERCEL_CLI: vercel@64.7.0
+
+jobs:
+  ci:
+    name: ci
+    uses: ./.github/workflows/ci.yml
+
+  backend:
+    name: backend
+    needs: ci
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.STONEFLOW_API_ORIGIN }}/health
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tylko bieżąca głowa main
+        run: deploy/scripts/check-fresh-commit.sh
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Narzędzia
+        run: dotnet tool restore
+
+      - name: Restore (lockfile)
+        run: dotnet restore stone-flow.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build stone-flow.slnx -c Release --no-restore
+
+      - name: Migracje (stała kolejność; błąd zatrzymuje publikację)
+        env:
+          ConnectionStrings__StoneFlow: ${{ secrets.PRODUCTION_MIGRATIONS_CONNECTION }}
+        run: deploy/scripts/migrate.sh
+
+      - name: Paczka API
+        run: deploy/scripts/publish-api.sh "${RUNNER_TEMP}/api"
+
+      - name: Instalacja lftp
+        run: sudo apt-get update -q && sudo apt-get install -y -q lftp
+
+      - name: Tylko bieżąca głowa main (przed wysyłką)
+        run: deploy/scripts/check-fresh-commit.sh
+
+      - name: Wysyłka API (FTPS)
+        env:
+          API_FTP_HOST: ${{ secrets.API_FTP_HOST }}
+          API_FTP_USER: ${{ secrets.API_FTP_USER }}
+          API_FTP_PASSWORD: ${{ secrets.API_FTP_PASSWORD }}
+          API_FTP_PATH: ${{ secrets.API_FTP_PATH }}
+        run: deploy/scripts/upload-api.sh "${RUNNER_TEMP}/api"
+
+      - name: Kontrola /health
+        env:
+          API_ORIGIN: ${{ vars.STONEFLOW_API_ORIGIN }}
+        run: deploy/scripts/wait-for-url.sh "${API_ORIGIN}/health"
+
+  frontend:
+    name: frontend
+    needs: backend
+    if: vars.DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.STONEFLOW_APP_URL }}
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tylko bieżąca głowa main
+        run: deploy/scripts/check-fresh-commit.sh
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: app/.nvmrc
+
+      - name: Konfiguracja produkcyjna Vercel (/api/* → API)
+        working-directory: app
+        env:
+          STONEFLOW_API_ORIGIN: ${{ vars.STONEFLOW_API_ORIGIN }}
+        run: node scripts/vercel-config.mjs vercel.json
+
+      - name: Vercel — ustawienia projektu
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$VERCEL_TOKEN"
+
+      - name: Vercel — budowa
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes "$VERCEL_CLI" build --prod --token="$VERCEL_TOKEN"
+
+      - uses: ./.github/actions/setup-gitleaks
+        id: gitleaks
+
+      - name: Brak sekretów w pakiecie frontendu
+        run: '"${{ steps.gitleaks.outputs.path }}" dir .vercel/output/static --config .gitleaks.toml --redact --verbose --exit-code 1'
+
+      - name: Vercel — publikacja
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+
+      - name: Kontrola strony, podstrony SPA i przepisania /api
+        env:
+          APP_URL: ${{ vars.STONEFLOW_APP_URL }}
+        run: |
+          deploy/scripts/wait-for-url.sh "${APP_URL}/"
+          deploy/scripts/wait-for-url.sh "${APP_URL}/logowanie"
+          deploy/scripts/wait-for-url.sh "${APP_URL}/api/auth/csrf"

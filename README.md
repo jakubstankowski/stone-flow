@@ -11,7 +11,7 @@ i miesięczne oraz raporty sprzedaży i przepływów pieniężnych. Wymagania pr
 | `api/src/` | backend ASP.NET Core: host `StoneFlow.Api`, część wspólna `Shared/`, moduły `Modules/{Orders,Expenses,Reporting,Integrations}` w warstwach Domain, Application, Infrastructure, Api |
 | `api/tests/` | testy backendu: architektura, część wspólna, integracyjne |
 | `app/` | frontend Angular (testy jednostkowe obok kodu w `app/src`) |
-| `deploy/` | konfiguracja wdrożeń; obecnie lokalny SQL Server i wzory zmiennych |
+| `deploy/` | lokalny SQL Server, wzory zmiennych, skrypty publikacji i migracji (`deploy/scripts/`) |
 | `docs/` | PRD, design guide, artefakty zadań (`docs/tasks/`) |
 | `stone-flow.slnx` | solution dla Visual Studio i `dotnet` CLI |
 
@@ -158,13 +158,27 @@ npm test -- --watch=false
 
 ## CI
 
-Workflow `.github/workflows/ci.yml` uruchamia się przy push i pull request do `main`:
+Workflow `.github/workflows/ci.yml` uruchamia się przy pull request do `main`; na `main` wywołuje
+go workflow publikacji `deploy.yml` (jeden przebieg CI na commit):
 
 | Zadanie | Sprawdza |
 |---|---|
 | `backend` | wersja runtime 10.0.14, restore z lockfile, formatowanie, build Release (ostrzeżenia jako błędy), wszystkie testy, w tym bazy danych |
-| `frontend` | `npm ci`, Prettier, ESLint, typy (kod i testy), build produkcyjny, testy Vitest |
+| `frontend` | `npm ci`, Prettier, ESLint, typy (kod i testy), build produkcyjny, testy Vitest, testy konfiguracji Vercel, skan sekretów w zbudowanym pakiecie |
 | `secrets` | skan całej historii repozytorium narzędziem gitleaks (`.gitleaks.toml`) |
+| `deploy-dry-run` | paczka API i migracje wszystkich kontekstów na pustej bazie: kolejność, ponowne uruchomienie, zatrzymanie po błędzie |
+
+## Wdrożenia
+
+Publikacja frontendu (Vercel) i backendu (SmarterASP.NET) po zielonym CI na `main`:
+`.github/workflows/deploy.yml`. Obecnie wyłączona (zmienna `DEPLOY_ENABLED`) do zamknięcia D-08.
+Procedura, sekrety, kolejność migracji i postępowanie po błędzie: [docs/wdrozenia.md](docs/wdrozenia.md).
+
+Próba migracji lokalnie (LocalDB, Git Bash) po `dotnet build stone-flow.slnx -c Release`:
+
+```
+STONEFLOW_TEST_SQLSERVER='Server=(localdb)\MSSQLLocalDB;Integrated Security=True;TrustServerCertificate=True' SQLCMD='sqlcmd -S (localdb)\MSSQLLocalDB -E' deploy/scripts/test-migrate.sh
+```
 
 ## Ochrona gałęzi `main`
 
@@ -173,13 +187,13 @@ kod; wykonuje je właściciel repozytorium po pierwszym zielonym przebiegu CI na
 kontroli muszą już istnieć).
 
 W ustawieniach repozytorium: *Settings → Branches → Add branch ruleset* (lub *branch protection
-rule*) dla `main`: wymagane kontrole `backend`, `frontend`, `secrets` i aktualna gałąź przed
-merge. Alternatywnie poleceniem:
+rule*) dla `main`: wymagane kontrole `backend`, `frontend`, `secrets`, `deploy-dry-run` i aktualna gałąź przed
+merge (po pierwszym przebiegu także `deploy-dry-run`). Alternatywnie poleceniem:
 
 ```
 gh api -X PUT "repos/{owner}/{repo}/branches/main/protection" --input - <<'EOF'
 {
-  "required_status_checks": { "strict": true, "contexts": ["backend", "frontend", "secrets"] },
+  "required_status_checks": { "strict": true, "contexts": ["backend", "frontend", "secrets", "deploy-dry-run"] },
   "enforce_admins": false,
   "required_pull_request_reviews": null,
   "restrictions": null

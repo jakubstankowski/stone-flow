@@ -1,23 +1,23 @@
 name: CI
 
+# Na PR uruchamiany bezpośrednio; na main wywołuje go deploy.yml (jeden przebieg CI na commit,
+# publikacja dopiero po zielonym CI).
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
 
+# Nowszy commit w PR anuluje poprzedni przebieg; na main (wywołanie z deploy.yml) nigdy.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # Runtime dostarczany przez SDK z global.json (10.0.403). Zmiana wymaga aktualizacji README i .sdd/context/role.md.
   DOTNET_RUNTIME_VERSION: 10.0.14
-  GITLEAKS_VERSION: 8.30.1
-  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
 
@@ -87,6 +87,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm test -- --watch=false
+      - run: npm run test:scripts
+
+      - uses: ./.github/actions/setup-gitleaks
+        id: gitleaks
+
+      - name: Brak sekretów w pakiecie frontendu
+        run: '"${{ steps.gitleaks.outputs.path }}" dir dist --config ../.gitleaks.toml --redact --verbose --exit-code 1'
 
   secrets:
     name: secrets
@@ -97,13 +104,62 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Instalacja gitleaks
-        run: |
-          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          curl -sSfL -o "$archive" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
-          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
-          tar -xzf "$archive" gitleaks
-          ./gitleaks version
+      - uses: ./.github/actions/setup-gitleaks
+        id: gitleaks
 
       - name: Skan całej historii
-        run: ./gitleaks git . --config .gitleaks.toml --redact --verbose --exit-code 1
+        run: '"${{ steps.gitleaks.outputs.path }}" git . --config .gitleaks.toml --redact --verbose --exit-code 1'
+
+  deploy-dry-run:
+    name: deploy-dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Jednorazowe hasło kontenera testowego (nie jest sekretem środowiska).
+      SA_PASSWORD: Ci-${{ github.run_id }}-${{ github.run_attempt }}-Aa
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Ci-${{ github.run_id }}-${{ github.run_attempt }}-Aa
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Narzędzia
+        run: dotnet tool restore
+
+      - name: Restore (lockfile)
+        run: dotnet restore stone-flow.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build stone-flow.slnx -c Release --no-restore
+
+      - name: Paczka API
+        run: deploy/scripts/publish-api.sh "${RUNNER_TEMP}/api"
+
+      - name: Oczekiwanie na SQL Server
+        env:
+          MSSQL_CONTAINER: ${{ job.services.mssql.id }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec "$MSSQL_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$SA_PASSWORD" -Q "SELECT 1" >/dev/null 2>&1; then
+              echo "SQL Server gotowy."; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::SQL Server nie wystartował."; exit 1
+
+      - name: Próba migracji (kolejność, ponowienie, błąd w środku, brak serwera)
+        env:
+          MSSQL_CONTAINER: ${{ job.services.mssql.id }}
+        run: |
+          export STONEFLOW_TEST_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+          export SQLCMD="docker exec -i ${MSSQL_CONTAINER} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ${SA_PASSWORD}"
+          deploy/scripts/test-migrate.sh
