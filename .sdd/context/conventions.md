@@ -85,13 +85,42 @@ correlation ID, without passwords, tokens or unnecessary personal data.
 ### Structure and naming
 
 Strict TypeScript, standalone components, feature areas, lazy-loaded routes. File naming
-follows the Angular CLI 22 style guide (`start-page.ts`, no `.component` suffix). Feature areas
-live in `app/src/app/features/{area}/` and are loaded with `loadComponent`/`loadChildren`.
+follows the Angular CLI 22 style guide (`orders-page.ts`, no `.component` suffix). Selectors use
+the `app` prefix (`app-data-table`), enforced by ESLint.
+
+| Path in `app/src/app/` | Holds |
+|---|---|
+| `features/{area}/` | One feature area per main section, loaded with `loadComponent`/`loadChildren` |
+| `layout/` | Application shell, main navigation (`nav-items.ts` is the single list of sections), page title strategy |
+| `shared/ui/` | Reusable UI elements: `app-button`, `app-field`, `app-confirm-dialog`, `app-data-table`, `app-status-badge`, `app-loading-state`, `app-empty-state`, `app-error-state` |
+| `shared/format/` | Polish formatting functions and pipes (`plnAmount`, `plDate`, `plMonth`, `plDateTime`) |
+
+Routes use Polish slugs without diacritics (`/pulpit`, `/zamowienia`, `/wydatki`, `/operacje`,
+`/historia-zmian`, `/integracja`), with `title` and `data.section` equal to the section label.
+`/` and unknown paths redirect to `/pulpit`.
 
 ### Components
 
 Shared repeated UI elements, without building a component system in advance. Component
-specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6.
+specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6. Before adding a new element, reuse
+`shared/ui/`:
+
+- Actions use `app-button` (`primary` for the one main action of a section, `secondary`,
+  `danger`); a saving button gets `busy`, which blocks repeated clicks and submit.
+- Form controls sit inside `app-field` and carry `#control`; the field binds the label,
+  `aria-required`, `aria-invalid` and `aria-describedby`.
+- Deletion and other destructive actions are confirmed with `app-confirm-dialog`
+  (`await dialog.open()`), naming the object and the effect.
+- Lists use `app-data-table`: it renders one page from the API and emits page, sort and filter
+  events; it never sorts or pages locally. Filters are projected with the `tableFilters`
+  attribute. A column shows text from `value(row)`, or any content (status, link to the object,
+  marker) from `<ng-template appTableCell="{key}" [appTableCellOf]="rows" let-row>`.
+- Headings of empty states and dialogs are passed as `heading`, never `title` (a `title` input
+  would leave a native tooltip on the host element).
+- Statuses use `app-status-badge` with visible text; the tone only reinforces it.
+- Amounts and dates are displayed only through `shared/format/` (`12 345,67 zł`, `28.10.2026`,
+  `październik 2026`, technical times in Europe/Warsaw, missing values as „Brak danych”).
+  Amounts may be passed as decimal strings from the API; the formatter does no arithmetic.
 
 ### State and data fetching
 
@@ -104,7 +133,12 @@ loading, empty and error states.
 
 Tailwind CSS for layout and spacing, daisyUI for components. Colours live centrally in CSS
 variables and one custom daisyUI theme; components use semantic tokens, never local hex
-codes. Tokens, contrast rules, states and number formats are in
+codes. The only colour literals are the `--sf-*` tokens in `app/src/styles.css`; the theme
+`stone-flow` maps daisyUI roles to them. Components use daisyUI semantic classes
+(`btn-primary`, `bg-base-100`) or token utilities (`text-(--sf-muted)`).
+`npm run lint` runs `lint:colors`, which fails on hex, `rgb()`, `hsl()` or `oklch()` literals in
+`app/src/app/`. Never put graphite text on the accent (2.86:1) or use `--sf-secondary` as text or
+the only field border (2.05:1). Tokens, contrast rules, states and number formats are in
 `docs/DESIGN-GUID-stone-flow.md`. The target is WCAG 2.2 AA, and status is never conveyed by
 colour alone.
 

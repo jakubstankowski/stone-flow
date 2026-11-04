@@ -1,0 +1,29 @@
+<a
+  href="#tresc"
+  class="sr-only z-50 rounded-field bg-base-100 px-4 py-3 font-medium focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+  (click)="skipToContent($event)"
+>
+  Przejdź do treści
+</a>
+<header class="border-b border-(--sf-secondary) bg-base-100">
+  <div
+    class="mx-auto flex w-full max-w-[1600px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 lg:px-8"
+  >
+    <p class="flex min-h-11 min-w-0 items-center gap-2">
+      <a class="text-xl font-bold" routerLink="/pulpit">{{ productName }}</a>
+      @if (section(); as current) {
+        <span class="truncate text-(--sf-muted)"
+          ><span aria-hidden="true">/ </span>{{ current }}</span
+        >
+      }
+    </p>
+    <app-main-nav />
+  </div>
+</header>
+<main
+  id="tresc"
+  tabindex="-1"
+  class="mx-auto w-full max-w-[1600px] min-w-0 flex-1 px-4 py-6 lg:px-8"
+>
+  <router-outlet />
+</main>

@@ -1,0 +1,148 @@
+@if (filterable()) {
+  <div class="flex flex-col gap-3">
+    <div class="md:hidden">
+      <button
+        type="button"
+        class="btn min-h-11 border-(--sf-border-strong) bg-base-100 font-medium"
+        [attr.aria-expanded]="filtersOpen()"
+        [attr.aria-controls]="filtersPanelId"
+        (click)="filtersOpen.set(!filtersOpen())"
+      >
+        Filtry
+      </button>
+    </div>
+    <div class="md:block" [id]="filtersPanelId" [class.hidden]="!filtersOpen()">
+      <ng-content select="[tableFilters]" />
+    </div>
+  </div>
+}
+
+@if (filters().length > 0) {
+  <div class="flex flex-wrap items-center gap-2">
+    <span class="text-sm text-(--sf-muted)">Aktywne filtry:</span>
+    @for (filter of filters(); track filter.id) {
+      <button
+        type="button"
+        class="btn btn-sm min-h-11 border-(--sf-border-strong) bg-base-100 font-normal"
+        [attr.aria-label]="'Usuń filtr: ' + filter.label"
+        (click)="filterRemove.emit(filter.id)"
+      >
+        {{ filter.label }} <span aria-hidden="true">×</span>
+      </button>
+    }
+    <button
+      type="button"
+      class="btn btn-link btn-sm min-h-11 text-(--sf-accent-text)"
+      (click)="filtersClear.emit()"
+    >
+      Wyczyść filtry
+    </button>
+  </div>
+}
+
+@if (loading()) {
+  <app-loading-state [rows]="5" />
+} @else if (error()) {
+  <app-error-state [message]="error() ?? ''" (retry)="retry.emit()" />
+} @else if (rows().length === 0) {
+  @if (filters().length > 0) {
+    <app-empty-state [heading]="filteredEmptyTitle()">
+      <app-button (pressed)="filtersClear.emit()">Wyczyść filtry</app-button>
+    </app-empty-state>
+  } @else {
+    <app-empty-state [heading]="emptyTitle()" [description]="emptyDescription()" />
+  }
+} @else {
+  <div
+    class="overflow-x-auto rounded-box border border-(--sf-secondary) bg-base-100"
+    role="region"
+    tabindex="0"
+    [attr.aria-label]="caption()"
+  >
+    <table class="table">
+      <caption class="sr-only">
+        {{
+          caption()
+        }}
+      </caption>
+      <thead>
+        <tr class="bg-base-200">
+          @for (column of columns(); track column.key; let first = $first) {
+            <th
+              scope="col"
+              class="text-sm font-semibold text-base-content"
+              [class.sticky]="first"
+              [class.left-0]="first"
+              [class.z-10]="first"
+              [class.bg-base-200]="first"
+              [class.text-right]="column.align === 'end'"
+              [attr.aria-sort]="ariaSort(column)"
+            >
+              @if (column.sortable) {
+                <button
+                  type="button"
+                  class="inline-flex min-h-11 items-center gap-1 font-semibold"
+                  [class.flex-row-reverse]="column.align === 'end'"
+                  (click)="toggleSort(column)"
+                >
+                  {{ column.header }}
+                  @switch (ariaSort(column)) {
+                    @case ('ascending') {
+                      <span aria-hidden="true">▲</span>
+                    }
+                    @case ('descending') {
+                      <span aria-hidden="true">▼</span>
+                    }
+                    @default {
+                      <span aria-hidden="true" class="text-(--sf-muted)">↕</span>
+                    }
+                  }
+                </button>
+              } @else {
+                {{ column.header }}
+              }
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track rowKey()(row)) {
+          <tr class="border-b border-base-300">
+            @for (column of columns(); track column.key; let first = $first) {
+              <td
+                class="text-sm"
+                [class.sticky]="first"
+                [class.left-0]="first"
+                [class.bg-base-100]="first"
+                [class.text-right]="column.align === 'end'"
+                [class.tabular-nums]="column.align === 'end'"
+                [class.whitespace-nowrap]="column.align === 'end'"
+              >
+                @if (templates().get(column.key); as cell) {
+                  <ng-container *ngTemplateOutlet="cell; context: { $implicit: row }" />
+                } @else {
+                  {{ column.value?.(row) ?? '' }}
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+<nav
+  class="flex flex-wrap items-center justify-between gap-3"
+  [attr.aria-label]="'Paginacja: ' + caption()"
+>
+  <p class="text-sm text-(--sf-muted)" aria-live="polite">{{ rangeText() }}</p>
+  <div class="flex gap-2">
+    <app-button [disabled]="!hasPrevious() || loading()" (pressed)="goTo(page() - 1)">
+      Poprzednia
+    </app-button>
+    <app-button [disabled]="!hasNext() || loading()" (pressed)="goTo(page() + 1)">
+      Następna
+    </app-button>
+  </div>
+</nav>
