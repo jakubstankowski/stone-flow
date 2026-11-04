@@ -46,6 +46,33 @@ public sealed class DispatcherTests
         Assert.Contains(nameof(UnhandledCommand), exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Synchronous_handler_exception_is_original()
+    {
+        using var provider = BuildProvider();
+        using var scope = provider.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => dispatcher.SendAsync(new ThrowingCommand(Synchronously: true), TestContext.Current.CancellationToken));
+
+        Assert.Equal("Błąd handlera", exception.Message);
+        Assert.Contains(nameof(ThrowingCommandHandler), exception.StackTrace, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Faulted_task_exception_is_original()
+    {
+        using var provider = BuildProvider();
+        using var scope = provider.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => dispatcher.SendAsync(new ThrowingCommand(Synchronously: false), TestContext.Current.CancellationToken));
+
+        Assert.Equal("Błąd handlera", exception.Message);
+    }
+
     private static ServiceProvider BuildProvider()
     {
         var services = new ServiceCollection();
@@ -61,6 +88,23 @@ public sealed class DispatcherTests
     public sealed record DoubleQuery(int Value) : IQuery<int>;
 
     public sealed record UnhandledCommand : ICommand<int>;
+
+    public sealed record ThrowingCommand(bool Synchronously) : ICommand<int>;
+
+    public sealed class ThrowingCommandHandler : ICommandHandler<ThrowingCommand, int>
+    {
+        public Task<int> HandleAsync(ThrowingCommand command, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(command);
+            return command.Synchronously ? throw new ArgumentException("Błąd handlera") : ThrowLaterAsync();
+        }
+
+        private static async Task<int> ThrowLaterAsync()
+        {
+            await Task.Yield();
+            throw new ArgumentException("Błąd handlera");
+        }
+    }
 
     public sealed class EchoCommandHandler : ICommandHandler<EchoCommand, EchoResult>
     {
