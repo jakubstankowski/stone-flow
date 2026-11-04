@@ -24,7 +24,8 @@ internal sealed class UnitOfWork(ModuleConnection connection) : IUnitOfWork
             }
             else
             {
-                await transaction.RollbackAsync(cancellationToken);
+                // Wycofanie nie zależy od anulowania: wynik błędu ma wrócić do wywołującego.
+                await transaction.RollbackAsync(CancellationToken.None);
             }
 
             return result;

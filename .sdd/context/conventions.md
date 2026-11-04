@@ -226,10 +226,14 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
 - Financial audit (SF-7): every create, change and delete of financial data calls
   `IAuditLog.RecordAsync` inside the same `IUnitOfWork` call, with the author from the command
   (`AuditAuthor.Account(accountId)`) or a system author (`WooCommerceSync`, `AutomatedJob`).
-  Values follow the format in `docs/tasks/sf-7/02-spec.md` (amounts `1234.50`, dates
-  `yyyy-MM-dd`, codes not labels, `null` for no value); fields with personal data set
-  `IsPersonalData`; the object label never contains personal data. No changed fields → no audit
-  call. Payments, refunds and sales corrections pass the order as `Parent`.
+  Value format: field names are stable English camelCase property names (`amount`, `paidAt`);
+  amounts are invariant decimals with a dot (`1234.50`); dates `yyyy-MM-dd`; timestamps ISO 8601
+  UTC; dictionary values (status, channel, category) as stable codes, not labels; no value is
+  `null`, never an empty string. Fields with personal data set `IsPersonalData`; the object label
+  never contains personal data. No changed fields → no audit call. Business date and parent per
+  object: order — order date; payment, refund, sales correction — own date, parent = the order;
+  expense — cost date, parent = the recurring definition for a recurring occurrence;
+  recurring definition — cycle start; owner withdrawal — withdrawal date.
 - Financial module contexts share one connection per DI scope (`ModuleConnection`), registered
   with `UseModuleSqlServer<TContext>(serviceProvider, schema)`. Therefore: no `AddDbContextPool`,
   no parallel queries in one scope (no `Task.WhenAll` over queries, no interleaved streaming), no

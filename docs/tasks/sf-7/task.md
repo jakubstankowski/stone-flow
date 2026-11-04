@@ -1,12 +1,12 @@
 ---
 id: SF-7
 title: Zapis audytu zmian finansowych
-status: planned
+status: done
 risk: high
 depends_on: [SF-3, SF-6]
 parts: []
 spec_review: PASS WITH ISSUES
-code_review: null
+code_review: PASS WITH ISSUES
 source: https://standev.youtrack.cloud/issue/SF-7
 created: 2026-11-04
 updated: 2026-11-04

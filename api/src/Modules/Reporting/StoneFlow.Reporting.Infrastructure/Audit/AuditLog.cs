@@ -14,6 +14,9 @@ internal sealed class AuditLog(ReportingDbContext context, ModuleConnection conn
     public async Task RecordAsync(AuditEntry entry, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(entry.Author, nameof(entry));
+        ArgumentNullException.ThrowIfNull(entry.Object, nameof(entry));
+        ArgumentNullException.ThrowIfNull(entry.Changes, nameof(entry));
         if (connection.Transaction is null)
         {
             throw new InvalidOperationException(

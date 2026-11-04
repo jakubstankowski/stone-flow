@@ -23,9 +23,9 @@ modułu.
 - **Wspólna transakcja:** `IUnitOfWork` w `StoneFlow.Shared.Application/Persistence` z
   implementacją w `StoneFlow.Shared.Infrastructure/Persistence`. Nie ma transakcji rozproszonej.
   - `ModuleConnection` (scoped, rejestrowany w `AddSharedInfrastructure`) to jedno połączenie SQL
-    na zakres DI (żądanie). Ma `PersistSecurityInfo=true`, żeby po otwarciu połączenia EF mógł
-    utworzyć połączenie do `master` (np. migracja tworząca bazę przy uwierzytelnianiu SQL).
-    Hasło pozostaje wyłącznie w pamięci procesu, tak jak w konfiguracji, i nie jest logowane.
+    na zakres DI (żądanie). Bez `PersistSecurityInfo` (zmiana po przeglądzie 03, zapisana w
+    planie): bazę tworzy pierwsza migracja modułu Access na własnym połączeniu, skrypty wdrożenia
+    migrują po jednym kontekście na proces, a `test-migrate.sh` tworzy bazę z góry.
   - Konteksty modułów finansowych (Orders, Expenses, Reporting, Integrations) rejestrują się
     przeciążeniem `UseModuleSqlServer<TContext>(serviceProvider, schema)`. Przeciążenie podaje EF
     połączenie zakresu i dodaje `ModuleTransactionInterceptor`. Shared nie zna typów modułów;
@@ -170,8 +170,9 @@ W `StoneFlow.Shared.Application/Audit`:
 W `StoneFlow.Shared.Application/Persistence`:
 
 - `IUnitOfWork`: `Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> work,
-  Func<T, bool>? commitWhen, CancellationToken cancellationToken)`; `commitWhen = null` oznacza
-  zatwierdzenie każdego wyniku bez wyjątku.
+  Func<T, bool> commitWhen, CancellationToken cancellationToken)`; `commitWhen` jest wymagany
+  (zmiana po przeglądzie 03, zapisana w planie) — przypadek użycia bez wyniku błędu podaje
+  `_ => true`.
 
 ## Invariant impact
 

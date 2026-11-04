@@ -119,7 +119,7 @@ public sealed class AuditRecord
         return new AuditRecord(
             occurredAt.UtcDateTime,
             authorKind,
-            isAccount ? authorAccountId : null,
+            authorAccountId,
             objectType,
             objectId,
             objectBusinessDate,

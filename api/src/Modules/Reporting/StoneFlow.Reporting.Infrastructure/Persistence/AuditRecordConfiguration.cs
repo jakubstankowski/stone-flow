@@ -1,5 +1,7 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Unicode;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -50,7 +52,10 @@ internal sealed class AuditRecordConfiguration : IEntityTypeConfiguration<AuditR
 /// <summary>Zakres zmiany jako JSON: <c>[{"field","old","new","personal"}]</c>.</summary>
 internal static class ChangesJson
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+    };
 
     public static readonly ValueConverter<IReadOnlyList<AuditFieldChange>, string> Converter = new(
         changes => Serialize(changes),

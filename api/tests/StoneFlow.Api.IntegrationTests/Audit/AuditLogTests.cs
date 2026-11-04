@@ -110,8 +110,9 @@ public sealed class AuditLogTests(SqlServerFixture sqlServer)
     public async Task Database_failure_of_audit_rolls_back_data_change()
     {
         await using var test = await ProbeDatabase.CreateAsync(sqlServer);
+        // Ograniczenie odrzucające każdy wpis: prawdziwy błąd bazy przy zapisie audytu.
         await test.ExecuteSqlAsync(
-            "CREATE TRIGGER reporting.TR_AuditEntries_Fail ON reporting.AuditEntries INSTEAD OF INSERT AS THROW 50000, 'audit unavailable', 1;");
+            "ALTER TABLE reporting.AuditEntries ADD CONSTRAINT CK_Test_RejectAll CHECK (ObjectLabel = N'nigdy');");
 
         await Assert.ThrowsAnyAsync<DbUpdateException>(() => test.RunAsync(async (services, cancellationToken) =>
         {
@@ -224,6 +225,76 @@ public sealed class AuditLogTests(SqlServerFixture sqlServer)
 
         Assert.Equal(2, await test.CountItemsAsync());
         Assert.Single(await test.AuditRowsAsync());
+    }
+
+    [Fact]
+    public async Task Save_with_several_statements_joins_the_unit_of_work_transaction()
+    {
+        // SaveChanges z kilkoma poleceniami (UPDATE + INSERT) otwiera w EF własną transakcję — bez
+        // dołączenia kontekstu (UseTransaction w interceptorze) SqlClient odrzuciłby transakcję
+        // równoległą. Same wstawienia do jednej tabeli EF skleja w jedno polecenie bez transakcji.
+        await using var test = await ProbeDatabase.CreateAsync(sqlServer);
+        var existing = Guid.NewGuid();
+        await test.ExecuteSqlAsync($"INSERT INTO probe.Items (Id, Name) VALUES ('{existing}', N'przed');");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => test.RunAsync<bool>(async (services, cancellationToken) =>
+        {
+            await ChangeAndAddAsync(services, existing, "w transakcji", cancellationToken);
+            await services.GetRequiredService<IAuditLog>().RecordAsync(Entry(), cancellationToken);
+            throw new InvalidOperationException("wycofaj");
+        }));
+
+        Assert.Equal(1, await test.CountItemsAsync());
+        Assert.Equal("przed", await test.ScalarAsync<string>($"SELECT Name FROM probe.Items WHERE Id = '{existing}'"));
+        Assert.Empty(await test.AuditRowsAsync());
+
+        await test.RunAsync(async (services, cancellationToken) =>
+        {
+            await ChangeAndAddAsync(services, existing, "po", cancellationToken);
+            await services.GetRequiredService<IAuditLog>().RecordAsync(Entry(), cancellationToken);
+            await services.GetRequiredService<IAuditLog>().RecordAsync(Entry(), cancellationToken);
+            return true;
+        });
+
+        Assert.Equal(2, await test.CountItemsAsync());
+        Assert.Equal("po", await test.ScalarAsync<string>($"SELECT Name FROM probe.Items WHERE Id = '{existing}'"));
+        Assert.Equal(2, (await test.AuditRowsAsync()).Count);
+
+        static async Task ChangeAndAddAsync(IServiceProvider services, Guid id, string name, CancellationToken cancellationToken)
+        {
+            var probe = services.GetRequiredService<ProbeDbContext>();
+            var item = await probe.Items.SingleAsync(entity => entity.Id == id, cancellationToken);
+            item.Name = name;
+            probe.Items.Add(new ProbeItem { Id = Guid.NewGuid(), Name = "nowa" });
+            await probe.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task Cancellation_rolls_back_data_and_audit()
+    {
+        await using var test = await ProbeDatabase.CreateAsync(sqlServer);
+        using var cancellation = new CancellationTokenSource();
+
+        using (var scope = test.Factory.Services.CreateScope())
+        {
+            var services = scope.ServiceProvider;
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => services.GetRequiredService<IUnitOfWork>()
+                .ExecuteInTransactionAsync<bool>(
+                    async cancellationToken =>
+                    {
+                        await test.AddItemAsync(services, cancellationToken);
+                        await services.GetRequiredService<IAuditLog>().RecordAsync(Entry(), cancellationToken);
+                        await cancellation.CancelAsync();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        return true;
+                    },
+                    commitWhen: _ => true,
+                    cancellation.Token));
+        }
+
+        Assert.Equal(0, await test.CountItemsAsync());
+        Assert.Empty(await test.AuditRowsAsync());
     }
 
     [Fact]
