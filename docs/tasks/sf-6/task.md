@@ -1,11 +1,11 @@
 ---
 id: SF-6
 title: Logowanie, reset hasła, sesja i ochrona API
-status: specified
+status: planned
 risk: high
 depends_on: [SF-3, SF-4, SF-5]
 parts: []
-spec_review: null
+spec_review: PASS WITH ISSUES
 code_review: null
 source: https://standev.youtrack.cloud/issue/SF-6
 created: 2026-11-04

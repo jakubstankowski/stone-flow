@@ -125,8 +125,10 @@ przez proxy), więc ciasteczko jest ciasteczkiem pierwszej strony i CORS nie jes
 16. Dla istniejącego konta (lub tworzonego wg punktu 2) API tworzy losowy token (co najmniej
     256 bitów), zapisuje tylko jego hash SHA-256 z terminem ważności 30 minut, unieważnia
     wcześniejsze niewykorzystane tokeny tego konta i wysyła e-mail z linkiem
-    `{StoneFlow:App:BaseUrl}/reset-hasla/nowe?konto={id}&token={token}`. Link nie zawiera
-    adresu e-mail.
+    `{StoneFlow:App:BaseUrl}/reset-hasla/nowe#konto={id}&token={token}`. Token jest we
+    fragmencie URL, więc nie trafia do serwera hostingu, logów ani nagłówka `Referer`;
+    frontend usuwa fragment z historii przed pierwszym żądaniem. Link nie zawiera adresu
+    e-mail. (Zmiana po przeglądzie specyfikacji, uwaga 7: wcześniej query string.)
 17. Ponad 3 prośby o reset z jednego adresu IP w ciągu 15 minut → `429`. Ponad 3 prośby dla
     jednego konta w ciągu 15 minut → kolejne nie wysyłają e-maila, ale odpowiedź pozostaje
     `202`.
