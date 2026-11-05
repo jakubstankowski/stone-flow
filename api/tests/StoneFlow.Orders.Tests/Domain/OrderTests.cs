@@ -143,6 +143,23 @@ public sealed class OrderTests
     }
 
     [Fact]
+    public void Shop_order_treats_unreadable_shop_fields_as_changed()
+    {
+        var order = TestOrders.FromShop();
+        var edit = TestOrders.SameAs(order) with
+        {
+            Value = 1m,
+            Channel = null,
+            UnreadableShopFields = [ShopOwnedField.Channel],
+        };
+
+        var result = order.Edit(edit, TestOrders.Later);
+
+        Assert.Equal(OrderRuleViolationKind.FieldOwnedByShop, result.Violation?.Kind);
+        Assert.Equal([ShopOwnedField.Value, ShopOwnedField.Channel], result.Violation?.Fields);
+    }
+
+    [Fact]
     public void Shop_order_accepts_equal_or_missing_shop_fields_and_changes_erp_fields()
     {
         var order = TestOrders.FromShop();

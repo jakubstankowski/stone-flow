@@ -3,9 +3,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using StoneFlow.Access.Api;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
 using StoneFlow.Orders.Api;
+using StoneFlow.Orders.Application.Abstractions;
+using StoneFlow.Orders.Domain.Orders;
+using StoneFlow.Shared.Application.Persistence;
 
 namespace StoneFlow.Api.IntegrationTests.Orders;
 
@@ -17,9 +22,11 @@ namespace StoneFlow.Api.IntegrationTests.Orders;
 [Collection(SqlServerCollection.Name)]
 public sealed class OrdersApiTests(SqlServerFixture sqlServer)
 {
-    private static readonly int Year = TimeZoneInfo.ConvertTime(
-        DateTimeOffset.UtcNow,
-        TimeZoneInfo.TryFindSystemTimeZoneById("Europe/Warsaw", out var zone) ? zone : TimeZoneInfo.Utc).Year;
+    /// <summary>Rok numeru według zegara testu (<see cref="Now"/>, Europe/Warsaw).</summary>
+    private const int Year = 2026;
+
+    /// <summary>Stały zegar aplikacji: numeracja nie zależy od dnia uruchomienia testów.</summary>
+    private static readonly DateTimeOffset Now = new(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task Create_returns_201_with_number_and_the_order_appears_on_the_list()
@@ -390,6 +397,159 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task Change_between_load_and_save_returns_409_order_conflict()
+    {
+        // Wiersz zmieniony innym połączeniem już po wczytaniu w jednostce pracy: EF dostaje
+        // DbUpdateConcurrencyException, port zwraca konflikt, API — 409 bez zapisu i audytu.
+        var hooks = new StoreHooks();
+        await using var test = await OrdersTest.CreateAsync(sqlServer, hooks: hooks);
+        var created = await test.CreateOrderAsync(Input());
+        hooks.BeforeSave = order => test.ExecuteSqlAsync(
+            $"UPDATE orders.Orders SET Comment = N'Zmiana z innej karty' WHERE Id = '{order.Id}';");
+
+        using var edit = await test.SendAsync(HttpMethod.Put, $"/api/orders/{created.Id}", Input(value: "1300.00", version: created.Version));
+        var afterEdit = await test.GetJsonAsync($"/api/orders/{created.Id}");
+        using var cancel = await test.SendAsync(
+            HttpMethod.Post, $"/api/orders/{created.Id}/cancel", new { version = afterEdit.GetProperty("version").GetString() });
+
+        Assert.Equal(HttpStatusCode.Conflict, edit.StatusCode);
+        Assert.Equal(OrderProblems.ConflictCode, (await Json(edit)).GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Conflict, cancel.StatusCode);
+        Assert.Equal(OrderProblems.ConflictCode, (await Json(cancel)).GetProperty("code").GetString());
+        var details = await test.GetJsonAsync($"/api/orders/{created.Id}");
+        Assert.Equal("1234.50", details.GetProperty("value").GetString());
+        Assert.Equal("inProgress", details.GetProperty("fulfillmentStatus").GetString());
+        Assert.Equal("Zmiana z innej karty", details.GetProperty("comment").GetString());
+        Assert.Single(await test.AuditRowsAsync(created.Id));
+    }
+
+    [Fact]
+    public async Task Store_compares_with_the_client_version_not_the_loaded_one()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+        var created = await test.CreateOrderAsync(Input());
+        var current = await test.EditAsync(created.Id, Input(comment: "Nowsza wersja", version: created.Version));
+
+        // Wczytana jest aktualna wersja, ale klient przysłał starszą: zapis nie może przejść.
+        using var scope = test.Factory.Services.CreateScope();
+        var services = scope.ServiceProvider;
+        var result = await services.GetRequiredService<IUnitOfWork>().ExecuteInTransactionAsync(
+            async cancellationToken =>
+            {
+                var store = services.GetRequiredService<IOrderStore>();
+                var stored = await store.LoadAsync(created.Id, cancellationToken);
+                Assert.Equal(current, Convert.ToBase64String(stored!.Version));
+                Assert.True(stored.Order.Cancel(DateTime.UtcNow).Succeeded);
+                return await store.SaveAsync(stored.Order, Convert.FromBase64String(created.Version), cancellationToken);
+            },
+            commitWhen: saved => saved.Status == OrderSaveStatus.Saved,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(OrderSaveStatus.Conflict, result.Status);
+        var details = await test.GetJsonAsync($"/api/orders/{created.Id}");
+        Assert.Equal("inProgress", details.GetProperty("fulfillmentStatus").GetString());
+        Assert.Equal(current, details.GetProperty("version").GetString());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Duplicate_key_on_insert_is_resolved_after_rollback(bool sameData)
+    {
+        // Zamówienie z tym samym kluczem powstaje „równolegle” już po kroku szukania po kluczu:
+        // zapis trafia na unikalny indeks CreationRequestId, wynik zależy od skrótu danych.
+        var hooks = new StoreHooks();
+        await using var test = await OrdersTest.CreateAsync(sqlServer, hooks: hooks);
+        var first = await test.CreateOrderAsync(Input());
+        var key = Guid.NewGuid();
+        var racing = Guid.Empty;
+        hooks.BeforeAdd = async _ => racing = await test.SeedCopyAsync(
+            first.Id, "ZR-2026-9002", key, sameData ? "CreationRequestHash" : "CAST(0x01 AS binary(32))");
+
+        using var response = await test.CreateAsync(Input(), key);
+
+        var body = await Json(response);
+        if (sameData)
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Equal(racing, body.GetProperty("id").GetGuid());
+            Assert.Equal("ZR-2026-9002", body.GetProperty("number").GetString());
+        }
+        else
+        {
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            Assert.Equal(OrderProblems.IdempotencyKeyReusedCode, body.GetProperty("code").GetString());
+            Assert.Equal(racing, body.GetProperty("orderId").GetGuid());
+            Assert.Equal("ZR-2026-9002", body.GetProperty("orderNumber").GetString());
+        }
+
+        // Wycofanie objęło numer i audyt: licznik stoi na pierwszym zamówieniu.
+        Assert.Equal(2, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Orders"));
+        Assert.Equal(1, await test.ScalarAsync<int>($"SELECT LastNumber FROM orders.OrderNumberCounters WHERE Year = {Year}"));
+        Assert.Equal(1, await test.ScalarAsync<int>("SELECT COUNT(*) FROM reporting.AuditEntries"));
+    }
+
+    [Fact]
+    public async Task Duplicate_number_without_existing_key_rethrows_and_returns_503()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+        var source = await test.SeedShopOrderAsync();
+        // Numer, który dostanie następne zamówienie, jest już zajęty (błąd programu, nie klucz).
+        await test.SeedCopyAsync(source, $"ZR-{Year}-0001", creationRequestId: null, hashSql: "NULL");
+
+        using var response = await test.CreateAsync(Input());
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(2, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Orders"));
+        Assert.Equal(0, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.OrderNumberCounters"));
+        Assert.Equal(0, await test.ScalarAsync<int>("SELECT COUNT(*) FROM reporting.AuditEntries"));
+    }
+
+    [Fact]
+    public async Task Audit_failure_rolls_back_edit_cancel_and_restore()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+        var active = await test.CreateOrderAsync(Input());
+        var cancelled = await test.CreateOrderAsync(Input());
+        var cancelledVersion = await test.StatusActionAsync(cancelled.Id, "cancel", cancelled.Version);
+        // WITH NOCHECK: istniejące wpisy zostają, odrzucany jest każdy nowy.
+        await test.ExecuteSqlAsync("ALTER TABLE reporting.AuditEntries WITH NOCHECK ADD CONSTRAINT CK_Test_RejectAll CHECK (ObjectLabel = N'nigdy');");
+
+        using var edit = await test.SendAsync(HttpMethod.Put, $"/api/orders/{active.Id}", Input(value: "1300.00", version: active.Version));
+        using var cancel = await test.SendAsync(HttpMethod.Post, $"/api/orders/{active.Id}/cancel", new { version = active.Version });
+        using var restore = await test.SendAsync(HttpMethod.Post, $"/api/orders/{cancelled.Id}/restore", new { version = cancelledVersion });
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, edit.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, cancel.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, restore.StatusCode);
+        var activeDetails = await test.GetJsonAsync($"/api/orders/{active.Id}");
+        Assert.Equal("1234.50", activeDetails.GetProperty("value").GetString());
+        Assert.Equal("inProgress", activeDetails.GetProperty("fulfillmentStatus").GetString());
+        Assert.Equal(active.Version, activeDetails.GetProperty("version").GetString());
+        var cancelledDetails = await test.GetJsonAsync($"/api/orders/{cancelled.Id}");
+        Assert.Equal("cancelled", cancelledDetails.GetProperty("fulfillmentStatus").GetString());
+        Assert.Equal(cancelledVersion, cancelledDetails.GetProperty("version").GetString());
+        Assert.Single(await test.AuditRowsAsync(active.Id));
+        Assert.Equal(2, (await test.AuditRowsAsync(cancelled.Id)).Count);
+    }
+
+    [Fact]
+    public async Task Number_year_follows_Europe_Warsaw_time()
+    {
+        // 31.12 22:50 UTC to jeszcze 2026 w Warszawie; 23:10 UTC to już 1.01.2027 (UTC+1).
+        await using var test = await OrdersTest.CreateAsync(sqlServer, now: new DateTimeOffset(2026, 12, 31, 22, 50, 0, TimeSpan.Zero));
+
+        var lastOfYear = await test.CreateOrderAsync(Input());
+        test.Time.Advance(TimeSpan.FromMinutes(20));
+        var firstOfYear = await test.CreateOrderAsync(Input());
+        var second = await test.CreateOrderAsync(Input());
+
+        Assert.Equal("ZR-2026-0001", lastOfYear.Number);
+        Assert.Equal("ZR-2027-0001", firstOfYear.Number);
+        Assert.Equal("ZR-2027-0002", second.Number);
+    }
+
+    [Fact]
     public async Task Get_unknown_order_returns_404()
     {
         await using var test = await OrdersTest.CreateAsync(sqlServer);
@@ -511,8 +671,9 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
         using var create = await test.SendAsync(HttpMethod.Post, "/api/orders", Input(), withCsrf: false);
         using var edit = await test.SendAsync(HttpMethod.Put, $"/api/orders/{created.Id}", Input(value: "1.00", version: created.Version), withCsrf: false);
         using var cancel = await test.SendAsync(HttpMethod.Post, $"/api/orders/{created.Id}/cancel", new { version = created.Version }, withCsrf: false);
+        using var restore = await test.SendAsync(HttpMethod.Post, $"/api/orders/{created.Id}/restore", new { version = created.Version }, withCsrf: false);
 
-        foreach (var response in new[] { create, edit, cancel })
+        foreach (var response in new[] { create, edit, cancel, restore })
         {
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
             Assert.Equal(AuthProblems.CsrfInvalidCode, (await Json(response)).GetProperty("code").GetString());
@@ -639,10 +800,21 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
 
         public AuthClient Client { get; }
 
-        public static async Task<OrdersTest> CreateAsync(SqlServerFixture sqlServer)
+        public FakeTimeProvider Time => Factory.Time!;
+
+        /// <summary>
+        /// Baza z migracjami i zalogowany właściciel. <paramref name="hooks"/> wstawia przed port
+        /// zapisu dekorator, który wykonuje zmianę „z innej karty” w trakcie jednostki pracy
+        /// (deterministyczne wyścigi).
+        /// </summary>
+        public static async Task<OrdersTest> CreateAsync(SqlServerFixture sqlServer, DateTimeOffset? now = null, StoreHooks? hooks = null)
         {
             var connectionString = sqlServer.NewDatabase("orders");
-            var factory = new StoneFlowApiFactory().WithDatabase(connectionString);
+            var factory = new StoneFlowApiFactory
+            {
+                Time = new FakeTimeProvider(now ?? Now),
+                ConfigureTestServices = hooks is null ? null : services => HookedOrderStore.Register(services, hooks),
+            }.WithDatabase(connectionString);
             await TestDatabase.MigrateAsync(factory);
             var client = AuthClient.Create(factory);
             await client.SetUpOwnerAsync(factory);
@@ -707,6 +879,23 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
 
         public async Task<Guid[]> IdsAsync(string path) =>
             [.. (await GetJsonAsync(path)).GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid())];
+
+        /// <summary>
+        /// Zamówienie ręczne wstawione bezpośrednio (osobnym połączeniem, poza jednostką pracy API):
+        /// kopia zamówienia <paramref name="sourceId"/> z podanym numerem, kluczem i skrótem żądania.
+        /// </summary>
+        public async Task<Guid> SeedCopyAsync(Guid sourceId, string number, Guid? creationRequestId, string hashSql)
+        {
+            var id = Guid.NewGuid();
+            var key = creationRequestId is { } value ? $"'{value}'" : "NULL";
+            await ExecuteSqlAsync(
+                "INSERT INTO orders.Orders (Id, Number, Source, Channel, OrderDate, Value, FulfillmentStatus, CustomerKind, CustomerName, "
+                + "Suppliers, ZoReferences, HasPhotos, HasReview, CreatedAtUtc, UpdatedAtUtc, CreationRequestId, CreationRequestHash) "
+                + $"SELECT '{id}', N'{number}', N'Manual', Channel, OrderDate, Value, FulfillmentStatus, CustomerKind, CustomerName, "
+                + $"Suppliers, ZoReferences, HasPhotos, HasReview, CreatedAtUtc, UpdatedAtUtc, {key}, {hashSql} "
+                + $"FROM orders.Orders WHERE Id = '{sourceId}';");
+            return id;
+        }
 
         /// <summary>Zamówienie ze sklepu wstawione bezpośrednio (import WooCommerce powstanie w SF-12).</summary>
         public async Task<Guid> SeedShopOrderAsync()
@@ -783,5 +972,49 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
             await connection.OpenAsync(TestContext.Current.CancellationToken);
             return connection;
         }
+    }
+}
+
+/// <summary>Akcje wykonywane przez dekorator portu zapisu tuż przed dodaniem albo zapisem zamówienia.</summary>
+internal sealed class StoreHooks
+{
+    public Func<Order, Task>? BeforeAdd { get; set; }
+
+    public Func<Order, Task>? BeforeSave { get; set; }
+}
+
+/// <summary>Dekorator prawdziwego <see cref="IOrderStore"/> (tylko w testach).</summary>
+internal sealed class HookedOrderStore(IOrderStore inner, StoreHooks hooks) : IOrderStore
+{
+    public static void Register(IServiceCollection services, StoreHooks hooks)
+    {
+        var descriptor = services.Single(d => d.ServiceType == typeof(IOrderStore));
+        var implementation = descriptor.ImplementationType
+            ?? throw new InvalidOperationException("Port zapisu zamówień powinien być zarejestrowany typem.");
+        services.Remove(descriptor);
+        services.AddScoped<IOrderStore>(provider =>
+            new HookedOrderStore((IOrderStore)ActivatorUtilities.CreateInstance(provider, implementation), hooks));
+    }
+
+    public Task<StoredOrder?> LoadAsync(Guid id, CancellationToken cancellationToken) => inner.LoadAsync(id, cancellationToken);
+
+    public async Task<OrderSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
+    {
+        if (hooks.BeforeAdd is { } beforeAdd)
+        {
+            await beforeAdd(order);
+        }
+
+        return await inner.AddAsync(order, cancellationToken);
+    }
+
+    public async Task<OrderSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
+    {
+        if (hooks.BeforeSave is { } beforeSave)
+        {
+            await beforeSave(order);
+        }
+
+        return await inner.SaveAsync(order, expectedVersion, cancellationToken);
     }
 }

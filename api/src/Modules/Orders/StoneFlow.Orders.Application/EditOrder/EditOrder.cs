@@ -91,17 +91,16 @@ public sealed class EditOrderHandler(
         else
         {
             var shop = command.Input.ReadShopFields();
+            // Porównanie z zapisanymi (także pól nieczytelnych) należy do domeny (Order.Edit).
             edit = new OrderEdit(
-                editable.FulfillmentStatus, editable.Operational, editable.Comment, shop.OrderDate, shop.Channel, shop.Value, shop.Customer);
-
-            // Pole podane w postaci nieczytelnej nie może być równe zapisanemu: też jest zmianą pola sklepu.
-            var differing = order.ShopFieldsChangedBy(edit).Union(shop.Unreadable).ToHashSet();
-            if (differing.Count > 0)
-            {
-                return new EditOrderResult(
-                    EditOrderOutcome.FieldOwnedByShop,
-                    Fields: [.. Order.AllShopOwnedFields.Where(differing.Contains)]);
-            }
+                editable.FulfillmentStatus,
+                editable.Operational,
+                editable.Comment,
+                shop.OrderDate,
+                shop.Channel,
+                shop.Value,
+                shop.Customer,
+                shop.Unreadable);
         }
 
         var result = order.Edit(edit, timeProvider.GetUtcNow().UtcDateTime);

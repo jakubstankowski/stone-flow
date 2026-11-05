@@ -85,7 +85,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasIndex(order => order.Number).IsUnique();
         builder.HasIndex(order => new { order.Source, order.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
         builder.HasIndex(order => order.CreationRequestId).IsUnique().HasFilter("[CreationRequestId] IS NOT NULL");
-        builder.HasIndex(order => new { order.OrderDate, order.Id }).IsDescending(true, false);
+        builder.HasIndex(order => new { order.OrderDate, order.Id }).IsDescending(true, true);
         builder.HasIndex(order => order.Channel);
         builder.HasIndex(order => order.FulfillmentStatus);
     }

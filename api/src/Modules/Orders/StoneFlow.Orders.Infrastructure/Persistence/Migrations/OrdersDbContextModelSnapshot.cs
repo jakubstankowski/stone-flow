@@ -182,7 +182,7 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("OrderDate", "Id")
-                        .IsDescending(true, false);
+                        .IsDescending();
 
                     b.HasIndex("Source", "ExternalId")
                         .IsUnique()

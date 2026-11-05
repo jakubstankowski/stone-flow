@@ -489,13 +489,14 @@ public sealed partial record OrderInput(
         return result;
     }
 
-    [GeneratedRegex(@"^(?<sign>-)?\d+(\.(?<fraction>\d+))?$", RegexOptions.CultureInvariant)]
+    // [0-9], a nie \d: \d w .NET dopasowuje też cyfry spoza ASCII.
+    [GeneratedRegex(@"^(?<sign>-)?[0-9]+(\.(?<fraction>[0-9]+))?$", RegexOptions.CultureInvariant)]
     private static partial Regex AmountPattern();
 
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.CultureInvariant)]
     private static partial Regex EmailPattern();
 
-    [GeneratedRegex(@"^\d{2}-\d{3}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[0-9]{2}-[0-9]{3}$", RegexOptions.CultureInvariant)]
     private static partial Regex PostalCodePattern();
 
     private sealed record HashModel(

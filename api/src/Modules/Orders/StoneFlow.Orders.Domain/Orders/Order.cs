@@ -16,7 +16,8 @@ public sealed record OrderContent(
 /// Edycja zamówienia: pełny zestaw pól należących do ERP oraz pola sklepu
 /// (<see cref="OrderDate"/>, <see cref="Channel"/>, <see cref="Value"/>, <see cref="Customer"/>).
 /// W zamówieniu ręcznym pola sklepu są wymagane; w zamówieniu ze sklepu są opcjonalne i tylko
-/// porównywane z zapisanymi.
+/// porównywane z zapisanymi. <see cref="UnreadableShopFields"/> to pola sklepu podane w postaci,
+/// której nie da się odczytać (np. nieznany kod) — nie mogą być równe zapisanym.
 /// </summary>
 public sealed record OrderEdit(
     FulfillmentStatus FulfillmentStatus,
@@ -25,7 +26,8 @@ public sealed record OrderEdit(
     DateOnly? OrderDate,
     OrderChannel? Channel,
     decimal? Value,
-    Customer? Customer);
+    Customer? Customer,
+    IReadOnlyCollection<ShopOwnedField>? UnreadableShopFields = null);
 
 /// <summary>Wartość pola objętego audytem (typowana: data, kwota, słownik, tekst, flaga, lista).</summary>
 public sealed record OrderFieldValue(OrderField Field, object? Value);
@@ -296,32 +298,23 @@ public sealed class Order
         }
     }
 
-    /// <summary>Pola sklepu, które edycja zmieniłaby (podane i różne od zapisanych).</summary>
-    public IReadOnlyList<ShopOwnedField> ShopFieldsChangedBy(OrderEdit edit)
+    /// <summary>
+    /// Pola sklepu, które edycja zmieniłaby: podane i różne od zapisanych albo nieczytelne,
+    /// w kolejności <see cref="AllShopOwnedFields"/>.
+    /// </summary>
+    private List<ShopOwnedField> ShopFieldsChangedBy(OrderEdit edit)
     {
-        ArgumentNullException.ThrowIfNull(edit);
-        var differing = new List<ShopOwnedField>();
-        if (edit.OrderDate is { } orderDate && orderDate != OrderDate)
-        {
-            differing.Add(ShopOwnedField.OrderDate);
-        }
-
-        if (edit.Value is { } value && value != Value)
-        {
-            differing.Add(ShopOwnedField.Value);
-        }
-
-        if (edit.Channel is { } channel && channel != Channel)
-        {
-            differing.Add(ShopOwnedField.Channel);
-        }
-
-        if (edit.Customer is { } customer && customer != Customer)
-        {
-            differing.Add(ShopOwnedField.Customer);
-        }
-
-        return differing;
+        var unreadable = edit.UnreadableShopFields ?? [];
+        return
+        [
+            .. AllShopOwnedFields.Where(field => unreadable.Contains(field) || field switch
+            {
+                ShopOwnedField.OrderDate => edit.OrderDate is { } orderDate && orderDate != OrderDate,
+                ShopOwnedField.Value => edit.Value is { } value && value != Value,
+                ShopOwnedField.Channel => edit.Channel is { } channel && channel != Channel,
+                _ => edit.Customer is { } customer && customer != Customer,
+            }),
+        ];
     }
 
     private OrderChangeResult Changed(IReadOnlyList<OrderFieldValue> before, DateTime nowUtc)

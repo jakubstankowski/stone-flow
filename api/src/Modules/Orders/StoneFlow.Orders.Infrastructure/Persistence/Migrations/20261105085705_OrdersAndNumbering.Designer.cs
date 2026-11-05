@@ -13,7 +13,7 @@ using StoneFlow.Orders.Infrastructure.Persistence;
 namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(OrdersDbContext))]
-    [Migration("20261105080322_OrdersAndNumbering")]
+    [Migration("20261105085705_OrdersAndNumbering")]
     partial class OrdersAndNumbering
     {
         /// <inheritdoc />
@@ -185,7 +185,7 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("OrderDate", "Id")
-                        .IsDescending(true, false);
+                        .IsDescending();
 
                     b.HasIndex("Source", "ExternalId")
                         .IsUnique()

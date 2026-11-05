@@ -101,7 +101,7 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                 schema: "orders",
                 table: "Orders",
                 columns: new[] { "OrderDate", "Id" },
-                descending: new[] { true, false });
+                descending: new bool[0]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Orders_Source_ExternalId",

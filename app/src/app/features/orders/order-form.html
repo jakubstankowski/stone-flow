@@ -242,7 +242,12 @@
           </p>
         </div>
       } @else {
-        <app-field label="Status realizacji" fieldId="zamowienie-status" [required]="true">
+        <app-field
+          label="Status realizacji"
+          fieldId="zamowienie-status"
+          [required]="true"
+          [error]="errorOf(form.fulfillmentStatus)"
+        >
           <select #control class="select w-full" [formField]="form.fulfillmentStatus">
             @for (status of statuses; track status) {
               <option [value]="status">{{ statusLabels[status] }}</option>

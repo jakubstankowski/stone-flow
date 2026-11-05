@@ -1,12 +1,12 @@
 ---
 id: SF-8
 title: Zamówienia ręczne, wspólna lista, anulowanie i przywracanie
-status: planned
+status: done
 risk: high
 depends_on: [SF-6, SF-7]
 parts: []
 spec_review: PASS WITH ISSUES
-code_review: null
+code_review: PASS WITH ISSUES
 source: https://standev.youtrack.cloud/issue/SF-8
 created: 2026-11-05
 updated: 2026-11-05

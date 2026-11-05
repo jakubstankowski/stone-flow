@@ -78,6 +78,8 @@ public sealed class OrderInputTests
     [InlineData("1,23", OrderMessages.ValueInvalid)]
     [InlineData("abc", OrderMessages.ValueInvalid)]
     [InlineData("1e3", OrderMessages.ValueInvalid)]
+    [InlineData("\u0661\u0662\u0663", OrderMessages.ValueInvalid)]
+    [InlineData("12.\u0665\u0660", OrderMessages.ValueInvalid)]
     [InlineData("10000000000000000.00", OrderMessages.ValueTooLarge)]
     public void Rejected_values(string value, string message)
     {
@@ -99,6 +101,7 @@ public sealed class OrderInputTests
 
     [Theory]
     [InlineData("postalCode", "00950", "customer.postalCode")]
+    [InlineData("postalCode", "\u0660\u0660-\u0669\u0665\u0660", "customer.postalCode")]
     [InlineData("email", "jan.testowy", "customer.email")]
     [InlineData("name", "   ", "customer.name")]
     [InlineData("kind", "osoba", "customer.kind")]
