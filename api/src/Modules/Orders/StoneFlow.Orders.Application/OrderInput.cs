@@ -280,43 +280,56 @@ public sealed partial record OrderInput(
     /// </summary>
     public static bool TryParseValue(string? text, out decimal value, out string error)
     {
+        error = ParseAmount(text, out value) switch
+        {
+            AmountError.None => string.Empty,
+            AmountError.Missing => OrderMessages.ValueRequired,
+            AmountError.Invalid => OrderMessages.ValueInvalid,
+            AmountError.Negative => OrderMessages.ValueNegative,
+            AmountError.Scale => OrderMessages.ValueScale,
+            _ => OrderMessages.ValueTooLarge,
+        };
+        return error.Length == 0;
+    }
+
+    /// <summary>
+    /// Wspólny odczyt kwoty (wartość zamówienia, kwoty wpisów): kultura niezmienna, kropka
+    /// dziesiętna, najwyżej dwa miejsca po przecinku, zakres <c>decimal(18,2)</c>. Znak minus jest
+    /// rozpoznawany osobno, aby wywołujący mógł podać własny komunikat.
+    /// </summary>
+    internal static AmountError ParseAmount(string? text, out decimal value)
+    {
         value = 0;
-        error = string.Empty;
         var trimmed = Text(text);
         if (trimmed is null)
         {
-            error = OrderMessages.ValueRequired;
-            return false;
+            return AmountError.Missing;
         }
 
         var match = AmountPattern().Match(trimmed);
         if (!match.Success)
         {
-            error = OrderMessages.ValueInvalid;
-            return false;
+            return AmountError.Invalid;
         }
 
         if (match.Groups["sign"].Success)
         {
-            error = OrderMessages.ValueNegative;
-            return false;
+            return AmountError.Negative;
         }
 
         if (match.Groups["fraction"].Value.Length > 2)
         {
-            error = OrderMessages.ValueScale;
-            return false;
+            return AmountError.Scale;
         }
 
         if (!decimal.TryParse(trimmed, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsed)
             || parsed > Order.MaxValue)
         {
-            error = OrderMessages.ValueTooLarge;
-            return false;
+            return AmountError.TooLarge;
         }
 
         value = parsed;
-        return true;
+        return AmountError.None;
     }
 
     /// <summary>Przycięty tekst albo <c>null</c> dla pustego.</summary>
@@ -345,7 +358,8 @@ public sealed partial record OrderInput(
         return check != 10 && check == digits[9] - '0';
     }
 
-    private static bool TryParseDate(string text, out DateOnly date) =>
+    /// <summary>Data w formacie <c>yyyy-MM-dd</c>.</summary>
+    internal static bool TryParseDate(string text, out DateOnly date) =>
         DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
     private Customer? ValidateCustomer(FieldErrors errors)
@@ -527,7 +541,18 @@ public sealed partial record OrderInput(
         string? Notes);
 }
 
-/// <summary>Wersja zamówienia na granicy API: <c>rowversion</c> zakodowany base64.</summary>
+/// <summary>Błąd odczytu kwoty z tekstu (<see cref="OrderInput.ParseAmount"/>).</summary>
+internal enum AmountError
+{
+    None,
+    Missing,
+    Invalid,
+    Negative,
+    Scale,
+    TooLarge,
+}
+
+/// <summary>Wersja zamówienia i wpisu na granicy API: <c>rowversion</c> zakodowany base64.</summary>
 public static class OrderVersion
 {
     private const int Length = 8;
@@ -546,14 +571,18 @@ public static class OrderVersion
         return Convert.TryFromBase64String(text.Trim(), buffer, out var written) && written == Length ? buffer : null;
     }
 
-    /// <summary>Waliduje wersję z żądania; błąd pod kluczem <c>version</c>.</summary>
-    public static byte[]? Validate(string? text, FieldErrors errors)
+    /// <summary>Waliduje wersję zamówienia z żądania; błąd pod kluczem <c>version</c>.</summary>
+    public static byte[]? Validate(string? text, FieldErrors errors) =>
+        Validate(text, errors, OrderMessages.VersionRequired, OrderMessages.VersionInvalid);
+
+    /// <summary>Waliduje wersję (zamówienia albo wpisu) z podanymi komunikatami; błąd pod kluczem <c>version</c>.</summary>
+    public static byte[]? Validate(string? text, FieldErrors errors, string requiredMessage, string invalidMessage)
     {
         ArgumentNullException.ThrowIfNull(errors);
         var version = Parse(text);
         if (version is null)
         {
-            errors.Add(OrderFieldKeys.Version, string.IsNullOrWhiteSpace(text) ? OrderMessages.VersionRequired : OrderMessages.VersionInvalid);
+            errors.Add(OrderFieldKeys.Version, string.IsNullOrWhiteSpace(text) ? requiredMessage : invalidMessage);
         }
 
         return version;

@@ -1,4 +1,10 @@
-import { OrderDetails, OrderListItem, OrderListPage } from '../app/features/orders/order-models';
+import {
+  OrderDetails,
+  OrderListItem,
+  OrderListPage,
+  PaymentEntry,
+  RefundEntry,
+} from '../app/features/orders/order-models';
 
 /** Fikcyjne dane zamówień do testów (bez danych identyfikujących). Tylko specyfikacje. */
 export function orderDetails(overrides: Partial<OrderDetails> = {}): OrderDetails {
@@ -35,6 +41,15 @@ export function orderDetails(overrides: Partial<OrderDetails> = {}): OrderDetail
     updatedAtUtc: '2026-10-28T11:30:00Z',
     version: 'AAAAAAAAB9E=',
     shopOwnedFields: [],
+    payment: {
+      paid: '0.00',
+      state: 'unpaid',
+      amountDue: '1234.50',
+      overpayment: null,
+      toRefund: null,
+    },
+    payments: [],
+    refunds: [],
     ...overrides,
   };
 }
@@ -49,6 +64,35 @@ export function listItem(overrides: Partial<OrderListItem> = {}): OrderListItem 
     source: 'manual',
     value: '1234.50',
     fulfillmentStatus: 'inProgress',
+    paid: '0.00',
+    paymentState: 'unpaid',
+    ...overrides,
+  };
+}
+
+export function paymentEntry(overrides: Partial<PaymentEntry> = {}): PaymentEntry {
+  return {
+    id: 'p1',
+    amount: '300.00',
+    date: '2026-10-29',
+    method: 'transfer',
+    receivedBy: null,
+    createdAtUtc: '2026-10-29T09:00:00Z',
+    version: 'AAAAAAAAC1E=',
+    ...overrides,
+  };
+}
+
+export function refundEntry(overrides: Partial<RefundEntry> = {}): RefundEntry {
+  return {
+    id: 'r1',
+    kind: 'moneyReturn',
+    amount: '100.00',
+    date: '2026-10-30',
+    method: 'blik',
+    reason: 'Zwrot nadpłaty',
+    createdAtUtc: '2026-10-30T09:00:00Z',
+    version: 'AAAAAAAAD1E=',
     ...overrides,
   };
 }

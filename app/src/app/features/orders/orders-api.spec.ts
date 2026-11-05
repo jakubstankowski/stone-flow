@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideTestHttp, respondProblem } from '../../../testing/auth-testing';
+import { provideTestHttp, respondNoContent, respondProblem } from '../../../testing/auth-testing';
 import { toApiError } from '../../core/http/api-error';
 import { OrderInput, OrderListQuery } from './order-models';
 import { OrdersApi } from './orders-api';
@@ -16,6 +16,7 @@ const QUERY: OrderListQuery = {
   channel: 'olx',
   source: 'manual',
   statuses: ['inProgress', 'problem'],
+  paymentStates: ['unpaid', 'none'],
   search: 'Jan',
 };
 
@@ -64,7 +65,8 @@ describe('OrdersApi', () => {
     expect(request.request.method).toBe('GET');
     expect(request.request.urlWithParams).toBe(
       '/api/orders?page=2&pageSize=25&sort=orderDate&direction=desc&dateFrom=2026-10-01' +
-        '&dateTo=2026-10-31&channel=olx&source=manual&search=Jan&status=inProgress&status=problem',
+        '&dateTo=2026-10-31&channel=olx&source=manual&search=Jan&status=inProgress&status=problem' +
+        '&paymentState=unpaid&paymentState=none',
     );
     request.flush({ items: [], page: 2, pageSize: 25, total: 30 });
     expect((await result).total).toBe(30);
@@ -79,6 +81,7 @@ describe('OrdersApi', () => {
       channel: null,
       source: null,
       statuses: [],
+      paymentStates: [],
       search: null,
     });
     const request = http.expectOne((candidate) => candidate.url === '/api/orders');
@@ -143,6 +146,76 @@ describe('OrdersApi', () => {
     expect(restoreRequest.request.body).toEqual({ version: 'v3' });
     restoreRequest.flush({ version: 'v4' });
     expect(await restore).toEqual({ version: 'v4' });
+  });
+
+  it('adds payments and refunds with the Idempotency-Key header', async () => {
+    const payment = api.addEntry(
+      'payment',
+      'a1',
+      { amount: '300.00', date: '2026-10-29', method: 'cash', receivedBy: 'Anna' },
+      'key-p',
+    );
+    const paymentRequest = http.expectOne('/api/orders/a1/payments');
+    expect(paymentRequest.request.method).toBe('POST');
+    expect(paymentRequest.request.headers.get('Idempotency-Key')).toBe('key-p');
+    expect(paymentRequest.request.body).toEqual({
+      amount: '300.00',
+      date: '2026-10-29',
+      method: 'cash',
+      receivedBy: 'Anna',
+    });
+    paymentRequest.flush({ id: 'p1', version: 'v1' }, { status: 201, statusText: 'Created' });
+    expect(await payment).toEqual({ id: 'p1', version: 'v1' });
+
+    const refund = api.addEntry(
+      'refund',
+      'a1',
+      {
+        kind: 'salesReturn',
+        amount: '100.00',
+        date: '2026-10-30',
+        method: 'transfer',
+        reason: 'Oddany towar',
+      },
+      'key-r',
+    );
+    const refundRequest = http.expectOne('/api/orders/a1/refunds');
+    expect(refundRequest.request.method).toBe('POST');
+    expect(refundRequest.request.headers.get('Idempotency-Key')).toBe('key-r');
+    expect(refundRequest.request.body.kind).toBe('salesReturn');
+    refundRequest.flush({ id: 'r1', version: 'v1' }, { status: 200, statusText: 'OK' });
+    expect(await refund).toEqual({ id: 'r1', version: 'v1' });
+  });
+
+  it('updates an entry with the version in the body', async () => {
+    const update = api.updateEntry(
+      'payment',
+      'a1',
+      'p1',
+      { amount: '250.00', date: '2026-10-29', method: 'transfer', receivedBy: null },
+      'v1+/=',
+    );
+    const put = http.expectOne('/api/orders/a1/payments/p1');
+    expect(put.request.method).toBe('PUT');
+    expect(put.request.body).toEqual({
+      amount: '250.00',
+      date: '2026-10-29',
+      method: 'transfer',
+      receivedBy: null,
+      version: 'v1+/=',
+    });
+    put.flush({ version: 'v2' });
+    expect(await update).toEqual({ version: 'v2' });
+  });
+
+  it('deletes an entry with the version in the JSON body, not in the URL', async () => {
+    const removal = api.deleteEntry('refund', 'a1', 'r1', 'AAAA+/8=');
+    const request = http.expectOne('/api/orders/a1/refunds/r1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.urlWithParams).toBe('/api/orders/a1/refunds/r1');
+    expect(request.request.body).toEqual({ version: 'AAAA+/8=' });
+    respondNoContent(request);
+    await expect(removal).resolves.toBeUndefined();
   });
 
   it('rejects with an error that toApiError maps to the problem code', async () => {

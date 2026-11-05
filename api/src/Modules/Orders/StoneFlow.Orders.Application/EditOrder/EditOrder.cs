@@ -120,7 +120,7 @@ public sealed class EditOrderHandler(
         }
 
         var saved = await store.SaveAsync(order, version, cancellationToken);
-        if (saved.Status == OrderSaveStatus.Conflict)
+        if (saved.Status == StoreSaveStatus.Conflict)
         {
             return new EditOrderResult(EditOrderOutcome.Conflict);
         }

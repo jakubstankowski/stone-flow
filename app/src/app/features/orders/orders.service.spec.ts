@@ -4,9 +4,11 @@ import {
   nextRequest,
   provideTestHttp,
   respondNetworkError,
+  respondNoContent,
   respondProblem,
 } from '../../../testing/auth-testing';
 import { listItem, listPage, orderDetails } from '../../../testing/orders-testing';
+import { formatPln } from '../../shared/format/pl-format';
 import { OrderInput } from './order-models';
 import { LIST_ERROR_MESSAGE, OrdersService } from './orders.service';
 
@@ -213,5 +215,85 @@ describe('OrdersService', () => {
     const missing = service.loadOrder('zz');
     respondProblem(await nextRequest('/api/orders/zz'), 404, { code: 'order_not_found' });
     expect(await missing).toEqual({ kind: 'notFound' });
+  });
+
+  it('filters by payment state, including orders without a state', async () => {
+    const filtering = service.updateFilters({ paymentStates: ['partiallyPaid', 'none'] });
+    const request = await listRequest();
+    expect(request.request.params.getAll('paymentState')).toEqual(['partiallyPaid', 'none']);
+    request.flush(listPage([], 0));
+    await filtering;
+    expect(service.activeFilters().map((filter) => filter.label)).toEqual([
+      'Stan płatności: Częściowo opłacone',
+      'Stan płatności: Bez stanu (anulowane)',
+    ]);
+
+    const removing = service.removeFilter('paymentState:none');
+    const removed = await listRequest();
+    expect(removed.request.params.getAll('paymentState')).toEqual(['partiallyPaid']);
+    removed.flush(listPage([], 0));
+    await removing;
+  });
+
+  it('adds an entry with the key and treats 200 as saved', async () => {
+    const adding = service.addEntry(
+      'payment',
+      'a1',
+      { amount: '300.00', date: '2026-10-29', method: 'transfer', receivedBy: null },
+      'key-1',
+    );
+    const request = await nextRequest('/api/orders/a1/payments');
+    expect(request.request.headers.get('Idempotency-Key')).toBe('key-1');
+    request.flush({ id: 'p1', version: 'v1' }, { status: 200, statusText: 'OK' });
+    expect(await adding).toEqual({ kind: 'saved' });
+  });
+
+  it.each([
+    [409, { code: 'entry_conflict' }, { kind: 'conflict' }],
+    [409, { code: 'idempotency_key_reused', refundId: 'r9' }, { kind: 'keyReused' }],
+    [404, { code: 'entry_not_found' }, { kind: 'entryNotFound' }],
+    [404, { code: 'order_not_found' }, { kind: 'orderNotFound' }],
+    [
+      422,
+      { code: 'refund_exceeds_paid', available: '1000.00' },
+      {
+        kind: 'rejected',
+        message: `Zwrot nie może przekroczyć kwoty Zapłacono (${formatPln('1000.00')}).`,
+      },
+    ],
+    [
+      422,
+      { code: 'refund_exceeds_paid' },
+      { kind: 'rejected', message: 'Zwrot nie może przekroczyć kwoty Zapłacono.' },
+    ],
+    [
+      422,
+      { code: 'paid_would_be_negative' },
+      {
+        kind: 'rejected',
+        message: 'Zapłacono spadłoby poniżej 0 zł. Najpierw popraw lub usuń zwrot.',
+      },
+    ],
+  ])('maps %i %o on an entry change', async (status, body, expected) => {
+    const updating = service.updateEntry(
+      'refund',
+      'a1',
+      'r1',
+      { kind: 'moneyReturn', amount: '1200.00', date: '2026-10-30', method: 'cash', reason: 'X' },
+      'v1',
+    );
+    const request = await nextRequest('/api/orders/a1/refunds/r1');
+    expect(request.request.body.version).toBe('v1');
+    respondProblem(request, status, body);
+    expect(await updating).toEqual(expected);
+  });
+
+  it('deletes an entry with the version in the body', async () => {
+    const deleting = service.deleteEntry('payment', 'a1', 'p1', 'v1');
+    const request = await nextRequest('/api/orders/a1/payments/p1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toEqual({ version: 'v1' });
+    respondNoContent(request);
+    expect(await deleting).toEqual({ kind: 'saved' });
   });
 });

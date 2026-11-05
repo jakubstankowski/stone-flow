@@ -1,17 +1,20 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import {
   nextRequest,
   provideTestHttp,
+  respondNoContent,
   respondProblem,
   typeInto,
 } from '../../../testing/auth-testing';
-import { orderDetails } from '../../../testing/orders-testing';
+import { orderDetails, paymentEntry, refundEntry } from '../../../testing/orders-testing';
 import { formatPln } from '../../shared/format/pl-format';
 import { OrderDetails } from './order-models';
 import { OrderDetailsPage } from './order-details-page';
+import { OrderPayments } from './order-payments';
 import { OrdersService } from './orders.service';
 
 function buttonByText(root: ParentNode, text: string): HTMLButtonElement {
@@ -22,6 +25,16 @@ function buttonByText(root: ParentNode, text: string): HTMLButtonElement {
     throw new Error(`Brak przycisku „${text}”`);
   }
   return button;
+}
+
+function dialogWith(root: ParentNode, heading: string): HTMLDialogElement {
+  const dialog = Array.from(root.querySelectorAll('dialog')).find((candidate) =>
+    candidate.querySelector('h2')?.textContent?.includes(heading),
+  );
+  if (!dialog) {
+    throw new Error(`Brak dialogu „${heading}”`);
+  }
+  return dialog;
 }
 
 describe('OrderDetailsPage', () => {
@@ -61,10 +74,10 @@ describe('OrderDetailsPage', () => {
     }
     await navigation;
     await settle(() => expect(element().querySelector('.skeleton')).toBeNull());
-    return { element, stable, settle };
+    return { harness, element, stable, settle };
   }
 
-  it('shows all fields, the status and source markers, and no delete action', async () => {
+  it('shows all fields, the status and source markers, and no order delete action', async () => {
     const { element } = await open(orderDetails({ shopStatus: null }));
     const text = element().textContent ?? '';
 
@@ -80,7 +93,6 @@ describe('OrderDetailsPage', () => {
     expect(text).toContain('28.10.2026, 11:00');
     expect(text).toContain('28.10.2026, 12:30');
     expect(text).not.toContain('Status w sklepie');
-    expect(text).not.toContain('Zapłacono');
     const labels = Array.from(element().querySelectorAll('button'))
       .filter((button) => !button.closest('dialog'))
       .map((button) => button.textContent?.trim());
@@ -88,6 +100,7 @@ describe('OrderDetailsPage', () => {
     expect(labels).toContain('Anuluj zamówienie');
     expect(labels).not.toContain('Przywróć zamówienie');
     expect(labels.some((label) => label?.includes('Usuń'))).toBe(false);
+    expect(text).toContain('Brak wpłat.');
   });
 
   it('shows the shop status separately when present', async () => {
@@ -183,13 +196,14 @@ describe('OrderDetailsPage', () => {
 
   it('asks before cancelling and sends nothing when the dialog is dismissed', async () => {
     const page = await open();
-    const dialog = () => page.element().querySelector('dialog') as HTMLDialogElement;
+    const dialog = () => dialogWith(page.element(), 'Anulować zamówienie');
 
     buttonByText(page.element(), 'Anuluj zamówienie').click();
     await page.stable();
     expect(dialog().open).toBe(true);
     expect(dialog().textContent).toContain('Anulować zamówienie ZR-2026-0001?');
     expect(dialog().textContent).toContain('wypadnie ze sprzedaży');
+    expect(dialog().textContent).not.toContain('Zamówienie ma wpłaty');
     buttonByText(dialog(), 'Anuluj').click();
     await page.stable();
     http.expectNone('/api/orders/a1/cancel');
@@ -240,7 +254,7 @@ describe('OrderDetailsPage', () => {
     const page = await open();
     buttonByText(page.element(), 'Anuluj zamówienie').click();
     await page.stable();
-    const dialog = page.element().querySelector('dialog') as HTMLDialogElement;
+    const dialog = dialogWith(page.element(), 'Anulować zamówienie');
     buttonByText(dialog, 'Anuluj zamówienie').click();
     respondProblem(await nextRequest({ method: 'POST', url: '/api/orders/a1/cancel' }), 409, {
       code: 'order_conflict',
@@ -268,5 +282,154 @@ describe('OrderDetailsPage', () => {
       orderDetails({ fulfillmentStatus: 'cancelled', version: 'v2' }),
     );
     await page.settle(() => expect(page.element().querySelector('form')).toBeNull());
+  });
+
+  it('warns in the cancel dialog when the order has payments, with the paid amount', async () => {
+    // Wpłata 500 i zwrot 500: Zapłacono 0, ale zamówienie ma wpłaty (kryterium bez arytmetyki).
+    const page = await open(
+      orderDetails({
+        payment: {
+          paid: '0.00',
+          state: 'unpaid',
+          amountDue: '1234.50',
+          overpayment: null,
+          toRefund: null,
+        },
+        payments: [paymentEntry({ amount: '500.00' })],
+        refunds: [refundEntry({ amount: '500.00' })],
+      }),
+    );
+    buttonByText(page.element(), 'Anuluj zamówienie').click();
+    await page.stable();
+
+    const dialog = dialogWith(page.element(), 'Anulować zamówienie');
+    expect(dialog.textContent).toContain(
+      `Zamówienie ma wpłaty (Zapłacono ${formatPln('0.00')}). Wpłaty pozostaną; ewentualną kwotę rozlicz zwrotem.`,
+    );
+    buttonByText(dialog, 'Anuluj').click();
+    await page.stable();
+  });
+
+  it('disables entry actions while the order is being edited', async () => {
+    const page = await open(orderDetails({ payments: [paymentEntry()] }));
+    buttonByText(page.element(), 'Edytuj').click();
+    await page.stable();
+
+    const section = page.element().querySelector('app-order-payments') as HTMLElement;
+    expect(section.textContent).toContain('Zapisz albo zamknij edycję zamówienia');
+    expect(buttonByText(section, 'Dodaj wpłatę').disabled).toBe(true);
+    expect(buttonByText(section, 'Dodaj zwrot').disabled).toBe(true);
+    expect(buttonByText(section, 'Popraw wpłatę z 29.10.2026').disabled).toBe(true);
+    expect(buttonByText(section, 'Usuń wpłatę z 29.10.2026').disabled).toBe(true);
+
+    buttonByText(page.element(), 'Zamknij bez zapisu').click();
+    await page.stable();
+    expect(buttonByText(section, 'Dodaj wpłatę').disabled).toBe(false);
+  });
+
+  it('disables order editing while an entry form is open', async () => {
+    const page = await open();
+    buttonByText(page.element(), 'Dodaj wpłatę').click();
+    await page.stable();
+
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
+    expect(page.element().textContent).toContain(
+      'Edycja zamówienia będzie dostępna po zamknięciu formularza wpłaty lub zwrotu i zakończeniu zapisu albo usuwania wpisu.',
+    );
+
+    buttonByText(page.element(), 'Zamknij bez zapisu').click();
+    await page.stable();
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(false);
+  });
+
+  it('reloads the order after an entry is saved and shows the new summary', async () => {
+    const page = await open();
+    buttonByText(page.element(), 'Dodaj wpłatę').click();
+    await page.stable();
+    typeInto(page.element().querySelector('#wplata-kwota') as HTMLInputElement, '300');
+    const method = page.element().querySelector('#wplata-metoda') as HTMLSelectElement;
+    method.value = 'transfer';
+    method.dispatchEvent(new Event('input', { bubbles: true }));
+    method.dispatchEvent(new Event('change', { bubbles: true }));
+    buttonByText(page.element(), 'Zapisz wpłatę').click();
+
+    const post = await nextRequest({ method: 'POST', url: '/api/orders/a1/payments' });
+    expect(post.request.body.amount).toBe('300.00');
+    post.flush({ id: 'p1', version: 'v1' }, { status: 201, statusText: 'Created' });
+    const reload = await nextRequest({ method: 'GET', url: '/api/orders/a1' });
+    // Formularz wpisu jest już zamknięty, ale do końca odświeżenia „Edytuj” pozostaje wyłączone.
+    await page.settle(() => expect(page.element().querySelector('#wplata-kwota')).toBeNull());
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
+    reload.flush(
+      orderDetails({
+        payment: {
+          paid: '300.00',
+          state: 'partiallyPaid',
+          amountDue: '934.50',
+          overpayment: null,
+          toRefund: null,
+        },
+        payments: [paymentEntry()],
+      }),
+    );
+
+    await page.settle(() => expect(page.element().textContent).toContain('Wpłata zapisana.'));
+    expect(page.element().textContent).toContain('Częściowo opłacone');
+    expect(page.element().textContent).toContain(formatPln('934.50'));
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(false);
+  });
+
+  it('keeps „Edytuj” disabled from the delete confirmation until the reload ends', async () => {
+    const page = await open(orderDetails({ payments: [paymentEntry()] }));
+    const edit = () => buttonByText(page.element(), 'Edytuj');
+    const dialog = () => dialogWith(page.element(), 'Usunąć wpłatę?');
+
+    buttonByText(page.element(), 'Usuń wpłatę z 29.10.2026').click();
+    await page.settle(() => expect(edit().disabled).toBe(true));
+    expect(dialog().open).toBe(true);
+    buttonByText(dialog(), 'Anuluj').click();
+    await page.settle(() => expect(edit().disabled).toBe(false));
+
+    buttonByText(page.element(), 'Usuń wpłatę z 29.10.2026').click();
+    await page.stable();
+    buttonByText(dialog(), 'Usuń').click();
+    const removal = await nextRequest({ method: 'DELETE', url: '/api/orders/a1/payments/p1' });
+    await page.stable();
+    expect(edit().disabled).toBe(true);
+    respondNoContent(removal);
+
+    const reload = await nextRequest({ method: 'GET', url: '/api/orders/a1' });
+    await page.stable();
+    expect(edit().disabled).toBe(true);
+    reload.flush(orderDetails());
+
+    await page.settle(() => expect(page.element().textContent).toContain('Wpłata usunięta.'));
+    expect(edit().disabled).toBe(false);
+  });
+
+  it('never resets an open order edit when the payments section reloads the order', async () => {
+    const page = await open();
+    buttonByText(page.element(), 'Edytuj').click();
+    await page.stable();
+    const name = () => page.element().querySelector('#zamowienie-klient-nazwa') as HTMLInputElement;
+    typeInto(name(), 'Jan Niezapisany');
+    await page.stable();
+
+    const payments = page.harness.fixture.debugElement.query(By.directive(OrderPayments))
+      .componentInstance as OrderPayments;
+    const reloading = payments.reload()();
+    (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(
+      orderDetails({
+        customer: { ...orderDetails().customer, name: 'Jan Z Serwera' },
+        payments: [paymentEntry()],
+      }),
+    );
+    await reloading;
+    await page.stable();
+
+    expect(name().value).toBe('Jan Niezapisany');
+    expect(page.element().querySelector('app-order-payments')?.textContent).toContain(
+      formatPln('300.00'),
+    );
   });
 });

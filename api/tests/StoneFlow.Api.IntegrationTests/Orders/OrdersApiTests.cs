@@ -2,14 +2,11 @@ using System.Data.SqlTypes;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Time.Testing;
 using StoneFlow.Access.Api;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
 using StoneFlow.Orders.Api;
 using StoneFlow.Orders.Application.Abstractions;
-using StoneFlow.Orders.Domain.Orders;
 using StoneFlow.Shared.Application.Persistence;
 
 namespace StoneFlow.Api.IntegrationTests.Orders;
@@ -22,11 +19,8 @@ namespace StoneFlow.Api.IntegrationTests.Orders;
 [Collection(SqlServerCollection.Name)]
 public sealed class OrdersApiTests(SqlServerFixture sqlServer)
 {
-    /// <summary>Rok numeru według zegara testu (<see cref="Now"/>, Europe/Warsaw).</summary>
+    /// <summary>Rok numeru według zegara testu (<see cref="OrdersTest.DefaultNow"/>, Europe/Warsaw).</summary>
     private const int Year = 2026;
-
-    /// <summary>Stały zegar aplikacji: numeracja nie zależy od dnia uruchomienia testów.</summary>
-    private static readonly DateTimeOffset Now = new(2026, 11, 5, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task Create_returns_201_with_number_and_the_order_appears_on_the_list()
@@ -442,10 +436,10 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
                 Assert.True(stored.Order.Cancel(DateTime.UtcNow).Succeeded);
                 return await store.SaveAsync(stored.Order, Convert.FromBase64String(created.Version), cancellationToken);
             },
-            commitWhen: saved => saved.Status == OrderSaveStatus.Saved,
+            commitWhen: saved => saved.Status == StoreSaveStatus.Saved,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(OrderSaveStatus.Conflict, result.Status);
+        Assert.Equal(StoreSaveStatus.Conflict, result.Status);
         var details = await test.GetJsonAsync($"/api/orders/{created.Id}");
         Assert.Equal("inProgress", details.GetProperty("fulfillmentStatus").GetString());
         Assert.Equal(current, details.GetProperty("version").GetString());
@@ -697,12 +691,18 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
         Assert.DoesNotContain(tablesWithRows, t => !t.StartsWith("access.", StringComparison.Ordinal)
             && !t.EndsWith(".__EFMigrationsHistory", StringComparison.Ordinal)
             && t is not ("orders.Orders" or "orders.OrderNumberCounters" or "reporting.AuditEntries"));
-        string[] properties =
-        [
-            .. details.EnumerateObject().Select(p => p.Name),
-            .. list.GetProperty("items")[0].EnumerateObject().Select(p => p.Name),
-        ];
-        Assert.DoesNotContain(properties, p => p.Contains("paid", StringComparison.OrdinalIgnoreCase) || p.Contains("payment", StringComparison.OrdinalIgnoreCase));
+        // SF-9: zapis zamówienia nie jest wpływem pieniędzy — brak wpisów, stan wyliczony z zera.
+        Assert.Equal(0, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Payments"));
+        Assert.Equal(0, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Refunds"));
+        var payment = details.GetProperty("payment");
+        Assert.Equal("0.00", payment.GetProperty("paid").GetString());
+        Assert.Equal("unpaid", payment.GetProperty("state").GetString());
+        Assert.Equal("1234.50", payment.GetProperty("amountDue").GetString());
+        Assert.Equal(0, details.GetProperty("payments").GetArrayLength());
+        Assert.Equal(0, details.GetProperty("refunds").GetArrayLength());
+        var item = list.GetProperty("items")[0];
+        Assert.Equal("0.00", item.GetProperty("paid").GetString());
+        Assert.Equal("unpaid", item.GetProperty("paymentState").GetString());
     }
 
     private static object Input(
@@ -775,246 +775,4 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
             c.GetProperty("new").GetString(),
             c.GetProperty("personal").GetBoolean())),
     ];
-
-    private sealed record CreatedOrder(Guid Id, string Number, string Version);
-
-    private sealed record AuditRow(string Operation, string AuthorKind, string Label, DateTime BusinessDate, string Changes);
-
-    private sealed record AuditChangeRow(string Field, string? Old, string? New, bool Personal);
-
-    /// <summary>Baza testu z migracjami, zalogowany właściciel i pomocnicze wywołania API.</summary>
-    private sealed class OrdersTest : IAsyncDisposable
-    {
-        public const string IdempotencyKeyHeader = "Idempotency-Key";
-
-        private readonly string _connectionString;
-
-        private OrdersTest(StoneFlowApiFactory factory, AuthClient client, string connectionString)
-        {
-            Factory = factory;
-            Client = client;
-            _connectionString = connectionString;
-        }
-
-        public StoneFlowApiFactory Factory { get; }
-
-        public AuthClient Client { get; }
-
-        public FakeTimeProvider Time => Factory.Time!;
-
-        /// <summary>
-        /// Baza z migracjami i zalogowany właściciel. <paramref name="hooks"/> wstawia przed port
-        /// zapisu dekorator, który wykonuje zmianę „z innej karty” w trakcie jednostki pracy
-        /// (deterministyczne wyścigi).
-        /// </summary>
-        public static async Task<OrdersTest> CreateAsync(SqlServerFixture sqlServer, DateTimeOffset? now = null, StoreHooks? hooks = null)
-        {
-            var connectionString = sqlServer.NewDatabase("orders");
-            var factory = new StoneFlowApiFactory
-            {
-                Time = new FakeTimeProvider(now ?? Now),
-                ConfigureTestServices = hooks is null ? null : services => HookedOrderStore.Register(services, hooks),
-            }.WithDatabase(connectionString);
-            await TestDatabase.MigrateAsync(factory);
-            var client = AuthClient.Create(factory);
-            await client.SetUpOwnerAsync(factory);
-            using var login = await client.LoginAsync();
-            Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
-            return new OrdersTest(factory, client, connectionString);
-        }
-
-        public async Task<HttpResponseMessage> SendAsync(
-            HttpMethod method, string path, object? body = null, string? idempotencyKey = null, bool withCsrf = true)
-        {
-            using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative))
-            {
-                Content = body is null ? null : JsonContent.Create(body),
-            };
-            if (withCsrf && Client.XsrfToken is not null)
-            {
-                request.Headers.Add("X-XSRF-TOKEN", Client.XsrfToken);
-            }
-
-            if (idempotencyKey is not null)
-            {
-                request.Headers.Add(IdempotencyKeyHeader, idempotencyKey);
-            }
-
-            return await Client.Http.SendAsync(request, TestContext.Current.CancellationToken);
-        }
-
-        public Task<HttpResponseMessage> CreateAsync(object body, Guid? key = null) =>
-            SendAsync(HttpMethod.Post, "/api/orders", body, (key ?? Guid.NewGuid()).ToString());
-
-        public async Task<CreatedOrder> CreateOrderAsync(object body, Guid? key = null)
-        {
-            using var response = await CreateAsync(body, key);
-            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-            var json = await Json(response);
-            return new CreatedOrder(json.GetProperty("id").GetGuid(), json.GetProperty("number").GetString()!, json.GetProperty("version").GetString()!);
-        }
-
-        /// <summary>Udany <c>PUT</c>; zwraca nową wersję.</summary>
-        public async Task<string> EditAsync(Guid id, object body)
-        {
-            using var response = await SendAsync(HttpMethod.Put, $"/api/orders/{id}", body);
-            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-            return (await Json(response)).GetProperty("version").GetString()!;
-        }
-
-        /// <summary>Udane <c>cancel</c> albo <c>restore</c>; zwraca nową wersję.</summary>
-        public async Task<string> StatusActionAsync(Guid id, string action, string version)
-        {
-            using var response = await SendAsync(HttpMethod.Post, $"/api/orders/{id}/{action}", new { version });
-            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-            return (await Json(response)).GetProperty("version").GetString()!;
-        }
-
-        public async Task<JsonElement> GetJsonAsync(string path)
-        {
-            using var response = await SendAsync(HttpMethod.Get, path);
-            Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-            return await Json(response);
-        }
-
-        public async Task<Guid[]> IdsAsync(string path) =>
-            [.. (await GetJsonAsync(path)).GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetGuid())];
-
-        /// <summary>
-        /// Zamówienie ręczne wstawione bezpośrednio (osobnym połączeniem, poza jednostką pracy API):
-        /// kopia zamówienia <paramref name="sourceId"/> z podanym numerem, kluczem i skrótem żądania.
-        /// </summary>
-        public async Task<Guid> SeedCopyAsync(Guid sourceId, string number, Guid? creationRequestId, string hashSql)
-        {
-            var id = Guid.NewGuid();
-            var key = creationRequestId is { } value ? $"'{value}'" : "NULL";
-            await ExecuteSqlAsync(
-                "INSERT INTO orders.Orders (Id, Number, Source, Channel, OrderDate, Value, FulfillmentStatus, CustomerKind, CustomerName, "
-                + "Suppliers, ZoReferences, HasPhotos, HasReview, CreatedAtUtc, UpdatedAtUtc, CreationRequestId, CreationRequestHash) "
-                + $"SELECT '{id}', N'{number}', N'Manual', Channel, OrderDate, Value, FulfillmentStatus, CustomerKind, CustomerName, "
-                + $"Suppliers, ZoReferences, HasPhotos, HasReview, CreatedAtUtc, UpdatedAtUtc, {key}, {hashSql} "
-                + $"FROM orders.Orders WHERE Id = '{sourceId}';");
-            return id;
-        }
-
-        /// <summary>Zamówienie ze sklepu wstawione bezpośrednio (import WooCommerce powstanie w SF-12).</summary>
-        public async Task<Guid> SeedShopOrderAsync()
-        {
-            var id = Guid.NewGuid();
-            await ExecuteSqlAsync(
-                "INSERT INTO orders.Orders (Id, Number, Source, ExternalId, Channel, OrderDate, Value, FulfillmentStatus, ShopStatus, "
-                + "CustomerKind, CustomerName, Suppliers, ZoReferences, HasPhotos, HasReview, CreatedAtUtc, UpdatedAtUtc) "
-                + $"VALUES ('{id}', N'ZR-2026-9001', N'WooCommerce', N'1001', N'Shop', '2026-10-20', 250.00, N'InProgress', N'processing', "
-                + "N'Person', N'Sklepowy Klient Testowy', N'[]', N'[]', 0, 0, SYSUTCDATETIME(), SYSUTCDATETIME());");
-            return id;
-        }
-
-        public async Task<T> ScalarAsync<T>(string sql)
-        {
-            await using var connection = await OpenAsync();
-            await using var command = new SqlCommand(sql, connection);
-            return (T)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken))!;
-        }
-
-        public async Task ExecuteSqlAsync(string sql)
-        {
-            await using var connection = await OpenAsync();
-            await using var command = new SqlCommand(sql, connection);
-            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
-
-        public async Task<IReadOnlyList<AuditRow>> AuditRowsAsync(Guid orderId)
-        {
-            await using var connection = await OpenAsync();
-            await using var command = new SqlCommand(
-                "SELECT Operation, AuthorKind, ObjectLabel, ObjectBusinessDate, Changes FROM reporting.AuditEntries "
-                + "WHERE ObjectType = N'Order' AND ObjectId = @id AND AuthorAccountId IS NOT NULL ORDER BY Id",
-                connection);
-            command.Parameters.AddWithValue("@id", orderId);
-            await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
-            var rows = new List<AuditRow>();
-            while (await reader.ReadAsync(TestContext.Current.CancellationToken))
-            {
-                rows.Add(new AuditRow(reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetDateTime(3), reader.GetString(4)));
-            }
-
-            return rows;
-        }
-
-        /// <summary>Tabele z co najmniej jednym wierszem, jako <c>schemat.tabela</c>.</summary>
-        public async Task<IReadOnlyList<string>> TablesWithRowsAsync()
-        {
-            await using var connection = await OpenAsync();
-            await using var command = new SqlCommand(
-                "SELECT s.name + N'.' + t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id "
-                + "JOIN sys.partitions p ON p.object_id = t.object_id AND p.index_id IN (0, 1) "
-                + "GROUP BY s.name, t.name HAVING SUM(p.rows) > 0",
-                connection);
-            await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
-            var tables = new List<string>();
-            while (await reader.ReadAsync(TestContext.Current.CancellationToken))
-            {
-                tables.Add(reader.GetString(0));
-            }
-
-            return tables;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            Client.Dispose();
-            await Factory.DisposeAsync();
-        }
-
-        private async Task<SqlConnection> OpenAsync()
-        {
-            var connection = new SqlConnection(_connectionString);
-            await connection.OpenAsync(TestContext.Current.CancellationToken);
-            return connection;
-        }
-    }
-}
-
-/// <summary>Akcje wykonywane przez dekorator portu zapisu tuż przed dodaniem albo zapisem zamówienia.</summary>
-internal sealed class StoreHooks
-{
-    public Func<Order, Task>? BeforeAdd { get; set; }
-
-    public Func<Order, Task>? BeforeSave { get; set; }
-}
-
-/// <summary>Dekorator prawdziwego <see cref="IOrderStore"/> (tylko w testach).</summary>
-internal sealed class HookedOrderStore(IOrderStore inner, StoreHooks hooks) : IOrderStore
-{
-    public static void Register(IServiceCollection services, StoreHooks hooks)
-    {
-        var descriptor = services.Single(d => d.ServiceType == typeof(IOrderStore));
-        var implementation = descriptor.ImplementationType
-            ?? throw new InvalidOperationException("Port zapisu zamówień powinien być zarejestrowany typem.");
-        services.Remove(descriptor);
-        services.AddScoped<IOrderStore>(provider =>
-            new HookedOrderStore((IOrderStore)ActivatorUtilities.CreateInstance(provider, implementation), hooks));
-    }
-
-    public Task<StoredOrder?> LoadAsync(Guid id, CancellationToken cancellationToken) => inner.LoadAsync(id, cancellationToken);
-
-    public async Task<OrderSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
-    {
-        if (hooks.BeforeAdd is { } beforeAdd)
-        {
-            await beforeAdd(order);
-        }
-
-        return await inner.AddAsync(order, cancellationToken);
-    }
-
-    public async Task<OrderSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
-    {
-        if (hooks.BeforeSave is { } beforeSave)
-        {
-            await beforeSave(order);
-        }
-
-        return await inner.SaveAsync(order, expectedVersion, cancellationToken);
-    }
 }

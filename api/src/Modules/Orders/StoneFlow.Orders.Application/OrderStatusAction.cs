@@ -61,7 +61,7 @@ public sealed class OrderStatusAction(IUnitOfWork unitOfWork, IAuditLog auditLog
                 }
 
                 var saved = await store.SaveAsync(stored.Order, version, ct);
-                if (saved.Status == OrderSaveStatus.Conflict)
+                if (saved.Status == StoreSaveStatus.Conflict)
                 {
                     return new OrderStatusActionResult(OrderStatusActionOutcome.Conflict);
                 }

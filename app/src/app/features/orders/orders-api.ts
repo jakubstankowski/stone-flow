@@ -2,6 +2,7 @@ import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
+  EntryCreated,
   OrderCreated,
   OrderDetails,
   OrderInput,
@@ -9,6 +10,8 @@ import {
   OrderListQuery,
   OrderUpdate,
   OrderVersion,
+  PaymentInput,
+  RefundInput,
 } from './order-models';
 
 const BASE = '/api/orders';
@@ -18,6 +21,20 @@ export interface CreateResponse {
   readonly created: boolean;
   readonly order: OrderCreated;
 }
+
+/** Rodzaj wpisu płatności zamówienia (SF-9). */
+export type EntryType = 'payment' | 'refund';
+
+/** Treść zapisu danego rodzaju wpisu. */
+export interface EntryInputs {
+  readonly payment: PaymentInput;
+  readonly refund: RefundInput;
+}
+
+const ENTRY_SEGMENTS: Readonly<Record<EntryType, string>> = {
+  payment: 'payments',
+  refund: 'refunds',
+};
 
 /** Endpointy `/api/orders` (względne adresy, JSON camelCase). Błędy jako `HttpErrorResponse`. */
 @Injectable({ providedIn: 'root' })
@@ -60,6 +77,52 @@ export class OrdersApi {
       this.http.post<OrderVersion>(`${BASE}/${encodeURIComponent(id)}/restore`, { version }),
     );
   }
+
+  /** `POST …/payments|refunds` z `Idempotency-Key`: `201` nowy wpis, `200` powtórzenie. */
+  addEntry<T extends EntryType>(
+    type: T,
+    orderId: string,
+    input: EntryInputs[T],
+    idempotencyKey: string,
+  ): Promise<EntryCreated> {
+    return firstValueFrom(
+      this.http.post<EntryCreated>(entriesUrl(type, orderId), input, {
+        headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }),
+      }),
+    );
+  }
+
+  updateEntry<T extends EntryType>(
+    type: T,
+    orderId: string,
+    entryId: string,
+    input: EntryInputs[T],
+    version: string,
+  ): Promise<OrderVersion> {
+    return firstValueFrom(
+      this.http.put<OrderVersion>(entryUrl(type, orderId, entryId), { ...input, version }),
+    );
+  }
+
+  /** `DELETE` z `version` w ciele JSON (jak `cancel` i `restore`), nie w adresie. */
+  async deleteEntry(
+    type: EntryType,
+    orderId: string,
+    entryId: string,
+    version: string,
+  ): Promise<void> {
+    await firstValueFrom(
+      this.http.delete<void>(entryUrl(type, orderId, entryId), { body: { version } }),
+    );
+  }
+}
+
+function entriesUrl(type: EntryType, orderId: string): string {
+  return `${BASE}/${encodeURIComponent(orderId)}/${ENTRY_SEGMENTS[type]}`;
+}
+
+function entryUrl(type: EntryType, orderId: string, entryId: string): string {
+  return `${entriesUrl(type, orderId)}/${encodeURIComponent(entryId)}`;
 }
 
 function listParams(query: OrderListQuery): HttpParams {
@@ -82,6 +145,9 @@ function listParams(query: OrderListQuery): HttpParams {
   }
   for (const status of query.statuses) {
     params = params.append('status', status);
+  }
+  for (const state of query.paymentStates) {
+    params = params.append('paymentState', state);
   }
   return params;
 }

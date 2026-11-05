@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StoneFlow.Orders.Domain.Orders;
+using StoneFlow.Orders.Domain.Payments;
 
 namespace StoneFlow.Orders.Infrastructure.Persistence;
 
@@ -8,6 +9,10 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
     public const string Schema = "orders";
 
     public DbSet<Order> Orders => Set<Order>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
+
+    public DbSet<Refund> Refunds => Set<Refund>();
 
     internal DbSet<OrderNumberCounter> OrderNumberCounters => Set<OrderNumberCounter>();
 

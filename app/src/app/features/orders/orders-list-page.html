@@ -117,6 +117,22 @@
             }
           </div>
         </fieldset>
+        <fieldset class="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+          <legend class="text-base font-medium">Stan płatności</legend>
+          <div class="flex flex-wrap gap-x-6">
+            @for (state of paymentStateFilters; track state) {
+              <label class="flex min-h-11 items-center gap-2">
+                <input
+                  class="checkbox"
+                  type="checkbox"
+                  [checked]="isPaymentStateChecked(state)"
+                  (change)="onPaymentState(state, $event)"
+                />
+                {{ paymentStateFilterLabels[state] }}
+              </label>
+            }
+          </div>
+        </fieldset>
       </form>
 
       <ng-template appTableCell="number" [appTableCellOf]="orders.items()" let-row>
@@ -125,6 +141,13 @@
           [routerLink]="['/zamowienia', row.id]"
           >{{ row.number }}</a
         >
+      </ng-template>
+      <ng-template appTableCell="paymentState" [appTableCellOf]="orders.items()" let-row>
+        @if (row.paymentState; as state) {
+          <app-status-badge [label]="paymentStateLabels[state]" [tone]="paymentStateTones[state]" />
+        } @else {
+          <span aria-hidden="true">—</span><span class="sr-only">brak stanu</span>
+        }
       </ng-template>
       <ng-template appTableCell="status" [appTableCellOf]="orders.items()" let-row>
         <app-status-badge

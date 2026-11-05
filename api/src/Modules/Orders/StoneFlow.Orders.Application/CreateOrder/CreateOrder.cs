@@ -98,7 +98,7 @@ public sealed class CreateOrderHandler(
         var order = Order.CreateManual(Guid.NewGuid(), number, content, command.IdempotencyKey, requestHash, now.UtcDateTime);
 
         var saved = await store.AddAsync(order, cancellationToken);
-        if (saved.Status != OrderSaveStatus.Saved)
+        if (saved.Status != StoreSaveStatus.Saved)
         {
             return new Attempt(null, null, saved.Error ?? new InvalidOperationException("Nie udało się zapisać zamówienia."));
         }
@@ -108,17 +108,4 @@ public sealed class CreateOrderHandler(
     }
 
     private sealed record Attempt(CreateOrderResult? Created, CreationRequestMatch? Existing, Exception? Duplicate);
-}
-
-/// <summary>Rok w strefie Europe/Warsaw (rok numeru zamówienia).</summary>
-internal static class WarsawTime
-{
-    private static readonly TimeZoneInfo Zone = Find();
-
-    public static int Year(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, Zone).Year;
-
-    private static TimeZoneInfo Find() =>
-        TimeZoneInfo.TryFindSystemTimeZoneById("Europe/Warsaw", out var zone)
-            ? zone
-            : TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
 }

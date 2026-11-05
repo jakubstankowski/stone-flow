@@ -14,6 +14,11 @@ import {
   OrderChannel,
   OrderListItem,
   OrderSource,
+  PAYMENT_STATE_FILTERS,
+  PAYMENT_STATE_FILTER_LABELS,
+  PAYMENT_STATE_LABELS,
+  PAYMENT_STATE_TONES,
+  PaymentStateFilter,
   SOURCES,
   SOURCE_LABELS,
   STATUSES,
@@ -40,6 +45,8 @@ const COLUMNS: readonly DataTableColumn<OrderListItem>[] = [
     align: 'end',
     sortable: true,
   },
+  { key: 'paid', header: 'Zapłacono', value: (row) => formatPln(row.paid), align: 'end' },
+  { key: 'paymentState', header: 'Stan płatności' },
   { key: 'status', header: 'Status realizacji' },
 ];
 
@@ -65,6 +72,10 @@ export class OrdersListPage {
   protected readonly statuses = STATUSES;
   protected readonly statusLabels = STATUS_LABELS;
   protected readonly statusTones = STATUS_TONES;
+  protected readonly paymentStateFilters = PAYMENT_STATE_FILTERS;
+  protected readonly paymentStateFilterLabels = PAYMENT_STATE_FILTER_LABELS;
+  protected readonly paymentStateLabels = PAYMENT_STATE_LABELS;
+  protected readonly paymentStateTones = PAYMENT_STATE_TONES;
   protected readonly searchMaxLength = SEARCH_MAX_LENGTH;
   protected readonly dateRangeMessage = DATE_RANGE_MESSAGE;
 
@@ -105,6 +116,21 @@ export class OrdersListPage {
       ? STATUSES.filter((candidate) => candidate === status || current.includes(candidate))
       : current;
     void this.orders.updateFilters({ statuses: next });
+  }
+
+  protected onPaymentState(state: PaymentStateFilter, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    const current = this.orders.filters().paymentStates.filter((candidate) => candidate !== state);
+    const next = checked
+      ? PAYMENT_STATE_FILTERS.filter(
+          (candidate) => candidate === state || current.includes(candidate),
+        )
+      : current;
+    void this.orders.updateFilters({ paymentStates: next });
+  }
+
+  protected isPaymentStateChecked(state: PaymentStateFilter): boolean {
+    return this.orders.filters().paymentStates.includes(state);
   }
 
   protected onSearch(event: Event): void {

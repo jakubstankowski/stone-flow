@@ -82,6 +82,8 @@ describe('OrdersListPage', () => {
             number: 'ZR-2026-0002',
             fulfillmentStatus: 'cancelled',
             channel: 'shop',
+            paid: '500.00',
+            paymentState: null,
           }),
         ],
         2,
@@ -100,16 +102,21 @@ describe('OrdersListPage', () => {
       'OLX',
       'Ręczne',
       formatPln('1234.50'),
+      formatPln('0.00'),
+      'Nieopłacone',
       'W trakcie',
     ]);
     expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('/zamowienia/a1');
     expect(rows[1].textContent).toContain('Anulowane');
     expect(rows[1].textContent).toContain('Sklep');
     expect(rows[1].textContent).toContain('Ręczne');
+    expect(rows[1].textContent).toContain(formatPln('500.00'));
+    expect(rows[1].textContent).toContain('brak stanu');
+    expect(rows[1].querySelector('app-status-badge + app-status-badge')).toBeNull();
     const headers = Array.from(page.element.querySelectorAll('th')).map((th) =>
       th.textContent?.trim(),
     );
-    expect(headers.join('|')).not.toContain('Zapłacono');
+    expect(headers.join('|')).toContain('Zapłacono|Stan płatności|Status realizacji');
   });
 
   it('shows the empty registry with an action instead of the table', async () => {
@@ -189,10 +196,28 @@ describe('OrdersListPage', () => {
     expect(withStatus.request.params.getAll('status')).toEqual(['problem']);
     await respond(page, withStatus, listPage([], 0));
 
+    const checkState = async (labelText: string) => {
+      const label = Array.from(page.element.querySelectorAll('label')).find(
+        (candidate) => candidate.textContent?.trim() === labelText,
+      );
+      (label?.querySelector('input') as HTMLInputElement).click();
+      return listRequest();
+    };
+    const withNone = await checkState('Bez stanu (anulowane)');
+    expect(withNone.request.params.getAll('paymentState')).toEqual(['none']);
+    await respond(page, withNone, listPage([], 0));
+    const withUnpaid = await checkState('Nieopłacone');
+    expect(withUnpaid.request.params.get('page')).toBe('1');
+    expect(withUnpaid.request.params.getAll('paymentState')).toEqual(['unpaid', 'none']);
+    await respond(page, withUnpaid, listPage([], 0));
+    expect(page.element.textContent).toContain('Stan płatności: Nieopłacone');
+    expect(page.element.textContent).toContain('Stan płatności: Bez stanu (anulowane)');
+
     buttonByText(page.element, 'Wyczyść filtry').click();
     const cleared = await listRequest();
     expect(cleared.request.params.has('channel')).toBe(false);
     expect(cleared.request.params.has('status')).toBe(false);
+    expect(cleared.request.params.has('paymentState')).toBe(false);
     await respond(page, cleared, listPage([listItem()], 1));
   });
 

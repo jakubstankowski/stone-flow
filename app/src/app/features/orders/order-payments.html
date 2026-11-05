@@ -1,0 +1,231 @@
+<section
+  class="flex min-w-0 flex-col gap-5 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+  aria-labelledby="platnosci-naglowek"
+>
+  <h2 #heading id="platnosci-naglowek" tabindex="-1" class="text-xl font-semibold">Płatności</h2>
+
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+  <div role="alert">
+    @if (alert(); as current) {
+      <div
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+      >
+        <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+        @if (current.reload) {
+          <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+            Wczytaj aktualne dane
+          </app-button>
+        }
+      </div>
+    }
+  </div>
+
+  @let summary = order().payment;
+  <dl class="grid gap-3 sm:grid-cols-3">
+    <div>
+      <dt class="text-sm text-(--sf-muted)">Zapłacono</dt>
+      <dd class="text-lg font-semibold tabular-nums">{{ formatPln(summary.paid) }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-(--sf-muted)">Stan płatności</dt>
+      <dd>
+        @if (summary.state; as state) {
+          <app-status-badge [label]="stateLabels[state]" [tone]="stateTones[state]" />
+        } @else {
+          Brak stanu: zamówienie anulowane
+        }
+      </dd>
+    </div>
+    @if (summary.amountDue; as amountDue) {
+      <div>
+        <dt class="text-sm text-(--sf-muted)">Do zapłaty</dt>
+        <dd class="tabular-nums">{{ formatPln(amountDue) }}</dd>
+      </div>
+    }
+  </dl>
+
+  @if (summary.overpayment; as overpayment) {
+    <p class="rounded-box border border-(--sf-warning) bg-base-100 p-4 font-medium">
+      Nadpłata {{ formatPln(overpayment) }}
+    </p>
+  }
+  @if (summary.toRefund; as toRefund) {
+    <p class="rounded-box border border-(--sf-warning) bg-base-100 p-4 font-medium">
+      Do zwrotu {{ formatPln(toRefund) }}
+    </p>
+  }
+
+  @if (locked()) {
+    <p id="platnosci-zablokowane" class="text-(--sf-muted)">
+      Zapisz albo zamknij edycję zamówienia, aby dodawać, poprawiać i usuwać wpłaty i zwroty.
+    </p>
+  }
+
+  <div class="flex flex-wrap gap-3">
+    <app-button [disabled]="actionsDisabled()" (pressed)="addPayment()">Dodaj wpłatę</app-button>
+    <app-button [disabled]="actionsDisabled()" (pressed)="addRefund()">Dodaj zwrot</app-button>
+  </div>
+
+  @if (openForm(); as form) {
+    <div
+      class="flex flex-col gap-4 rounded-box border border-(--sf-border-strong) bg-base-100 p-4"
+      role="group"
+      aria-labelledby="platnosci-formularz-naglowek"
+    >
+      <h3 id="platnosci-formularz-naglowek" class="text-lg font-semibold">
+        {{ formHeading(form) }}
+      </h3>
+      @if (form.type === 'payment') {
+        <app-payment-form
+          [initial]="form.initial"
+          [cancelledWarning]="cancelled() && form.entry === null"
+          [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz wpłatę'"
+          [action]="savePayment"
+        >
+          <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+        </app-payment-form>
+      } @else {
+        <app-refund-form
+          [initial]="form.initial"
+          [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz zwrot'"
+          [action]="saveRefund"
+        >
+          <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+        </app-refund-form>
+      }
+    </div>
+  }
+
+  <div class="flex min-w-0 flex-col gap-2">
+    <h3 class="text-lg font-semibold">Wpłaty</h3>
+    @if (order().payments.length === 0) {
+      <p class="text-(--sf-muted)">Brak wpłat.</p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="table">
+          <caption class="sr-only">
+            Wpłaty do zamówienia
+            {{
+              order().number
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col" class="text-right">Kwota</th>
+              <th scope="col">Metoda</th>
+              <th scope="col">Przyjął</th>
+              <th scope="col"><span class="sr-only">Akcje</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of order().payments; track entry.id) {
+              <tr>
+                <td class="whitespace-nowrap">{{ formatDate(entry.date) }}</td>
+                <td class="text-right whitespace-nowrap tabular-nums">
+                  {{ formatPln(entry.amount) }}
+                </td>
+                <td>{{ paymentMethodLabels[entry.method] }}</td>
+                <td class="break-words">{{ entry.receivedBy ?? '—' }}</td>
+                <td>
+                  <div class="flex flex-wrap justify-end gap-2">
+                    <app-button [disabled]="actionsDisabled()" (pressed)="editPayment(entry)">
+                      Popraw<span class="sr-only"> wpłatę z {{ formatDate(entry.date) }}</span>
+                    </app-button>
+                    <app-button
+                      variant="danger"
+                      busyLabel="Usuwanie…"
+                      [busy]="deletingId() === entry.id"
+                      [disabled]="actionsDisabled() && deletingId() !== entry.id"
+                      (pressed)="deletePayment(entry)"
+                    >
+                      Usuń<span class="sr-only"> wpłatę z {{ formatDate(entry.date) }}</span>
+                    </app-button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <div class="flex min-w-0 flex-col gap-2">
+    <h3 class="text-lg font-semibold">Zwroty</h3>
+    @if (order().refunds.length === 0) {
+      <p class="text-(--sf-muted)">Brak zwrotów.</p>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="table">
+          <caption class="sr-only">
+            Zwroty do zamówienia
+            {{
+              order().number
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Rodzaj</th>
+              <th scope="col" class="text-right">Kwota</th>
+              <th scope="col">Metoda</th>
+              <th scope="col">Powód</th>
+              <th scope="col"><span class="sr-only">Akcje</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of order().refunds; track entry.id) {
+              <tr>
+                <td class="whitespace-nowrap">{{ formatDate(entry.date) }}</td>
+                <td>{{ refundKindLabels[entry.kind] }}</td>
+                <td class="text-right whitespace-nowrap tabular-nums">
+                  {{ formatPln(entry.amount) }}
+                </td>
+                <td>{{ refundMethodLabels[entry.method] }}</td>
+                <td class="min-w-48 break-words whitespace-pre-line">{{ entry.reason }}</td>
+                <td>
+                  <div class="flex flex-wrap justify-end gap-2">
+                    <app-button [disabled]="actionsDisabled()" (pressed)="editRefund(entry)">
+                      Popraw<span class="sr-only"> zwrot z {{ formatDate(entry.date) }}</span>
+                    </app-button>
+                    <app-button
+                      variant="danger"
+                      busyLabel="Usuwanie…"
+                      [busy]="deletingId() === entry.id"
+                      [disabled]="actionsDisabled() && deletingId() !== entry.id"
+                      (pressed)="deleteRefund(entry)"
+                    >
+                      Usuń<span class="sr-only"> zwrot z {{ formatDate(entry.date) }}</span>
+                    </app-button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  @let pending = pendingDelete();
+  <app-confirm-dialog
+    #deleteDialog
+    [heading]="pending ? deleteHeading(pending) : 'Usunąć wpis?'"
+    confirmLabel="Usuń"
+    tone="danger"
+  >
+    @if (pending) {
+      <p>{{ deleteSubject(pending) }}</p>
+      <p class="mt-2">
+        Zmieni się kwota Zapłacono i stan płatności. Ślad usunięcia zostanie w historii zmian.
+      </p>
+    }
+  </app-confirm-dialog>
+</section>
