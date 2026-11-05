@@ -111,3 +111,21 @@ function utcDate(year: number, month: number, day: number): Date | null {
     date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
   return valid ? date : null;
 }
+
+const AMOUNT_INPUT = /^(\d+|\d{1,3}(?:[ \u00A0\u202F]\d{3})+)(?:[.,](\d{1,2}))?$/;
+
+/**
+ * Kwota wpisana przez użytkownika po polsku (`1 234,50`, `1234,5`, `1234.50`, `0`) →
+ * kanoniczny ciąg dziesiętny dla API (`"1234.50"`). Konwersja działa wyłącznie na tekście,
+ * bez arytmetyki zmiennoprzecinkowej. Zwraca `null` dla wartości ujemnej, więcej niż dwóch
+ * miejsc po przecinku, tekstu i pustego pola. Zakres sprawdza walidacja formularza i API.
+ */
+export function parsePlnAmount(text: string | null | undefined): string | null {
+  const match = AMOUNT_INPUT.exec((text ?? '').trim());
+  if (!match) {
+    return null;
+  }
+  const integer = match[1].replace(/[ \u00A0\u202F]/g, '').replace(/^0+(?=\d)/, '');
+  const fraction = (match[2] ?? '').padEnd(2, '0');
+  return `${integer}.${fraction}`;
+}

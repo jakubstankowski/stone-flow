@@ -1,4 +1,11 @@
-import { NO_DATA, formatDate, formatDateTime, formatMonth, formatPln } from './pl-format';
+import {
+  NO_DATA,
+  formatDate,
+  formatDateTime,
+  formatMonth,
+  formatPln,
+  parsePlnAmount,
+} from './pl-format';
 
 const nbsp = ' ';
 
@@ -85,5 +92,41 @@ describe('formatting edge cases from code review', () => {
 
   it('respects an explicit offset', () => {
     expect(formatDateTime('2026-10-28T14:05:00+01:00')).toBe('28.10.2026, 14:05');
+  });
+});
+
+describe('parsePlnAmount', () => {
+  it.each([
+    ['1234,5', '1234.50'],
+    ['1 234,50', '1234.50'],
+    [`1${nbsp}234${nbsp}567,89`, '1234567.89'],
+    ['1234.50', '1234.50'],
+    ['0', '0.00'],
+    ['0,00', '0.00'],
+    ['007,1', '7.10'],
+    ['  99  ', '99.00'],
+    ['9999999999999999,99', '9999999999999999.99'],
+  ])('reads %s as %s', (text, expected) => {
+    expect(parsePlnAmount(text)).toBe(expected);
+  });
+
+  it.each([
+    '',
+    '   ',
+    null,
+    undefined,
+    '-1',
+    '-0,50',
+    '1,234',
+    '12,345',
+    'abc',
+    '12 zł',
+    '1,',
+    ',5',
+    '1 2 3',
+    '1.234,50',
+    '12,5e3',
+  ])('rejects %s', (text) => {
+    expect(parsePlnAmount(text)).toBeNull();
   });
 });

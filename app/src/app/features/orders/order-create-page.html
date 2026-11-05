@@ -1,0 +1,26 @@
+<section class="flex flex-col gap-6">
+  <h1 class="text-3xl font-bold">Dodaj zamówienie</h1>
+
+  <div aria-live="polite">
+    @if (keyReused(); as reused) {
+      <div
+        #reusedMessage
+        tabindex="-1"
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+      >
+        <p class="font-medium">
+          Ten formularz zapisał już zamówienie
+          <a class="link text-(--sf-accent-text)" [routerLink]="['/zamowienia', reused.orderId]">{{
+            reused.orderNumber || 'otwórz zamówienie'
+          }}</a
+          >.
+        </p>
+        <app-button (pressed)="startNext()">Dodaj kolejne zamówienie</app-button>
+      </div>
+    }
+  </div>
+
+  <app-order-form [initial]="initial()" [action]="save" submitLabel="Zapisz">
+    <app-button formActions (pressed)="goToList()">Wróć do listy</app-button>
+  </app-order-form>
+</section>

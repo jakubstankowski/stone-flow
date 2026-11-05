@@ -1,0 +1,345 @@
+<form novalidate class="flex flex-col gap-6" (submit)="onSubmit($event)">
+  @if (summary().length > 0) {
+    <div
+      #summaryBox
+      role="alert"
+      tabindex="-1"
+      aria-labelledby="zamowienie-bledy-naglowek"
+      class="flex flex-col gap-2 rounded-box border border-(--sf-error) bg-base-100 p-4"
+    >
+      <h2 id="zamowienie-bledy-naglowek" class="font-semibold text-(--sf-error)">
+        Popraw błędy w formularzu
+      </h2>
+      <ul class="list-disc pl-5">
+        @for (item of summary(); track $index) {
+          <li>
+            @if (item.id; as id) {
+              <a class="link" [href]="'#' + id" (click)="focusField($event, id)">{{
+                item.message
+              }}</a>
+            } @else {
+              {{ item.message }}
+            }
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  @if (hasShopFields()) {
+    <p class="text-(--sf-muted)">
+      Zamówienie pochodzi ze sklepu. Data, kanał, wartość i dane klienta są pobierane ze sklepu,
+      więc nie można ich tu zmienić.
+    </p>
+  }
+
+  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
+    <legend class="px-1 text-xl font-semibold">Klient</legend>
+    @if (ownsCustomer()) {
+      <dl class="grid gap-3 md:grid-cols-2">
+        <div>
+          <dt class="font-medium">Rodzaj</dt>
+          <dd>{{ customerKindLabels[form.customer.kind().value()] }}</dd>
+        </div>
+        <div>
+          <dt class="font-medium">Imię i nazwisko lub nazwa</dt>
+          <dd>{{ form.customer.name().value() }}</dd>
+        </div>
+      </dl>
+      <p class="text-sm text-(--sf-muted)">Dane klienta pochodzą ze sklepu (tylko do odczytu).</p>
+    } @else {
+      <div class="grid gap-4 md:grid-cols-2">
+        <app-field
+          label="Rodzaj klienta"
+          fieldId="zamowienie-klient-rodzaj"
+          [required]="true"
+          [error]="errorOf(form.customer.kind)"
+        >
+          <select #control class="select w-full" [formField]="form.customer.kind">
+            @for (kind of customerKinds; track kind) {
+              <option [value]="kind">{{ customerKindLabels[kind] }}</option>
+            }
+          </select>
+        </app-field>
+        <app-field
+          label="Imię i nazwisko lub nazwa firmy"
+          fieldId="zamowienie-klient-nazwa"
+          [required]="true"
+          [error]="errorOf(form.customer.name)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            autocomplete="off"
+            [formField]="form.customer.name"
+          />
+        </app-field>
+        <app-field
+          label="Telefon"
+          fieldId="zamowienie-klient-telefon"
+          [error]="errorOf(form.customer.phone)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="tel"
+            autocomplete="off"
+            [formField]="form.customer.phone"
+          />
+        </app-field>
+        <app-field
+          label="E-mail"
+          fieldId="zamowienie-klient-email"
+          [error]="errorOf(form.customer.email)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="email"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            [formField]="form.customer.email"
+          />
+        </app-field>
+        <app-field
+          label="Ulica i numer"
+          fieldId="zamowienie-klient-ulica"
+          [error]="errorOf(form.customer.street)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            autocomplete="off"
+            [formField]="form.customer.street"
+          />
+        </app-field>
+        <app-field
+          label="Kod pocztowy"
+          fieldId="zamowienie-klient-kod"
+          hint="Format 00-000."
+          [error]="errorOf(form.customer.postalCode)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            [formField]="form.customer.postalCode"
+          />
+        </app-field>
+        <app-field
+          label="Miejscowość"
+          fieldId="zamowienie-klient-miasto"
+          [error]="errorOf(form.customer.city)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            autocomplete="off"
+            [formField]="form.customer.city"
+          />
+        </app-field>
+        <app-field
+          label="NIP"
+          fieldId="zamowienie-klient-nip"
+          hint="10 cyfr; spacje i myślniki zostaną pominięte."
+          [error]="errorOf(form.customer.taxId)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            [formField]="form.customer.taxId"
+          />
+        </app-field>
+      </div>
+    }
+  </fieldset>
+
+  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
+    <legend class="px-1 text-xl font-semibold">Zamówienie</legend>
+    <div class="grid gap-4 md:grid-cols-3">
+      @if (ownsOrderDate()) {
+        <div>
+          <p class="font-medium">Data zamówienia</p>
+          <p>{{ shownDate() }}</p>
+          <p class="text-sm text-(--sf-muted)">Ze sklepu (tylko do odczytu).</p>
+        </div>
+      } @else {
+        <app-field
+          label="Data zamówienia"
+          fieldId="zamowienie-data"
+          [required]="true"
+          [error]="errorOf(form.orderDate)"
+        >
+          <input #control class="input w-full" type="date" [formField]="form.orderDate" />
+        </app-field>
+      }
+      @if (ownsChannel()) {
+        <div>
+          <p class="font-medium">Kanał</p>
+          <p>{{ shownChannel() }}</p>
+          <p class="text-sm text-(--sf-muted)">Ze sklepu (tylko do odczytu).</p>
+        </div>
+      } @else {
+        <app-field
+          label="Kanał"
+          fieldId="zamowienie-kanal"
+          [required]="true"
+          [error]="errorOf(form.channel)"
+        >
+          <select #control class="select w-full" [formField]="form.channel">
+            <option value="">Wybierz kanał</option>
+            @for (channel of channels; track channel) {
+              <option [value]="channel">{{ channelLabels[channel] }}</option>
+            }
+          </select>
+        </app-field>
+      }
+      @if (ownsValue()) {
+        <div>
+          <p class="font-medium">Wartość brutto</p>
+          <p class="tabular-nums">{{ shownValue() }}</p>
+          <p class="text-sm text-(--sf-muted)">Ze sklepu (tylko do odczytu).</p>
+        </div>
+      } @else {
+        <app-field
+          label="Wartość brutto (zł)"
+          fieldId="zamowienie-wartosc"
+          hint="Np. 1 234,50. Wartość 0 zł jest dozwolona."
+          [required]="true"
+          [error]="errorOf(form.value)"
+        >
+          <input
+            #control
+            class="input w-full tabular-nums"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            [formField]="form.value"
+          />
+        </app-field>
+      }
+    </div>
+  </fieldset>
+
+  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
+    <legend class="px-1 text-xl font-semibold">Realizacja</legend>
+    <div class="grid gap-4 md:grid-cols-2">
+      @if (cancelled()) {
+        <div>
+          <p class="font-medium">Status realizacji</p>
+          <p>{{ cancelledLabel }}</p>
+          <p class="text-sm text-(--sf-muted)">
+            Status anulowanego zamówienia zmienia akcja „Przywróć zamówienie”.
+          </p>
+        </div>
+      } @else {
+        <app-field
+          label="Status realizacji"
+          fieldId="zamowienie-status"
+          [required]="true"
+          [error]="errorOf(form.fulfillmentStatus)"
+        >
+          <select #control class="select w-full" [formField]="form.fulfillmentStatus">
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ statusLabels[status] }}</option>
+            }
+          </select>
+        </app-field>
+      }
+      <app-field
+        label="Numer faktury"
+        fieldId="zamowienie-faktura"
+        [error]="errorOf(form.operational.invoiceNumber)"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="text"
+          autocomplete="off"
+          [formField]="form.operational.invoiceNumber"
+        />
+      </app-field>
+      <app-field
+        label="Dostawcy"
+        fieldId="zamowienie-dostawcy"
+        hint="Jeden dostawca w wierszu, najwyżej 10."
+        [error]="errorOf(form.operational.suppliers)"
+      >
+        <textarea
+          #control
+          class="textarea w-full"
+          rows="3"
+          [formField]="form.operational.suppliers"
+        ></textarea>
+      </app-field>
+      <app-field
+        label="Referencje ZO"
+        fieldId="zamowienie-zo"
+        hint="Jedna referencja w wierszu, najwyżej 10."
+        [error]="errorOf(form.operational.zoReferences)"
+      >
+        <textarea
+          #control
+          class="textarea w-full"
+          rows="3"
+          [formField]="form.operational.zoReferences"
+        ></textarea>
+      </app-field>
+      <div class="flex flex-col gap-2">
+        <label class="flex min-h-11 items-center gap-3">
+          <input
+            id="zamowienie-zdjecia"
+            class="checkbox"
+            type="checkbox"
+            [formField]="form.operational.hasPhotos"
+          />
+          Zdjęcia z realizacji
+        </label>
+        <label class="flex min-h-11 items-center gap-3">
+          <input
+            id="zamowienie-opinia"
+            class="checkbox"
+            type="checkbox"
+            [formField]="form.operational.hasReview"
+          />
+          Opinia klienta
+        </label>
+      </div>
+      <app-field
+        label="Uwagi do realizacji"
+        fieldId="zamowienie-uwagi"
+        [error]="errorOf(form.operational.notes)"
+      >
+        <textarea
+          #control
+          class="textarea w-full"
+          rows="3"
+          [formField]="form.operational.notes"
+        ></textarea>
+      </app-field>
+    </div>
+  </fieldset>
+
+  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
+    <legend class="px-1 text-xl font-semibold">Uwagi</legend>
+    <app-field label="Komentarz" fieldId="zamowienie-komentarz" [error]="errorOf(form.comment)">
+      <textarea #control class="textarea w-full" rows="3" [formField]="form.comment"></textarea>
+    </app-field>
+  </fieldset>
+
+  <div class="flex flex-wrap gap-3">
+    <app-button variant="primary" type="submit" [busy]="busy()" busyLabel="Zapisywanie…">
+      {{ submitLabel() }}
+    </app-button>
+    <ng-content select="[formActions]" />
+  </div>
+</form>
