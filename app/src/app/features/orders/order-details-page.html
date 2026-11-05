@@ -1,0 +1,251 @@
+<section class="flex flex-col gap-6">
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+  <div role="alert">
+    @if (alert(); as current) {
+      <div
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+      >
+        <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+        @if (current.reload) {
+          <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+            Wczytaj aktualne dane
+          </app-button>
+        }
+      </div>
+    }
+  </div>
+
+  @switch (status()) {
+    @case ('loading') {
+      <h1 class="text-3xl font-bold">Zamówienie</h1>
+      <app-loading-state [rows]="6" label="Wczytywanie zamówienia…" />
+    }
+    @case ('notFound') {
+      <h1 class="text-3xl font-bold">Zamówienie</h1>
+      <app-empty-state heading="Nie znaleziono zamówienia">
+        <app-button (pressed)="goToList()">Wróć do listy</app-button>
+      </app-empty-state>
+    }
+    @case ('error') {
+      <h1 class="text-3xl font-bold">Zamówienie</h1>
+      <app-error-state message="Nie udało się wczytać zamówienia." (retry)="retry()" />
+    }
+    @case ('loaded') {
+      @if (order(); as order) {
+        <header class="flex flex-col gap-3">
+          <h1 class="text-3xl font-bold">Zamówienie {{ order.number }}</h1>
+          <div class="flex flex-wrap items-center gap-2">
+            <app-status-badge
+              [label]="statusLabels[order.fulfillmentStatus]"
+              [tone]="statusTones[order.fulfillmentStatus]"
+              [marker]="order.fulfillmentStatus === 'cancelled'"
+            />
+            <app-status-badge [label]="'Źródło: ' + sourceLabels[order.source]" />
+          </div>
+        </header>
+
+        @if (editing() && formInitial(); as initial) {
+          <app-order-form
+            submitLabel="Zapisz zmiany"
+            [initial]="initial"
+            [shopOwnedFields]="order.shopOwnedFields"
+            [cancelled]="cancelled()"
+            [action]="save"
+          >
+            <app-button formActions (pressed)="stopEdit()">Zamknij bez zapisu</app-button>
+          </app-order-form>
+        } @else {
+          <div class="flex flex-wrap gap-3">
+            <app-button variant="primary" (pressed)="startEdit()">Edytuj</app-button>
+            @if (cancelled()) {
+              <app-button
+                variant="secondary"
+                busyLabel="Przywracanie…"
+                [busy]="actionBusy() === 'restore'"
+                (pressed)="restoreOrder()"
+              >
+                Przywróć zamówienie
+              </app-button>
+            } @else {
+              <app-button
+                variant="danger"
+                busyLabel="Anulowanie…"
+                [busy]="actionBusy() === 'cancel'"
+                (pressed)="cancelOrder()"
+              >
+                Anuluj zamówienie
+              </app-button>
+            }
+            <app-button (pressed)="goToList()">Wróć do listy</app-button>
+          </div>
+
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="szczegoly-klient"
+            >
+              <h2 id="szczegoly-klient" class="text-xl font-semibold">Klient</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Rodzaj</dt>
+                  <dd>{{ customerKindLabels[order.customer.kind] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Imię i nazwisko lub nazwa</dt>
+                  <dd class="break-words">{{ order.customer.name }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Telefon</dt>
+                  <dd>{{ order.customer.phone ?? noData }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">E-mail</dt>
+                  <dd class="break-all">{{ order.customer.email ?? noData }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Adres</dt>
+                  <dd class="break-words">{{ address(order) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">NIP</dt>
+                  <dd>{{ order.customer.taxId ?? noData }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="szczegoly-zamowienie"
+            >
+              <h2 id="szczegoly-zamowienie" class="text-xl font-semibold">Zamówienie</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Data zamówienia</dt>
+                  <dd>{{ formatDate(order.orderDate) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kanał</dt>
+                  <dd>{{ channelLabels[order.channel] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Wartość brutto</dt>
+                  <dd class="tabular-nums">{{ formatPln(order.value) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Źródło</dt>
+                  <dd>{{ sourceLabels[order.source] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Zewnętrzne ID</dt>
+                  <dd>{{ order.externalId ?? noData }}</dd>
+                </div>
+                @if (order.shopStatus) {
+                  <div>
+                    <dt class="text-sm text-(--sf-muted)">Status w sklepie</dt>
+                    <dd>{{ order.shopStatus }}</dd>
+                  </div>
+                }
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="szczegoly-realizacja"
+            >
+              <h2 id="szczegoly-realizacja" class="text-xl font-semibold">Realizacja</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Status realizacji</dt>
+                  <dd>{{ statusLabels[order.fulfillmentStatus] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Numer faktury</dt>
+                  <dd>{{ order.operational.invoiceNumber ?? noData }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Dostawcy</dt>
+                  <dd class="break-words">{{ list(order.operational.suppliers) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Referencje ZO</dt>
+                  <dd class="break-words">{{ list(order.operational.zoReferences) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Zdjęcia z realizacji</dt>
+                  <dd>{{ order.operational.hasPhotos ? 'Tak' : 'Nie' }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Opinia klienta</dt>
+                  <dd>{{ order.operational.hasReview ? 'Tak' : 'Nie' }}</dd>
+                </div>
+                <div class="sm:col-span-2">
+                  <dt class="text-sm text-(--sf-muted)">Uwagi do realizacji</dt>
+                  <dd class="break-words whitespace-pre-line">
+                    {{ order.operational.notes ?? noData }}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="szczegoly-uwagi"
+            >
+              <h2 id="szczegoly-uwagi" class="text-xl font-semibold">Uwagi</h2>
+              <dl class="grid gap-3">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Komentarz</dt>
+                  <dd class="break-words whitespace-pre-line">{{ order.comment ?? noData }}</dd>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <dt class="text-sm text-(--sf-muted)">Utworzono</dt>
+                    <dd>{{ formatDateTime(order.createdAtUtc) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-(--sf-muted)">Ostatnia zmiana</dt>
+                    <dd>{{ formatDateTime(order.updatedAtUtc) }}</dd>
+                  </div>
+                </div>
+              </dl>
+            </section>
+          </div>
+        }
+
+        @if (cancelled()) {
+          <app-confirm-dialog
+            #restoreDialog
+            [heading]="'Przywrócić zamówienie ' + order.number + '?'"
+            confirmLabel="Przywróć zamówienie"
+            tone="primary"
+          >
+            <p>
+              Zamówienie {{ order.number }} wróci do sprzedaży w okresie daty zamówienia ({{
+                formatDate(order.orderDate)
+              }}) ze statusem „W trakcie”.
+            </p>
+          </app-confirm-dialog>
+        } @else {
+          <app-confirm-dialog
+            #cancelDialog
+            [heading]="'Anulować zamówienie ' + order.number + '?'"
+            confirmLabel="Anuluj zamówienie"
+            tone="danger"
+          >
+            <p>
+              Zamówienie {{ order.number }} wypadnie ze sprzedaży w okresie daty zamówienia ({{
+                formatDate(order.orderDate)
+              }}). Zamówienia nie można usunąć, ale można je później przywrócić.
+            </p>
+          </app-confirm-dialog>
+        }
+      }
+    }
+  }
+</section>

@@ -1,0 +1,138 @@
+<section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-bold">Zamówienia</h1>
+    @if (!orders.registryEmpty()) {
+      <app-button variant="primary" (pressed)="add()">Dodaj zamówienie</app-button>
+    }
+  </div>
+
+  @if (orders.registryEmpty()) {
+    <app-empty-state
+      heading="Brak zamówień"
+      description="Dodaj pierwsze zamówienie, aby pojawiło się na liście."
+    >
+      <app-button variant="primary" (pressed)="add()">Dodaj zamówienie</app-button>
+    </app-empty-state>
+  } @else {
+    <app-data-table
+      caption="Zamówienia"
+      emptyTitle="Brak zamówień"
+      filteredEmptyTitle="Brak wyników dla filtrów"
+      [columns]="columns"
+      [rows]="orders.items()"
+      [rowKey]="rowKey"
+      [total]="orders.total()"
+      [page]="orders.page()"
+      [pageSize]="orders.pageSize"
+      [sort]="orders.sort()"
+      [filters]="orders.activeFilters()"
+      [filterable]="true"
+      [loading]="orders.loading()"
+      [error]="orders.error()"
+      (pageChange)="onPage($event)"
+      (sortChange)="onSort($event)"
+      (filterRemove)="orders.removeFilter($event)"
+      (filtersClear)="orders.clearFilters()"
+      (retry)="orders.load()"
+    >
+      <form
+        tableFilters
+        novalidate
+        aria-label="Filtry zamówień"
+        class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2 xl:grid-cols-4"
+        (submit)="onSearch($event)"
+      >
+        <app-field
+          label="Szukaj"
+          fieldId="zamowienia-szukaj"
+          hint="Numer lub nazwa klienta. Zatwierdź klawiszem Enter."
+        >
+          <input
+            #control
+            class="input w-full"
+            type="search"
+            autocomplete="off"
+            [attr.maxlength]="searchMaxLength"
+            [value]="orders.filters().search"
+            (change)="onSearchChange($event)"
+          />
+        </app-field>
+        <app-field
+          label="Data od"
+          fieldId="zamowienia-data-od"
+          [error]="orders.dateRangeInvalid() ? dateRangeMessage : null"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="orders.filters().dateFrom"
+            (change)="onDate('dateFrom', $event)"
+          />
+        </app-field>
+        <app-field label="Data do" fieldId="zamowienia-data-do">
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="orders.filters().dateTo"
+            (change)="onDate('dateTo', $event)"
+          />
+        </app-field>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-field label="Kanał" fieldId="zamowienia-kanal">
+            <select #control class="select w-full" (change)="onChannel($event)">
+              <option value="" [selected]="orders.filters().channel === ''">Wszystkie</option>
+              @for (channel of channels; track channel) {
+                <option [value]="channel" [selected]="orders.filters().channel === channel">
+                  {{ channelLabels[channel] }}
+                </option>
+              }
+            </select>
+          </app-field>
+          <app-field label="Źródło" fieldId="zamowienia-zrodlo">
+            <select #control class="select w-full" (change)="onSource($event)">
+              <option value="" [selected]="orders.filters().source === ''">Wszystkie</option>
+              @for (source of sources; track source) {
+                <option [value]="source" [selected]="orders.filters().source === source">
+                  {{ sourceLabels[source] }}
+                </option>
+              }
+            </select>
+          </app-field>
+        </div>
+        <fieldset class="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+          <legend class="text-base font-medium">Status realizacji</legend>
+          <div class="flex flex-wrap gap-x-6">
+            @for (status of statuses; track status) {
+              <label class="flex min-h-11 items-center gap-2">
+                <input
+                  class="checkbox"
+                  type="checkbox"
+                  [checked]="isStatusChecked(status)"
+                  (change)="onStatus(status, $event)"
+                />
+                {{ statusLabels[status] }}
+              </label>
+            }
+          </div>
+        </fieldset>
+      </form>
+
+      <ng-template appTableCell="number" [appTableCellOf]="orders.items()" let-row>
+        <a
+          class="link font-medium text-(--sf-accent-text)"
+          [routerLink]="['/zamowienia', row.id]"
+          >{{ row.number }}</a
+        >
+      </ng-template>
+      <ng-template appTableCell="status" [appTableCellOf]="orders.items()" let-row>
+        <app-status-badge
+          [label]="statusLabels[row.fulfillmentStatus]"
+          [tone]="statusTones[row.fulfillmentStatus]"
+          [marker]="row.fulfillmentStatus === 'cancelled'"
+        />
+      </ng-template>
+    </app-data-table>
+  }
+</section>

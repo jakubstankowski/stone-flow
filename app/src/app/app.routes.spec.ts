@@ -3,7 +3,7 @@ import { Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { provideTestHttp, signIn, signOut } from '../testing/auth-testing';
+import { nextRequest, provideTestHttp, signIn, signOut } from '../testing/auth-testing';
 import { routes, sectionRoutes } from './app.routes';
 import { LoginPage } from './features/auth/login-page';
 import { PasswordResetRequestPage } from './features/auth/password-reset-request-page';
@@ -13,12 +13,11 @@ import { DashboardPage } from './features/dashboard/dashboard-page';
 import { ExpensesPage } from './features/expenses/expenses-page';
 import { IntegrationPage } from './features/integration/integration-page';
 import { OperationsPage } from './features/operations/operations-page';
-import { OrdersPage } from './features/orders/orders-page';
+import { OrdersListPage } from './features/orders/orders-list-page';
 import { NAV_ITEMS } from './layout/nav-items';
 
 const SECTIONS: [string, string, Type<unknown>][] = [
   ['/pulpit', 'Pulpit', DashboardPage],
-  ['/zamowienia', 'Zamówienia', OrdersPage],
   ['/wydatki', 'Wydatki', ExpensesPage],
   ['/operacje', 'Operacje', OperationsPage],
   ['/historia-zmian', 'Historia zmian', ChangeHistoryPage],
@@ -41,7 +40,7 @@ describe('app routes', () => {
   it('defines a lazily loaded route for every navigation item', () => {
     for (const item of NAV_ITEMS) {
       const route = sectionRoutes.find((candidate) => candidate.path === item.path);
-      expect(route?.loadComponent).toBeDefined();
+      expect(route?.loadComponent ?? route?.loadChildren).toBeDefined();
       expect(route?.component).toBeUndefined();
       expect(route?.title).toBe(item.label);
       expect(route?.data?.['section']).toBe(item.label);
@@ -61,6 +60,44 @@ describe('app routes', () => {
       'Ten widok powstanie w kolejnych etapach.',
     );
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+  });
+
+  it.each([
+    ['/zamowienia', 'Zamówienia'],
+    ['/zamowienia/nowe', 'Dodaj zamówienie'],
+  ])('loads the orders section at %s with the heading %s', async (url, heading) => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl(url);
+    if (url === '/zamowienia') {
+      (await nextRequest((request) => request.url === '/api/orders')).flush({
+        items: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+      });
+    }
+    await navigation;
+
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(heading);
+  });
+
+  it('lists orders with the list page', async () => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl('/zamowienia');
+    (await nextRequest((request) => request.url === '/api/orders')).flush({
+      items: [],
+      page: 1,
+      pageSize: 25,
+      total: 0,
+    });
+    await navigation;
+
+    expect(
+      harness.routeDebugElement?.query((node) => node.componentInstance instanceof OrdersListPage),
+    ).not.toBeNull();
   });
 
   it.each(['/', '/cokolwiek'])('redirects %s to the dashboard', async (url) => {

@@ -4,6 +4,7 @@ import {
   TestRequest,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { HttpRequest } from '@angular/common/http';
 import { EnvironmentProviders, Provider } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { AuthSession } from '../app/core/auth/auth-session';
@@ -18,7 +19,9 @@ export function provideTestHttp(): (Provider | EnvironmentProviders)[] {
 }
 
 /** Czeka na kolejne żądanie wieloetapowego przepływu (kroki dzielą mikrozadania). */
-export function nextRequest(match: string | RequestMatch): Promise<TestRequest> {
+export function nextRequest(
+  match: string | RequestMatch | ((request: HttpRequest<unknown>) => boolean),
+): Promise<TestRequest> {
   const http = TestBed.inject(HttpTestingController);
   return vi.waitFor(() => http.expectOne(match), { interval: 1, timeout: 1000 });
 }
