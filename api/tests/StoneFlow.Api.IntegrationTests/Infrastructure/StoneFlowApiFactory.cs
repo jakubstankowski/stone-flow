@@ -47,6 +47,9 @@ public sealed class StoneFlowApiFactory : WebApplicationFactory<Program>
     /// <summary>Prawdziwa wysyłka SMTP zamiast przechwytywania (test błędu transportu).</summary>
     public bool UseRealEmailSender { get; init; }
 
+    /// <summary>Dodatkowe rejestracje usług testu (np. kontekst modułu testowego).</summary>
+    public Action<IServiceCollection>? ConfigureTestServices { get; init; }
+
     public CapturingEmailSender Emails { get; } = new();
 
     /// <summary>
@@ -87,6 +90,8 @@ public sealed class StoneFlowApiFactory : WebApplicationFactory<Program>
                 services.RemoveAll<IEmailSender>();
                 services.AddSingleton<IEmailSender>(Emails);
             }
+
+            ConfigureTestServices?.Invoke(services);
 
             if (Time is not null)
             {

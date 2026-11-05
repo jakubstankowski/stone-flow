@@ -133,8 +133,11 @@ per module assembly (`AddHandlersFromAssembly` in the module's `DependencyInject
   - authentication: the fallback policy in the host; **authorisation of the concrete resource**
     (does the record exist and may this account act on it): in the handler — being logged in
     does not replace it;
-  - transaction: one `SaveChanges` per use case is already atomic; several writes that must
-    succeed together go through the module's unit-of-work port (`IAccessUnitOfWork`).
+  - transaction: one `SaveChanges` per use case is already atomic. In financial modules
+    (Orders, Expenses, Reporting, Integrations) every state-changing use case runs in
+    `IUnitOfWork.ExecuteInTransactionAsync(work, commitWhen, …)` (SF-7), which also covers the
+    audit entry; `commitWhen` returns `false` for a failure result so partial writes roll back.
+    Access keeps its own `IAccessUnitOfWork`.
 - Handlers do not call other handlers through the dispatcher. When use cases share behaviour,
   extract a module-local operation (a domain method or an Application helper used by both) and
   state who owns validation, the transaction, retries and side effects. No global service layer.
@@ -220,6 +223,23 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
 - No outbox by default. A durable coordination mechanism is required only where a use case must
   survive a crash between the database write and an external effect.
 - Money, audit and idempotency follow `rules.md` invariants 2, 4 and 5 as written.
+- Financial audit (SF-7): every create, change and delete of financial data calls
+  `IAuditLog.RecordAsync` inside the same `IUnitOfWork` call, with the author from the command
+  (`AuditAuthor.Account(accountId)`) or a system author (`WooCommerceSync`, `AutomatedJob`).
+  Value format: field names are stable English camelCase property names (`amount`, `paidAt`);
+  amounts are invariant decimals with a dot (`1234.50`); dates `yyyy-MM-dd`; timestamps ISO 8601
+  UTC; dictionary values (status, channel, category) as stable codes, not labels; no value is
+  `null`, never an empty string. Fields with personal data set `IsPersonalData`; the object label
+  never contains personal data. No changed fields → no audit call. Business date and parent per
+  object: order — order date; payment, refund, sales correction — own date, parent = the order;
+  expense — cost date, parent = the recurring definition for a recurring occurrence;
+  recurring definition — cycle start; owner withdrawal — withdrawal date.
+- Financial module contexts share one connection per DI scope (`ModuleConnection`), registered
+  with `UseModuleSqlServer<TContext>(serviceProvider, schema)`. Therefore: no `AddDbContextPool`,
+  no parallel queries in one scope (no `Task.WhenAll` over queries, no interleaved streaming), no
+  `EnableRetryOnFailure`, no direct `Database.BeginTransaction` — use `IUnitOfWork`. A background
+  job or sync creates a new DI scope per unit of work; after a rolled-back unit of work the scope
+  does no further writes.
 - Migrations run before the new code is published (SF-4), so every migration must work with the
   previous API version (expand/contract: add first, remove in a later deployment). Never edit an
   applied migration; fix forward. A new module with a database is appended to

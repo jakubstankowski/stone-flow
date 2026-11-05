@@ -13,6 +13,7 @@ using StoneFlow.Orders.Infrastructure;
 using StoneFlow.Orders.Infrastructure.Persistence;
 using StoneFlow.Reporting.Infrastructure;
 using StoneFlow.Reporting.Infrastructure.Persistence;
+using StoneFlow.Shared.Infrastructure;
 
 namespace StoneFlow.Architecture.Tests;
 
@@ -53,6 +54,7 @@ public sealed class DbContextSchemaTests
 
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
+        services.AddSharedInfrastructure();
         register(services);
         return services.BuildServiceProvider();
     }

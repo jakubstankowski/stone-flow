@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace StoneFlow.Shared.Infrastructure.Persistence;
 
@@ -24,5 +25,27 @@ public static class ModuleDbContextOptions
         return builder.UseSqlServer(connectionString, sql => sql
             .MigrationsHistoryTable(MigrationsHistoryTable, schema)
             .MigrationsAssembly(typeof(TContext).Assembly.GetName().Name));
+    }
+
+    /// <summary>
+    /// Kontekst modułu finansowego: wspólne połączenie zakresu (<see cref="ModuleConnection"/>) i
+    /// udział w transakcji jednostki pracy, w tym zapisu audytu.
+    /// </summary>
+    public static DbContextOptionsBuilder UseModuleSqlServer<TContext>(
+        this DbContextOptionsBuilder builder,
+        IServiceProvider serviceProvider,
+        string schema)
+        where TContext : DbContext
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
+        ArgumentException.ThrowIfNullOrWhiteSpace(schema);
+
+        var connection = serviceProvider.GetRequiredService<ModuleConnection>();
+        return builder
+            .UseSqlServer(connection.Connection, sql => sql
+                .MigrationsHistoryTable(MigrationsHistoryTable, schema)
+                .MigrationsAssembly(typeof(TContext).Assembly.GetName().Name))
+            .AddInterceptors(new ModuleTransactionInterceptor(connection));
     }
 }
