@@ -109,16 +109,3 @@ public sealed class CreateOrderHandler(
 
     private sealed record Attempt(CreateOrderResult? Created, CreationRequestMatch? Existing, Exception? Duplicate);
 }
-
-/// <summary>Rok w strefie Europe/Warsaw (rok numeru zamówienia).</summary>
-internal static class WarsawTime
-{
-    private static readonly TimeZoneInfo Zone = Find();
-
-    public static int Year(DateTimeOffset instant) => TimeZoneInfo.ConvertTime(instant, Zone).Year;
-
-    private static TimeZoneInfo Find() =>
-        TimeZoneInfo.TryFindSystemTimeZoneById("Europe/Warsaw", out var zone)
-            ? zone
-            : TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
-}

@@ -1,10 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { ApiError, toApiError } from '../../core/http/api-error';
-import { formatDate } from '../../shared/format/pl-format';
+import { formatDate, formatPln } from '../../shared/format/pl-format';
 import { ActiveFilter, SortState } from '../../shared/ui/data-table';
 import {
   CHANNEL_LABELS,
+  ENTRY_PROBLEM,
   FulfillmentStatus,
   ORDER_PROBLEM,
   OrderChannel,
@@ -14,10 +15,12 @@ import {
   OrderListQuery,
   OrderSort,
   OrderSource,
+  PAYMENT_STATE_FILTER_LABELS,
+  PaymentStateFilter,
   SOURCE_LABELS,
   STATUS_LABELS,
 } from './order-models';
-import { OrdersApi } from './orders-api';
+import { EntryInputs, EntryType, OrdersApi } from './orders-api';
 
 export const ORDERS_PAGE_SIZE = 25;
 export const SEARCH_MAX_LENGTH = 100;
@@ -28,6 +31,7 @@ export interface OrderFilters {
   readonly channel: OrderChannel | '';
   readonly source: OrderSource | '';
   readonly statuses: readonly FulfillmentStatus[];
+  readonly paymentStates: readonly PaymentStateFilter[];
   readonly search: string;
 }
 
@@ -37,6 +41,7 @@ export const EMPTY_FILTERS: OrderFilters = {
   channel: '',
   source: '',
   statuses: [],
+  paymentStates: [],
   search: '',
 };
 
@@ -63,6 +68,31 @@ export type ChangeOrderOutcome =
   /** Akcja niezgodna ze stanem (`order_already_cancelled` / `order_not_cancelled`). */
   | { readonly kind: 'stateChanged'; readonly detail: string | null }
   | { readonly kind: 'error'; readonly error: ApiError };
+
+/** Wynik zapisu albo usunięcia wpisu płatności (SF-9). */
+export type EntryOutcome =
+  | { readonly kind: 'saved' }
+  /** `409 idempotency_key_reused`: ten formularz zapisał już wpis z innymi danymi. */
+  | { readonly kind: 'keyReused' }
+  /** `409 entry_conflict`: wpis zmieniono w międzyczasie. */
+  | { readonly kind: 'conflict' }
+  /** `404 entry_not_found`: wpisu nie ma (usunięty albo należy do innego zamówienia). */
+  | { readonly kind: 'entryNotFound' }
+  | { readonly kind: 'orderNotFound' }
+  /** `422`: reguła Zapłacono; komunikat zawiera kwotę `available`, gdy API ją podało. */
+  | { readonly kind: 'rejected'; readonly message: string }
+  | { readonly kind: 'error'; readonly error: ApiError };
+
+export const PAID_WOULD_BE_NEGATIVE_MESSAGE =
+  'Zapłacono spadłoby poniżej 0 zł. Najpierw popraw lub usuń zwrot.';
+export const REFUND_EXCEEDS_PAID_MESSAGE = 'Zwrot nie może przekroczyć kwoty Zapłacono.';
+
+/** Komunikat `422 refund_exceeds_paid` z kwotą z backendu (bez liczenia we frontendzie). */
+export function refundExceedsPaidMessage(available: string | null): string {
+  return available === null
+    ? REFUND_EXCEEDS_PAID_MESSAGE
+    : `Zwrot nie może przekroczyć kwoty Zapłacono (${formatPln(available)}).`;
+}
 
 /**
  * Stan listy zamówień na sygnałach (strona, sortowanie, filtry, wynik) oraz przepływy
@@ -118,6 +148,12 @@ export class OrdersService {
     }
     for (const status of filters.statuses) {
       active.push({ id: `status:${status}`, label: `Status: ${STATUS_LABELS[status]}` });
+    }
+    for (const state of filters.paymentStates) {
+      active.push({
+        id: `paymentState:${state}`,
+        label: `Stan płatności: ${PAYMENT_STATE_FILTER_LABELS[state]}`,
+      });
     }
     if (filters.search.trim()) {
       active.push({ id: 'search', label: `Szukaj: ${filters.search.trim()}` });
@@ -196,6 +232,12 @@ export class OrdersService {
         statuses: this.filtersState().statuses.filter((candidate) => candidate !== status),
       });
     }
+    if (id.startsWith('paymentState:')) {
+      const state = id.slice('paymentState:'.length);
+      return this.updateFilters({
+        paymentStates: this.filtersState().paymentStates.filter((candidate) => candidate !== state),
+      });
+    }
     if (id in EMPTY_FILTERS) {
       return this.updateFilters({ [id]: EMPTY_FILTERS[id as keyof OrderFilters] });
     }
@@ -239,6 +281,35 @@ export class OrdersService {
     return this.change(() => this.api.restore(id, version), 'Zamówienie przywrócone.');
   }
 
+  /** Dodanie wpłaty albo zwrotu; `200` (powtórzenie z tym samym kluczem) też jest zapisem. */
+  addEntry<T extends EntryType>(
+    type: T,
+    orderId: string,
+    input: EntryInputs[T],
+    idempotencyKey: string,
+  ): Promise<EntryOutcome> {
+    return this.entryChange(() => this.api.addEntry(type, orderId, input, idempotencyKey));
+  }
+
+  updateEntry<T extends EntryType>(
+    type: T,
+    orderId: string,
+    entryId: string,
+    input: EntryInputs[T],
+    version: string,
+  ): Promise<EntryOutcome> {
+    return this.entryChange(() => this.api.updateEntry(type, orderId, entryId, input, version));
+  }
+
+  deleteEntry(
+    type: EntryType,
+    orderId: string,
+    entryId: string,
+    version: string,
+  ): Promise<EntryOutcome> {
+    return this.entryChange(() => this.api.deleteEntry(type, orderId, entryId, version));
+  }
+
   /** Jednorazowy komunikat sukcesu dla ekranu szczegółów. */
   takeNotice(): string | null {
     const notice = this.notice;
@@ -274,6 +345,15 @@ export class OrdersService {
     }
   }
 
+  private async entryChange(call: () => Promise<unknown>): Promise<EntryOutcome> {
+    try {
+      await call();
+      return { kind: 'saved' };
+    } catch (error) {
+      return entryFailure(error);
+    }
+  }
+
   private query(): OrderListQuery {
     const filters = this.filtersState();
     const sort = this.sortState();
@@ -288,6 +368,7 @@ export class OrdersService {
       channel: filters.channel || null,
       source: filters.source || null,
       statuses: filters.statuses,
+      paymentStates: filters.paymentStates,
       search: search ? search.slice(0, SEARCH_MAX_LENGTH) : null,
     };
   }
@@ -315,4 +396,40 @@ function keyReusedOf(error: unknown): CreateOrderOutcome | null {
     orderId,
     orderNumber: typeof orderNumber === 'string' ? orderNumber : '',
   };
+}
+
+/** Błąd zapisu wpisu → wynik; rozszerzenie `available` czyta z ciała Problem Details. */
+function entryFailure(error: unknown): EntryOutcome {
+  const apiError = toApiError(error);
+  if (apiError.kind !== 'problem') {
+    return { kind: 'error', error: apiError };
+  }
+  switch (apiError.code) {
+    case ENTRY_PROBLEM.conflict:
+      return { kind: 'conflict' };
+    case ENTRY_PROBLEM.keyReused:
+      return { kind: 'keyReused' };
+    case ENTRY_PROBLEM.notFound:
+      return { kind: 'entryNotFound' };
+    case ENTRY_PROBLEM.paidWouldBeNegative:
+      return { kind: 'rejected', message: PAID_WOULD_BE_NEGATIVE_MESSAGE };
+    case ENTRY_PROBLEM.refundExceedsPaid:
+      return { kind: 'rejected', message: refundExceedsPaidMessage(availableOf(error)) };
+  }
+  if (apiError.status === 404) {
+    return { kind: 'orderNotFound' };
+  }
+  return { kind: 'error', error: apiError };
+}
+
+function availableOf(error: unknown): string | null {
+  if (!(error instanceof HttpErrorResponse)) {
+    return null;
+  }
+  const body: unknown = error.error;
+  if (typeof body !== 'object' || body === null) {
+    return null;
+  }
+  const { available } = body as Record<string, unknown>;
+  return typeof available === 'string' ? available : null;
 }

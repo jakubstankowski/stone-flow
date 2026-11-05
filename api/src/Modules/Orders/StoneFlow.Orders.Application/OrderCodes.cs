@@ -1,4 +1,5 @@
 using StoneFlow.Orders.Domain.Orders;
+using StoneFlow.Orders.Domain.Payments;
 
 namespace StoneFlow.Orders.Application;
 
@@ -45,6 +46,34 @@ public static class OrderCodes
         [ShopOwnedField.Customer] = "customer",
     };
 
+    private static readonly Dictionary<PaymentMethod, string> PaymentMethods = new()
+    {
+        [PaymentMethod.Transfer] = "transfer",
+        [PaymentMethod.Blik] = "blik",
+        [PaymentMethod.Cash] = "cash",
+        [PaymentMethod.CashOnDelivery] = "cashOnDelivery",
+    };
+
+    private static readonly Dictionary<RefundMethod, string> RefundMethods = new()
+    {
+        [RefundMethod.Transfer] = "transfer",
+        [RefundMethod.Blik] = "blik",
+        [RefundMethod.Cash] = "cash",
+    };
+
+    private static readonly Dictionary<RefundKind, string> RefundKinds = new()
+    {
+        [RefundKind.SalesReturn] = "salesReturn",
+        [RefundKind.MoneyReturn] = "moneyReturn",
+    };
+
+    private static readonly Dictionary<PaymentState, string> PaymentStates = new()
+    {
+        [PaymentState.Unpaid] = "unpaid",
+        [PaymentState.PartiallyPaid] = "partiallyPaid",
+        [PaymentState.Paid] = "paid",
+    };
+
     public static string Of(OrderSource source) => Sources[source];
 
     public static string Of(OrderChannel channel) => Channels[channel];
@@ -56,12 +85,19 @@ public static class OrderCodes
     /// <summary>Nazwa pola sklepu w żądaniu i w <c>shopOwnedFields</c>.</summary>
     public static string Of(ShopOwnedField field) => ShopFields[field];
 
+    public static string Of(PaymentMethod method) => PaymentMethods[method];
+
+    public static string Of(RefundMethod method) => RefundMethods[method];
+
+    public static string Of(RefundKind kind) => RefundKinds[kind];
+
+    public static string Of(PaymentState state) => PaymentStates[state];
+
     /// <summary>Nazwa pola w audycie: camelCase nazwy pola (<c>customerName</c>).</summary>
-    public static string Of(OrderField field)
-    {
-        var name = field.ToString();
-        return string.Concat(name[..1].ToLowerInvariant(), name.AsSpan(1));
-    }
+    public static string Of(OrderField field) => CamelCase(field.ToString());
+
+    /// <summary>Nazwa pola wpisu w audycie (<c>amount</c>, <c>receivedBy</c>).</summary>
+    public static string Of(EntryField field) => CamelCase(field.ToString());
 
     public static bool TryParse(string? code, out OrderSource source) => TryParse(Sources, code, out source);
 
@@ -70,6 +106,16 @@ public static class OrderCodes
     public static bool TryParse(string? code, out FulfillmentStatus status) => TryParse(Statuses, code, out status);
 
     public static bool TryParse(string? code, out CustomerKind kind) => TryParse(CustomerKinds, code, out kind);
+
+    public static bool TryParse(string? code, out PaymentMethod method) => TryParse(PaymentMethods, code, out method);
+
+    public static bool TryParse(string? code, out RefundMethod method) => TryParse(RefundMethods, code, out method);
+
+    public static bool TryParse(string? code, out RefundKind kind) => TryParse(RefundKinds, code, out kind);
+
+    public static bool TryParse(string? code, out PaymentState state) => TryParse(PaymentStates, code, out state);
+
+    private static string CamelCase(string name) => string.Concat(name[..1].ToLowerInvariant(), name.AsSpan(1));
 
     private static bool TryParse<TEnum>(Dictionary<TEnum, string> codes, string? code, out TEnum value)
         where TEnum : struct, Enum

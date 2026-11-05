@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
 using StoneFlow.Orders.Domain.Orders;
+using StoneFlow.Orders.Domain.Payments;
 using StoneFlow.Shared.Application.Audit;
 using StoneFlow.Shared.Kernel.Audit;
 
@@ -60,6 +61,9 @@ public static class OrderAudit
         FulfillmentStatus status => OrderCodes.Of(status),
         CustomerKind kind => OrderCodes.Of(kind),
         OrderSource source => OrderCodes.Of(source),
+        PaymentMethod method => OrderCodes.Of(method),
+        RefundMethod method => OrderCodes.Of(method),
+        RefundKind kind => OrderCodes.Of(kind),
         IReadOnlyList<string> { Count: 0 } => null,
         IReadOnlyList<string> list => JsonSerializer.Serialize(list, ListJson),
         string text => text,

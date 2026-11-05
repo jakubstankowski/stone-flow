@@ -19,7 +19,8 @@ namespace StoneFlow.Orders.Api.Endpoints;
 /// <summary>
 /// Endpointy <c>/api/orders</c>. Bez logiki biznesowej: każde wywołanie przez dyspozytor, wynik
 /// mapowany na odpowiedź HTTP. Wszystkie wymagają sesji (polityka domyślna hosta), a zapisy tokenu
-/// XSRF (globalny middleware). Usuwania nie ma: <c>DELETE</c> nie jest zmapowany.
+/// XSRF (globalny middleware). Usuwania zamówień nie ma: <c>DELETE /api/orders/{id}</c> nie jest
+/// zmapowany (usuwać można tylko wpłaty i zwroty, <see cref="PaymentsEndpoints"/>).
 /// </summary>
 internal static class OrdersEndpoints
 {
@@ -49,10 +50,11 @@ internal static class OrdersEndpoints
         [FromQuery] string? channel = null,
         [FromQuery] string? source = null,
         [FromQuery] string[]? status = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] string[]? paymentState = null)
     {
         var result = await dispatcher.QueryAsync(
-            new ListOrdersQuery(page, pageSize, sort, direction, dateFrom, dateTo, channel, source, status, search),
+            new ListOrdersQuery(page, pageSize, sort, direction, dateFrom, dateTo, channel, source, status, search, paymentState),
             cancellationToken);
 
         return result.Page is { } list
@@ -156,17 +158,17 @@ internal static class OrdersEndpoints
     private static OrderCreatedResponse Created(CreateOrderResult result) =>
         new(result.Id!.Value, result.Number!, OrderVersion.Format(result.Version!));
 
-    private static ValidationProblem ValidationProblem(FieldErrors? errors) =>
+    internal static ValidationProblem ValidationProblem(FieldErrors? errors) =>
         TypedResults.ValidationProblem(errors?.ToDictionary() ?? new Dictionary<string, string[]>());
 
     /// <summary>Klucz idempotencji: UUID z nagłówka; brak, pusty albo inny tekst to <c>null</c>.</summary>
-    private static Guid? IdempotencyKey(HttpRequest request) =>
+    internal static Guid? IdempotencyKey(HttpRequest request) =>
         request.Headers[IdempotencyKeyHeader] is { Count: 1 } values
         && Guid.TryParse(values[0], out var key)
         && key != Guid.Empty
             ? key
             : null;
 
-    private static Guid? CurrentAccount(ClaimsPrincipal user) =>
+    internal static Guid? CurrentAccount(ClaimsPrincipal user) =>
         Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 }

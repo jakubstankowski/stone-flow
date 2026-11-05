@@ -2,6 +2,7 @@ using System.Globalization;
 using StoneFlow.Orders.Application;
 using StoneFlow.Orders.Application.GetOrder;
 using StoneFlow.Orders.Application.ListOrders;
+using StoneFlow.Orders.Domain.Payments;
 
 namespace StoneFlow.Orders.Api.Endpoints;
 
@@ -37,7 +38,7 @@ public sealed record OrderRequest(
     string? Comment,
     string? Version = null);
 
-/// <summary>Ciało <c>cancel</c> i <c>restore</c>.</summary>
+/// <summary>Ciało <c>cancel</c> i <c>restore</c> zamówienia oraz <c>DELETE</c> wpisu (wersja wpisu).</summary>
 public sealed record OrderVersionRequest(string? Version);
 
 public sealed record OrderCreatedResponse(Guid Id, string Number, string Version);
@@ -52,7 +53,9 @@ public sealed record OrderListItemResponse(
     string Channel,
     string Source,
     string Value,
-    string FulfillmentStatus);
+    string FulfillmentStatus,
+    string Paid,
+    string? PaymentState);
 
 public sealed record OrderListPageResponse(IReadOnlyList<OrderListItemResponse> Items, int Page, int PageSize, int Total);
 
@@ -90,7 +93,32 @@ public sealed record OrderDetailsResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     string Version,
-    IReadOnlyList<string> ShopOwnedFields);
+    IReadOnlyList<string> ShopOwnedFields,
+    OrderPaymentSummaryResponse Payment,
+    IReadOnlyList<PaymentEntryResponse> Payments,
+    IReadOnlyList<RefundEntryResponse> Refunds);
+
+/// <summary>Podsumowanie płatności; <see cref="State"/> <c>null</c> dla zamówienia anulowanego, kwoty opcjonalne jako <c>null</c>.</summary>
+public sealed record OrderPaymentSummaryResponse(string Paid, string? State, string? AmountDue, string? Overpayment, string? ToRefund);
+
+public sealed record PaymentEntryResponse(
+    Guid Id,
+    string Amount,
+    string Date,
+    string Method,
+    string? ReceivedBy,
+    DateTime CreatedAtUtc,
+    string Version);
+
+public sealed record RefundEntryResponse(
+    Guid Id,
+    string Kind,
+    string Amount,
+    string Date,
+    string Method,
+    string Reason,
+    DateTime CreatedAtUtc,
+    string Version);
 
 /// <summary>Mapowanie kontraktu HTTP na wejście aplikacji i DTO na odpowiedzi.</summary>
 internal static class OrderContracts
@@ -134,7 +162,9 @@ internal static class OrderContracts
                 OrderCodes.Of(item.Channel),
                 OrderCodes.Of(item.Source),
                 OrderInput.FormatValue(item.Value),
-                OrderCodes.Of(item.FulfillmentStatus))),
+                OrderCodes.Of(item.FulfillmentStatus),
+                OrderInput.FormatValue(item.Payment.Paid),
+                item.Payment.State is { } state ? OrderCodes.Of(state) : null)),
         ],
         page.Page,
         page.PageSize,
@@ -170,7 +200,38 @@ internal static class OrderContracts
         order.CreatedAtUtc,
         order.UpdatedAtUtc,
         OrderVersion.Format(order.Version),
-        [.. order.ShopOwnedFields.Select(OrderCodes.Of)]);
+        [.. order.ShopOwnedFields.Select(OrderCodes.Of)],
+        ToResponse(order.Payment),
+        [
+            .. order.Payments.Select(payment => new PaymentEntryResponse(
+                payment.Id,
+                OrderInput.FormatValue(payment.Amount),
+                Date(payment.Date),
+                OrderCodes.Of(payment.Method),
+                payment.ReceivedBy,
+                payment.CreatedAtUtc,
+                OrderVersion.Format(payment.Version))),
+        ],
+        [
+            .. order.Refunds.Select(refund => new RefundEntryResponse(
+                refund.Id,
+                OrderCodes.Of(refund.Kind),
+                OrderInput.FormatValue(refund.Amount),
+                Date(refund.Date),
+                OrderCodes.Of(refund.Method),
+                refund.Reason,
+                refund.CreatedAtUtc,
+                OrderVersion.Format(refund.Version))),
+        ]);
+
+    private static OrderPaymentSummaryResponse ToResponse(PaymentSummary summary) => new(
+        OrderInput.FormatValue(summary.Paid),
+        summary.State is { } state ? OrderCodes.Of(state) : null,
+        Amount(summary.AmountDue),
+        Amount(summary.Overpayment),
+        Amount(summary.ToRefund));
+
+    private static string? Amount(decimal? amount) => amount is { } value ? OrderInput.FormatValue(value) : null;
 
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

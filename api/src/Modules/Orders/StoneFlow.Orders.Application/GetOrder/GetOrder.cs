@@ -1,10 +1,35 @@
 using StoneFlow.Orders.Application.Abstractions;
 using StoneFlow.Orders.Domain.Orders;
+using StoneFlow.Orders.Domain.Payments;
 using StoneFlow.Shared.Application.Cqrs;
 
 namespace StoneFlow.Orders.Application.GetOrder;
 
-/// <summary>Szczegóły zamówienia; czasy techniczne w UTC, <see cref="Version"/> to <c>rowversion</c>.</summary>
+/// <summary>Wpłata w szczegółach zamówienia.</summary>
+public sealed record PaymentEntryDto(
+    Guid Id,
+    decimal Amount,
+    DateOnly Date,
+    PaymentMethod Method,
+    string? ReceivedBy,
+    DateTime CreatedAtUtc,
+    byte[] Version);
+
+/// <summary>Zwrot w szczegółach zamówienia.</summary>
+public sealed record RefundEntryDto(
+    Guid Id,
+    RefundKind Kind,
+    decimal Amount,
+    DateOnly Date,
+    RefundMethod Method,
+    string Reason,
+    DateTime CreatedAtUtc,
+    byte[] Version);
+
+/// <summary>
+/// Szczegóły zamówienia; czasy techniczne w UTC, <see cref="Version"/> to <c>rowversion</c>. Wpisy
+/// są posortowane po dacie, czasie utworzenia i identyfikatorze (rosnąco).
+/// </summary>
 public sealed record OrderDetailsDto(
     Guid Id,
     string Number,
@@ -20,8 +45,17 @@ public sealed record OrderDetailsDto(
     string? Comment,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    byte[] Version)
+    byte[] Version,
+    IReadOnlyList<PaymentEntryDto> Payments,
+    IReadOnlyList<RefundEntryDto> Refunds)
 {
+    /// <summary>Podsumowanie płatności z wpisów zamówienia (reguły w <see cref="PaymentSummary"/>).</summary>
+    public PaymentSummary Payment => PaymentSummary.Compute(
+        Value,
+        FulfillmentStatus == FulfillmentStatus.Cancelled,
+        Payments.Sum(payment => payment.Amount),
+        Refunds.Sum(refund => refund.Amount));
+
     /// <summary>Pola tylko do odczytu w edycji (puste dla zamówienia ręcznego).</summary>
     public IReadOnlyList<ShopOwnedField> ShopOwnedFields => Order.OwnedByShop(Source);
 }

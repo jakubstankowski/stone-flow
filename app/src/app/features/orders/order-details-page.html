@@ -62,7 +62,9 @@
           </app-order-form>
         } @else {
           <div class="flex flex-wrap gap-3">
-            <app-button variant="primary" (pressed)="startEdit()">Edytuj</app-button>
+            <app-button variant="primary" [disabled]="entryFormOpen()" (pressed)="startEdit()">
+              Edytuj
+            </app-button>
             @if (cancelled()) {
               <app-button
                 variant="secondary"
@@ -84,6 +86,11 @@
             }
             <app-button (pressed)="goToList()">Wróć do listy</app-button>
           </div>
+          @if (entryFormOpen()) {
+            <p class="text-(--sf-muted)">
+              Zapisz albo zamknij formularz wpłaty lub zwrotu, aby edytować zamówienie.
+            </p>
+          }
 
           <div class="grid gap-6 lg:grid-cols-2">
             <section
@@ -218,6 +225,13 @@
           </div>
         }
 
+        <app-order-payments
+          [order]="order"
+          [locked]="editing()"
+          [reload]="reloadOrder"
+          (formOpenChange)="onEntryFormOpen($event)"
+        />
+
         @if (cancelled()) {
           <app-confirm-dialog
             #restoreDialog
@@ -243,6 +257,12 @@
                 formatDate(order.orderDate)
               }}). Zamówienia nie można usunąć, ale można je później przywrócić.
             </p>
+            @if (order.payments.length > 0) {
+              <p class="mt-3 rounded-box border border-(--sf-warning) bg-base-100 p-3 font-medium">
+                Zamówienie ma wpłaty: Zapłacono {{ formatPln(order.payment.paid) }}. Wpłaty
+                pozostaną, a pieniądze rozlicz zwrotem.
+              </p>
+            }
           </app-confirm-dialog>
         }
       }

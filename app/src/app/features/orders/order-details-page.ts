@@ -10,6 +10,7 @@ import { ErrorState } from '../../shared/ui/error-state';
 import { LoadingState } from '../../shared/ui/loading-state';
 import { StatusBadge } from '../../shared/ui/status-badge';
 import { OrderForm, OrderFormOutcome } from './order-form';
+import { OrderPayments } from './order-payments';
 import { OrderFormModel, orderErrorMessage, orderFormFrom } from './order-form-model';
 import {
   CHANNEL_LABELS,
@@ -35,11 +36,23 @@ interface Alert {
 
 /**
  * Ekran `/zamowienia/:id`: szczegóły, edycja z `version`, konflikt `409 order_conflict`
- * z „Wczytaj aktualne dane” oraz anulowanie i przywracanie po potwierdzeniu. Usuwania nie ma.
+ * z „Wczytaj aktualne dane” oraz anulowanie i przywracanie po potwierdzeniu. Zamówień się nie
+ * usuwa; usuwać można tylko wpisy płatności w sekcji „Płatności” (SF-9). Edycja zamówienia
+ * i formularz wpisu wykluczają się, żeby odświeżenie po zapisie wpisu nie skasowało
+ * niezapisanych zmian zamówienia.
  */
 @Component({
   selector: 'app-order-details-page',
-  imports: [Button, ConfirmDialog, EmptyState, ErrorState, LoadingState, OrderForm, StatusBadge],
+  imports: [
+    Button,
+    ConfirmDialog,
+    EmptyState,
+    ErrorState,
+    LoadingState,
+    OrderForm,
+    OrderPayments,
+    StatusBadge,
+  ],
   templateUrl: './order-details-page.html',
 })
 export class OrderDetailsPage {
@@ -59,6 +72,8 @@ export class OrderDetailsPage {
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
   protected readonly actionBusy = signal<'cancel' | 'restore' | null>(null);
+  /** W sekcji „Płatności” jest otwarty formularz wpisu (wtedy „Edytuj” jest wyłączone). */
+  protected readonly entryFormOpen = signal(false);
 
   protected readonly cancelled = computed(() => this.order()?.fulfillmentStatus === 'cancelled');
   protected readonly statusLabels = STATUS_LABELS;
@@ -75,6 +90,11 @@ export class OrderDetailsPage {
   private readonly restoreDialog = viewChild<ConfirmDialog>('restoreDialog');
 
   protected readonly save = (input: OrderInput): Promise<OrderFormOutcome> => this.update(input);
+  /** Odświeżenie po zmianie wpisu płatności; zwraca wczytane zamówienie albo `null`. */
+  protected readonly reloadOrder = async (): Promise<OrderDetails | null> => {
+    await this.load(this.id(), { keepView: true });
+    return this.status() === 'loaded' && !this.alert() ? this.order() : null;
+  };
 
   constructor() {
     effect(() => {
@@ -99,7 +119,7 @@ export class OrderDetailsPage {
 
   protected startEdit(): void {
     const order = this.order();
-    if (!order) {
+    if (!order || this.entryFormOpen()) {
       return;
     }
     this.notice.set(null);
@@ -111,6 +131,14 @@ export class OrderDetailsPage {
   protected stopEdit(): void {
     this.editing.set(false);
     this.alert.set(null);
+  }
+
+  protected onEntryFormOpen(open: boolean): void {
+    this.entryFormOpen.set(open);
+    if (open) {
+      this.notice.set(null);
+      this.alert.set(null);
+    }
   }
 
   protected goToList(): void {
