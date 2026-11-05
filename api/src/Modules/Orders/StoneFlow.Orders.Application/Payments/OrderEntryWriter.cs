@@ -31,12 +31,15 @@ public enum EntryWriteOutcome
     Conflict,
     PaidWouldBeNegative,
     RefundExceedsPaid,
+
+    /// <summary>Obniżenia sprzedaży przekroczyłyby wartość zamówienia; <c>Available</c> to maksymalny wkład wpisu.</summary>
+    SalesReductionLimitExceeded,
 }
 
 /// <summary>
 /// Wynik zapisu wpisu. <see cref="Id"/> dla dodania i <see cref="EntryWriteOutcome.KeyReused"/>;
 /// <see cref="Version"/> dla dodania, powtórzenia i poprawy; <see cref="Available"/> dla
-/// <see cref="EntryWriteOutcome.RefundExceedsPaid"/>.
+/// <see cref="EntryWriteOutcome.RefundExceedsPaid"/> i <see cref="EntryWriteOutcome.SalesReductionLimitExceeded"/>.
 /// </summary>
 public sealed record EntryWriteResult(
     EntryWriteOutcome Outcome,
@@ -77,7 +80,7 @@ public sealed class OrderEntryWriter<TEntry>(
         Guid orderId,
         Guid idempotencyKey,
         byte[] requestHash,
-        Func<EntryTotals, PaidRuleViolation?>? check,
+        Func<EntryTotals, EntryRuleViolation?>? check,
         Func<DateTime, TEntry> create,
         CancellationToken cancellationToken)
     {
@@ -142,7 +145,7 @@ public sealed class OrderEntryWriter<TEntry>(
         Guid orderId,
         Guid entryId,
         byte[] version,
-        Func<TEntry, EntryTotals, PaidRuleViolation?> check,
+        Func<TEntry, EntryTotals, EntryRuleViolation?> check,
         Func<TEntry, DateTime, IReadOnlyList<EntryFieldChange>> edit,
         CancellationToken cancellationToken)
     {
@@ -184,7 +187,7 @@ public sealed class OrderEntryWriter<TEntry>(
         Guid orderId,
         Guid entryId,
         byte[] version,
-        Func<TEntry, EntryTotals, PaidRuleViolation?>? check,
+        Func<TEntry, EntryTotals, EntryRuleViolation?>? check,
         CancellationToken cancellationToken) =>
         ChangeAsync(
             orderId,
@@ -208,7 +211,7 @@ public sealed class OrderEntryWriter<TEntry>(
         Guid orderId,
         Guid entryId,
         byte[] version,
-        Func<TEntry, EntryTotals, PaidRuleViolation?>? check,
+        Func<TEntry, EntryTotals, EntryRuleViolation?>? check,
         Func<LockedOrder, StoredEntry<TEntry>, CancellationToken, Task<EntryWriteResult>> apply,
         CancellationToken cancellationToken)
     {
@@ -250,9 +253,11 @@ public sealed class OrderEntryWriter<TEntry>(
             ? new EntryWriteResult(EntryWriteOutcome.Repeated, existing.Id, existing.Version)
             : new EntryWriteResult(EntryWriteOutcome.KeyReused, existing.Id);
 
-    private static EntryWriteResult Rejected(PaidRuleViolation violation) => violation.Kind switch
+    private static EntryWriteResult Rejected(EntryRuleViolation violation) => violation.Kind switch
     {
-        PaidRuleViolationKind.RefundExceedsPaid => new EntryWriteResult(EntryWriteOutcome.RefundExceedsPaid, Available: violation.Available),
+        EntryRuleViolationKind.RefundExceedsPaid => new EntryWriteResult(EntryWriteOutcome.RefundExceedsPaid, Available: violation.Available),
+        EntryRuleViolationKind.SalesReductionLimitExceeded =>
+            new EntryWriteResult(EntryWriteOutcome.SalesReductionLimitExceeded, Available: violation.Available),
         _ => new EntryWriteResult(EntryWriteOutcome.PaidWouldBeNegative),
     };
 

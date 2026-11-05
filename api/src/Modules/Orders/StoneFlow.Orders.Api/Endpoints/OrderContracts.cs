@@ -96,7 +96,14 @@ public sealed record OrderDetailsResponse(
     IReadOnlyList<string> ShopOwnedFields,
     OrderPaymentSummaryResponse Payment,
     IReadOnlyList<PaymentEntryResponse> Payments,
-    IReadOnlyList<RefundEntryResponse> Refunds);
+    IReadOnlyList<RefundEntryResponse> Refunds,
+    IReadOnlyList<SalesCorrectionEntryResponse> SalesCorrections,
+    SalesReductionsResponse SalesReductions);
+
+public sealed record SalesCorrectionEntryResponse(Guid Id, string Amount, string Date, string Reason, DateTime CreatedAtUtc, string Version);
+
+/// <summary>Obniżenia sprzedaży: zwroty sprzedaży, korekty, suma i nadwyżka nad wartością (<c>null</c>, gdy jej nie ma).</summary>
+public sealed record SalesReductionsResponse(string ReturnsTotal, string CorrectionsTotal, string Total, string? Excess);
 
 /// <summary>Podsumowanie płatności; <see cref="State"/> <c>null</c> dla zamówienia anulowanego, kwoty opcjonalne jako <c>null</c>.</summary>
 public sealed record OrderPaymentSummaryResponse(string Paid, string? State, string? AmountDue, string? Overpayment, string? ToRefund);
@@ -222,7 +229,21 @@ internal static class OrderContracts
                 refund.Reason,
                 refund.CreatedAtUtc,
                 OrderVersion.Format(refund.Version))),
-        ]);
+        ],
+        [
+            .. order.SalesCorrections.Select(correction => new SalesCorrectionEntryResponse(
+                correction.Id,
+                OrderInput.FormatValue(correction.Amount),
+                Date(correction.Date),
+                correction.Reason,
+                correction.CreatedAtUtc,
+                OrderVersion.Format(correction.Version))),
+        ],
+        new SalesReductionsResponse(
+            OrderInput.FormatValue(order.SalesReductions.ReturnsTotal),
+            OrderInput.FormatValue(order.SalesReductions.CorrectionsTotal),
+            OrderInput.FormatValue(order.SalesReductions.Total),
+            Amount(order.SalesReductions.Excess)));
 
     private static OrderPaymentSummaryResponse ToResponse(PaymentSummary summary) => new(
         OrderInput.FormatValue(summary.Paid),

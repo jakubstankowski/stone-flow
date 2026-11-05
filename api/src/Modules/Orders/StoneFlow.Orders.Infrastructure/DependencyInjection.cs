@@ -23,8 +23,10 @@ public static class DependencyInjection
         services.AddScoped<IOrderLock, OrderLock>();
         services.AddScoped<IOrderEntryStore<Payment>, OrderEntryStore<Payment>>();
         services.AddScoped<IOrderEntryStore<Refund>, OrderEntryStore<Refund>>();
+        services.AddScoped<IOrderEntryStore<SalesCorrection>, OrderEntryStore<SalesCorrection>>();
         services.AddScoped<OrderEntryWriter<Payment>>();
         services.AddScoped<OrderEntryWriter<Refund>>();
+        services.AddScoped<OrderEntryWriter<SalesCorrection>>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 

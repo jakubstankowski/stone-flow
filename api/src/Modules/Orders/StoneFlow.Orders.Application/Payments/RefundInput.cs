@@ -47,15 +47,7 @@ public sealed record RefundInput(string? Kind, string? Amount, string? Date, str
             errors.Add(EntryFieldKeys.Method, EntryMessages.RefundMethodUnknown);
         }
 
-        var reason = OrderInput.Text(Reason);
-        if (reason is null)
-        {
-            errors.Add(EntryFieldKeys.Reason, EntryMessages.ReasonRequired);
-        }
-        else if (reason.Length > Refund.ReasonMaxLength)
-        {
-            errors.Add(EntryFieldKeys.Reason, EntryMessages.ReasonTooLong);
-        }
+        var reason = EntryInput.ValidateReason(Reason, Refund.ReasonMaxLength, EntryMessages.ReasonRequired, EntryMessages.ReasonTooLong, errors);
 
         return before && errors.IsEmpty && kind is { } k && amount is { } a && date is { } d && method is { } m && reason is not null
             ? new RefundDetails(k, a, d, m, reason)

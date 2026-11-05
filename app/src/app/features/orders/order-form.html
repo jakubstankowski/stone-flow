@@ -213,7 +213,7 @@
         <app-field
           label="Wartość brutto (zł)"
           fieldId="zamowienie-wartosc"
-          hint="Np. 1 234,50. Wartość 0 zł jest dozwolona."
+          [hint]="valueHint()"
           [required]="true"
           [error]="errorOf(form.value)"
         >

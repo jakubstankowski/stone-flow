@@ -6,7 +6,7 @@ using StoneFlow.Orders.Domain.Payments;
 namespace StoneFlow.Orders.Infrastructure.Persistence;
 
 /// <summary>
-/// Wspólne mapowanie wpisów (wpłat i zwrotów, osobne tabele): kwota <c>decimal(18,2)</c> &gt; 0,
+/// Wspólne mapowanie wpisów (wpłat, zwrotów i korekt sprzedaży; osobne tabele): kwota <c>decimal(18,2)</c> &gt; 0,
 /// FK do zamówienia bez kaskady (zamówień się nie usuwa), indeks <c>(OrderId) INCLUDE (Amount)</c>
 /// pod sumy, unikalny klucz idempotencji i <c>rowversion</c>.
 /// </summary>
@@ -71,5 +71,17 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(refund => refund.Kind).HasConversion<string>().HasMaxLength(OrderEntryConfiguration.CodeMaxLength);
         builder.Property(refund => refund.Method).HasConversion<string>().HasMaxLength(OrderEntryConfiguration.CodeMaxLength);
         builder.Property(refund => refund.Reason).HasMaxLength(Refund.ReasonMaxLength).IsRequired();
+    }
+}
+
+internal sealed class SalesCorrectionConfiguration : IEntityTypeConfiguration<SalesCorrection>
+{
+    public const string Table = "SalesCorrections";
+
+    public void Configure(EntityTypeBuilder<SalesCorrection> builder)
+    {
+        OrderEntryConfiguration.Configure(builder, Table, "CorrectedOn", _ => { });
+
+        builder.Property(correction => correction.Reason).HasMaxLength(SalesCorrection.ReasonMaxLength).IsRequired();
     }
 }

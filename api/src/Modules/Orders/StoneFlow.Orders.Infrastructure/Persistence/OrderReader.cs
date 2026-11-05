@@ -103,6 +103,18 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 EF.Property<byte[]>(r, OrderEntryConfiguration.VersionProperty)))
             .ToListAsync(cancellationToken);
 
+        var corrections = await context.SalesCorrections.AsNoTracking()
+            .Where(c => c.OrderId == id)
+            .OrderBy(c => c.Date).ThenBy(c => c.CreatedAtUtc).ThenBy(c => c.Id)
+            .Select(c => new SalesCorrectionEntryDto(
+                c.Id,
+                c.Amount,
+                c.Date,
+                c.Reason,
+                c.CreatedAtUtc,
+                EF.Property<byte[]>(c, OrderEntryConfiguration.VersionProperty)))
+            .ToListAsync(cancellationToken);
+
         return new OrderDetailsDto(
                 row.Id,
                 row.Number,
@@ -120,7 +132,8 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 DateTime.SpecifyKind(row.UpdatedAtUtc, DateTimeKind.Utc),
                 row.Version,
                 [.. payments.Select(p => p with { CreatedAtUtc = DateTime.SpecifyKind(p.CreatedAtUtc, DateTimeKind.Utc) })],
-                [.. refunds.Select(r => r with { CreatedAtUtc = DateTime.SpecifyKind(r.CreatedAtUtc, DateTimeKind.Utc) })]);
+                [.. refunds.Select(r => r with { CreatedAtUtc = DateTime.SpecifyKind(r.CreatedAtUtc, DateTimeKind.Utc) })],
+                [.. corrections.Select(c => c with { CreatedAtUtc = DateTime.SpecifyKind(c.CreatedAtUtc, DateTimeKind.Utc) })]);
     }
 
     public async Task<CreationRequestMatch?> FindByCreationRequestAsync(Guid creationRequestId, CancellationToken cancellationToken)

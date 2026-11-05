@@ -208,6 +208,32 @@ describe('OrdersApi', () => {
     expect(await update).toEqual({ version: 'v2' });
   });
 
+  it('writes sales corrections under their own route', async () => {
+    const adding = api.addEntry(
+      'salesCorrection',
+      'a1',
+      { amount: '500.00', date: '2026-10-31', reason: 'Oddany towar' },
+      'key-k',
+    );
+    const post = http.expectOne('/api/orders/a1/sales-corrections');
+    expect(post.request.method).toBe('POST');
+    expect(post.request.headers.get('Idempotency-Key')).toBe('key-k');
+    expect(post.request.body).toEqual({
+      amount: '500.00',
+      date: '2026-10-31',
+      reason: 'Oddany towar',
+    });
+    post.flush({ id: 'k1', version: 'v1' }, { status: 201, statusText: 'Created' });
+    expect(await adding).toEqual({ id: 'k1', version: 'v1' });
+
+    const removal = api.deleteEntry('salesCorrection', 'a1', 'k1', 'v1');
+    const request = http.expectOne('/api/orders/a1/sales-corrections/k1');
+    expect(request.request.method).toBe('DELETE');
+    expect(request.request.body).toEqual({ version: 'v1' });
+    respondNoContent(request);
+    await removal;
+  });
+
   it('deletes an entry with the version in the JSON body, not in the URL', async () => {
     const removal = api.deleteEntry('refund', 'a1', 'r1', 'AAAA+/8=');
     const request = http.expectOne('/api/orders/a1/refunds/r1');

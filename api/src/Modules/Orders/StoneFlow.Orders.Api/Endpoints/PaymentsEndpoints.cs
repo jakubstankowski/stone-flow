@@ -6,18 +6,21 @@ using Microsoft.AspNetCore.Routing;
 using StoneFlow.Orders.Application;
 using StoneFlow.Orders.Application.AddPayment;
 using StoneFlow.Orders.Application.AddRefund;
+using StoneFlow.Orders.Application.AddSalesCorrection;
 using StoneFlow.Orders.Application.DeletePayment;
 using StoneFlow.Orders.Application.DeleteRefund;
+using StoneFlow.Orders.Application.DeleteSalesCorrection;
 using StoneFlow.Orders.Application.EditPayment;
 using StoneFlow.Orders.Application.EditRefund;
+using StoneFlow.Orders.Application.EditSalesCorrection;
 using StoneFlow.Orders.Application.Payments;
 using StoneFlow.Shared.Application.Cqrs;
 
 namespace StoneFlow.Orders.Api.Endpoints;
 
 /// <summary>
-/// Endpointy wpłat i zwrotów zamówienia: <c>/api/orders/{orderId}/payments</c> i
-/// <c>/api/orders/{orderId}/refunds</c>. Bez logiki biznesowej: każde wywołanie przez dyspozytor.
+/// Endpointy wpisów zamówienia: <c>/api/orders/{orderId}/payments</c>,
+/// <c>/api/orders/{orderId}/refunds</c> i <c>/api/orders/{orderId}/sales-corrections</c>. Bez logiki biznesowej: każde wywołanie przez dyspozytor.
 /// Wszystkie wymagają sesji, a zapisy (także <c>DELETE</c>) tokenu XSRF. Wersja wpisu w
 /// <c>PUT</c> i <c>DELETE</c> idzie w ciele JSON (<c>{ version }</c>), jak w <c>cancel</c>.
 /// </summary>
@@ -25,6 +28,7 @@ internal static class PaymentsEndpoints
 {
     private static readonly EntryKind PaymentKind = new("paymentId", "wpłatę");
     private static readonly EntryKind RefundKind = new("refundId", "zwrot");
+    private static readonly EntryKind SalesCorrectionKind = new("salesCorrectionId", "korektę sprzedaży");
 
     public static void Map(IEndpointRouteBuilder endpoints)
     {
@@ -36,6 +40,9 @@ internal static class PaymentsEndpoints
         group.MapPost("/refunds", AddRefundAsync).WithName("Orders.AddRefund");
         group.MapPut("/refunds/{entryId:guid}", EditRefundAsync).WithName("Orders.EditRefund");
         group.MapDelete("/refunds/{entryId:guid}", DeleteRefundAsync).WithName("Orders.DeleteRefund");
+        group.MapPost("/sales-corrections", AddSalesCorrectionAsync).WithName("Orders.AddSalesCorrection");
+        group.MapPut("/sales-corrections/{entryId:guid}", EditSalesCorrectionAsync).WithName("Orders.EditSalesCorrection");
+        group.MapDelete("/sales-corrections/{entryId:guid}", DeleteSalesCorrectionAsync).WithName("Orders.DeleteSalesCorrection");
     }
 
     private static Task<Results<Created<EntryCreatedResponse>, Ok<EntryCreatedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> AddPaymentAsync(
@@ -79,6 +86,28 @@ internal static class PaymentsEndpoints
         DeleteAsync(
             context,
             accountId => dispatcher.SendAsync(new DeleteRefundCommand(accountId, orderId, entryId, request?.Version), cancellationToken));
+
+    private static Task<Results<Created<EntryCreatedResponse>, Ok<EntryCreatedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> AddSalesCorrectionAsync(
+        Guid orderId, SalesCorrectionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken) =>
+        AddAsync(
+            context,
+            orderId,
+            SalesCorrectionKind,
+            (accountId, key) => dispatcher.SendAsync(
+                new AddSalesCorrectionCommand(accountId, orderId, key, PaymentContracts.ToInput(request)), cancellationToken));
+
+    private static Task<Results<Ok<OrderVersionResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> EditSalesCorrectionAsync(
+        Guid orderId, Guid entryId, SalesCorrectionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken) =>
+        EditAsync(
+            context,
+            accountId => dispatcher.SendAsync(
+                new EditSalesCorrectionCommand(accountId, orderId, entryId, PaymentContracts.ToInput(request), request?.Version), cancellationToken));
+
+    private static Task<Results<NoContent, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> DeleteSalesCorrectionAsync(
+        Guid orderId, Guid entryId, [FromBody] OrderVersionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken) =>
+        DeleteAsync(
+            context,
+            accountId => dispatcher.SendAsync(new DeleteSalesCorrectionCommand(accountId, orderId, entryId, request?.Version), cancellationToken));
 
     private static async Task<Results<Created<EntryCreatedResponse>, Ok<EntryCreatedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> AddAsync(
         HttpContext context, Guid orderId, EntryKind kind, Func<Guid, Guid, Task<EntryWriteResult>> send)
@@ -151,6 +180,8 @@ internal static class PaymentsEndpoints
         EntryWriteOutcome.Conflict => OrderProblems.EntryConflict(),
         EntryWriteOutcome.PaidWouldBeNegative => OrderProblems.PaidWouldBeNegative(),
         EntryWriteOutcome.RefundExceedsPaid => OrderProblems.RefundExceedsPaid(result.Available!.Value, OrderInput.FormatValue(result.Available.Value)),
+        EntryWriteOutcome.SalesReductionLimitExceeded =>
+            OrderProblems.SalesReductionLimitExceeded(result.Available!.Value, OrderInput.FormatValue(result.Available.Value)),
         _ => throw new InvalidOperationException($"Nieoczekiwany wynik zapisu wpisu: {result.Outcome}."),
     };
 

@@ -20,11 +20,14 @@ import {
   EntryFormOutcome,
   PaymentFormModel,
   RefundFormModel,
+  SalesCorrectionFormModel,
   emptyPaymentForm,
   emptyRefundForm,
+  emptySalesCorrectionForm,
   entryErrorMessage,
   paymentFormFrom,
   refundFormFrom,
+  salesCorrectionFormFrom,
 } from './entry-form-model';
 import {
   OrderDetails,
@@ -37,11 +40,15 @@ import {
   REFUND_METHOD_LABELS,
   RefundEntry,
   RefundInput,
+  SalesCorrectionEntry,
+  SalesCorrectionInput,
 } from './order-models';
 import { EntryInputs, EntryType } from './orders-api';
 import { EntryOutcome, OrdersService } from './orders.service';
 import { PaymentForm } from './payment-form';
 import { RefundForm } from './refund-form';
+import { SalesCorrectionForm } from './sales-correction-form';
+import { SalesCorrections } from './sales-corrections';
 
 export const ENTRY_CONFLICT_MESSAGE = 'Wpis został zmieniony w międzyczasie.';
 export const ENTRY_NOT_FOUND_MESSAGE = 'Nie znaleziono wpisu. Mógł zostać usunięty w międzyczasie.';
@@ -63,13 +70,29 @@ type OpenForm =
       readonly entry: RefundEntry | null;
       readonly initial: RefundFormModel;
       readonly key: string | null;
+    }
+  | {
+      readonly type: 'salesCorrection';
+      readonly entry: SalesCorrectionEntry | null;
+      readonly initial: SalesCorrectionFormModel;
+      readonly key: string | null;
     };
 
 type PendingDelete =
   | { readonly type: 'payment'; readonly entry: PaymentEntry }
-  | { readonly type: 'refund'; readonly entry: RefundEntry };
+  | { readonly type: 'refund'; readonly entry: RefundEntry }
+  | { readonly type: 'salesCorrection'; readonly entry: SalesCorrectionEntry };
+
+/** Sekcja szczegółów, w której pokazuje się komunikat: „Płatności” albo „Korekty sprzedaży”. */
+export type EntrySection = 'payments' | 'corrections';
+
+interface Notice {
+  readonly section: EntrySection;
+  readonly text: string;
+}
 
 interface Alert {
+  readonly section: EntrySection;
   readonly text: string;
   /** Pokazuje akcję „Wczytaj aktualne dane”. */
   readonly reload: boolean;
@@ -78,18 +101,34 @@ interface Alert {
 const NOTICES: Readonly<Record<EntryType, { saved: string; deleted: string }>> = {
   payment: { saved: 'Wpłata zapisana.', deleted: 'Wpłata usunięta.' },
   refund: { saved: 'Zwrot zapisany.', deleted: 'Zwrot usunięty.' },
+  salesCorrection: { saved: 'Korekta sprzedaży zapisana.', deleted: 'Korekta sprzedaży usunięta.' },
 };
 
+function sectionOf(type: EntryType): EntrySection {
+  return type === 'salesCorrection' ? 'corrections' : 'payments';
+}
+
 /**
- * Sekcja „Płatności” w szczegółach zamówienia (SF-9): podsumowanie z backendu (Zapłacono,
- * stan, Do zapłaty, ostrzeżenia), tabele wpłat i zwrotów, formularze dodania i poprawy oraz
- * usuwanie po potwierdzeniu. Po każdym zapisie strona pobiera szczegóły ponownie (`reload`).
- * Gdy edycja zamówienia jest otwarta (`locked`), akcje wpisów są wyłączone.
+ * Wpisy zamówienia w szczegółach: sekcja „Płatności” (SF-9: podsumowanie z backendu, tabele
+ * wpłat i zwrotów) oraz pod nią sekcja „Korekty sprzedaży” (SF-10, `app-sales-corrections`).
+ * Jeden stan dla obu sekcji: naraz otwarty jest jeden formularz wpisu, a licznik operacji
+ * (`activeChange`) obejmuje wszystkie rodzaje wpisów, więc „Edytuj” jest zablokowane przy każdej
+ * pracy z wpisem. Po każdym zapisie strona pobiera szczegóły ponownie (`reload`). Gdy edycja
+ * zamówienia jest otwarta (`locked`), akcje wpisów są wyłączone.
  */
 @Component({
   selector: 'app-order-payments',
-  imports: [Button, ConfirmDialog, PaymentForm, RefundForm, StatusBadge],
+  imports: [
+    Button,
+    ConfirmDialog,
+    PaymentForm,
+    RefundForm,
+    SalesCorrectionForm,
+    SalesCorrections,
+    StatusBadge,
+  ],
   templateUrl: './order-payments.html',
+  host: { class: 'flex min-w-0 flex-col gap-6' },
 })
 export class OrderPayments {
   readonly order = input.required<OrderDetails>();
@@ -110,7 +149,7 @@ export class OrderPayments {
 
   protected readonly openForm = signal<OpenForm | null>(null);
   protected readonly pendingDelete = signal<PendingDelete | null>(null);
-  protected readonly notice = signal<string | null>(null);
+  protected readonly notice = signal<Notice | null>(null);
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
   protected readonly deletingId = signal<string | null>(null);
@@ -141,6 +180,8 @@ export class OrderPayments {
     });
   }
 
+  protected readonly saveCorrection = (input: SalesCorrectionInput): Promise<EntryFormOutcome> =>
+    this.save('salesCorrection', input);
   protected readonly savePayment = (input: PaymentInput): Promise<EntryFormOutcome> =>
     this.save('payment', input);
   protected readonly saveRefund = (input: RefundInput): Promise<EntryFormOutcome> =>
@@ -152,6 +193,38 @@ export class OrderPayments {
 
   protected addRefund(): void {
     this.open({ type: 'refund', entry: null, initial: emptyRefundForm(), key: newKey() });
+  }
+
+  protected addCorrection(): void {
+    this.open({
+      type: 'salesCorrection',
+      entry: null,
+      initial: emptySalesCorrectionForm(),
+      key: newKey(),
+    });
+  }
+
+  protected editCorrection(entry: SalesCorrectionEntry): void {
+    this.open({
+      type: 'salesCorrection',
+      entry,
+      initial: salesCorrectionFormFrom(entry),
+      key: null,
+    });
+  }
+
+  protected async deleteCorrection(entry: SalesCorrectionEntry): Promise<void> {
+    await this.delete({ type: 'salesCorrection', entry });
+  }
+
+  protected noticeIn(section: EntrySection): string | null {
+    const notice = this.notice();
+    return notice?.section === section ? notice.text : null;
+  }
+
+  protected alertIn(section: EntrySection): Alert | null {
+    const alert = this.alert();
+    return alert?.section === section ? alert : null;
   }
 
   protected editPayment(entry: PaymentEntry): void {
@@ -208,14 +281,32 @@ export class OrderPayments {
   }
 
   protected formHeading(form: OpenForm): string {
-    if (form.type === 'payment') {
-      return form.entry ? 'Popraw wpłatę' : 'Dodaj wpłatę';
+    switch (form.type) {
+      case 'payment':
+        return form.entry ? 'Popraw wpłatę' : 'Dodaj wpłatę';
+      case 'refund':
+        return form.entry ? 'Popraw zwrot' : 'Dodaj zwrot';
+      case 'salesCorrection':
+        return form.entry ? 'Popraw korektę sprzedaży' : 'Dodaj korektę sprzedaży';
     }
-    return form.entry ? 'Popraw zwrot' : 'Dodaj zwrot';
   }
 
   protected deleteHeading(pending: PendingDelete): string {
-    return pending.type === 'payment' ? 'Usunąć wpłatę?' : 'Usunąć zwrot?';
+    switch (pending.type) {
+      case 'payment':
+        return 'Usunąć wpłatę?';
+      case 'refund':
+        return 'Usunąć zwrot?';
+      case 'salesCorrection':
+        return 'Usunąć korektę sprzedaży?';
+    }
+  }
+
+  /** Skutek usunięcia w dialogu: wpisy pieniężne zmieniają Zapłacono, korekta obniżenia sprzedaży. */
+  protected deleteEffect(pending: PendingDelete): string {
+    return pending.type === 'salesCorrection'
+      ? 'Zmieni się suma obniżeń sprzedaży. Ślad usunięcia zostanie w historii zmian.'
+      : 'Zmieni się kwota Zapłacono i stan płatności. Ślad usunięcia zostanie w historii zmian.';
   }
 
   /** Wskazanie wpisu w dialogu usuwania: rodzaj, kwota, data i metoda. */
@@ -227,6 +318,10 @@ export class OrderPayments {
         `Wpłata ${formatPln(amount)} z ${formatDate(date)} (${PAYMENT_METHOD_LABELS[method]}) ` +
         `zostanie usunięta z zamówienia ${number}.`
       );
+    }
+    if (pending.type === 'salesCorrection') {
+      const { amount, date } = pending.entry;
+      return `Korekta sprzedaży ${formatPln(amount)} z ${formatDate(date)} zostanie usunięta z zamówienia ${number}.`;
     }
     const { kind, amount, date, method } = pending.entry;
     return (
@@ -247,16 +342,23 @@ export class OrderPayments {
   }
 
   private refreshOpenEntry(current: OpenForm, order: OrderDetails): void {
+    const id = current.entry?.id;
     if (current.type === 'payment') {
-      const fresh = order.payments.find((entry) => entry.id === current.entry?.id);
+      const fresh = order.payments.find((entry) => entry.id === id);
       if (fresh) {
         this.openForm.set({ ...current, entry: fresh, initial: paymentFormFrom(fresh) });
         return;
       }
-    } else {
-      const fresh = order.refunds.find((entry) => entry.id === current.entry?.id);
+    } else if (current.type === 'refund') {
+      const fresh = order.refunds.find((entry) => entry.id === id);
       if (fresh) {
         this.openForm.set({ ...current, entry: fresh, initial: refundFormFrom(fresh) });
+        return;
+      }
+    } else {
+      const fresh = order.salesCorrections.find((entry) => entry.id === id);
+      if (fresh) {
+        this.openForm.set({ ...current, entry: fresh, initial: salesCorrectionFormFrom(fresh) });
         return;
       }
     }
@@ -272,6 +374,7 @@ export class OrderPayments {
       return null;
     }
     const orderId = this.order().id;
+    const section = sectionOf(type);
     this.alert.set(null);
     const outcome: EntryOutcome = current.entry
       ? await this.orders.updateEntry(type, orderId, current.entry.id, input, current.entry.version)
@@ -280,17 +383,17 @@ export class OrderPayments {
     switch (outcome.kind) {
       case 'saved':
         await this.closeAndReload();
-        this.notice.set(NOTICES[type].saved);
+        this.notice.set({ section, text: NOTICES[type].saved });
         return null;
       case 'keyReused':
         await this.closeAndReload();
-        this.alert.set({ text: ENTRY_KEY_REUSED_MESSAGE, reload: false });
+        this.alert.set({ section, text: ENTRY_KEY_REUSED_MESSAGE, reload: false });
         return null;
       case 'conflict':
-        this.alert.set({ text: ENTRY_CONFLICT_MESSAGE, reload: true });
+        this.alert.set({ section, text: ENTRY_CONFLICT_MESSAGE, reload: true });
         return null;
       case 'entryNotFound':
-        this.alert.set({ text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
+        this.alert.set({ section, text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
         return null;
       case 'orderNotFound':
         await this.closeAndReload();
@@ -336,6 +439,7 @@ export class OrderPayments {
       return;
     }
     const { type, entry } = pending;
+    const section = sectionOf(type);
     this.notice.set(null);
     this.alert.set(null);
     this.deletingId.set(entry.id);
@@ -344,29 +448,30 @@ export class OrderPayments {
       switch (outcome.kind) {
         case 'saved':
           await this.reload()();
-          this.notice.set(NOTICES[type].deleted);
+          this.notice.set({ section, text: NOTICES[type].deleted });
           return;
         case 'conflict':
-          this.alert.set({ text: ENTRY_CONFLICT_MESSAGE, reload: true });
+          this.alert.set({ section, text: ENTRY_CONFLICT_MESSAGE, reload: true });
           return;
         case 'entryNotFound':
-          this.alert.set({ text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
+          this.alert.set({ section, text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
           return;
         case 'orderNotFound':
           await this.reload()();
           return;
         case 'rejected':
-          this.alert.set({ text: outcome.message, reload: false });
+          this.alert.set({ section, text: outcome.message, reload: false });
           return;
         case 'error':
           this.alert.set({
+            section,
             text: entryErrorMessage(outcome.error, DELETE_FAILED_MESSAGE),
             reload: false,
           });
           return;
         case 'keyReused':
           // Usuwanie nie używa klucza idempotencji; odpowiedź traktujemy jak nieudaną.
-          this.alert.set({ text: DELETE_FAILED_MESSAGE, reload: true });
+          this.alert.set({ section, text: DELETE_FAILED_MESSAGE, reload: true });
           return;
       }
     } finally {

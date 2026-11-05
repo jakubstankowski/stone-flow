@@ -11,6 +11,9 @@ public sealed record PaymentRequest(string? Amount, string? Date, string? Method
 /// <summary>Ciało <c>POST</c> i <c>PUT</c> zwrotu; <see cref="Version"/> tylko w <c>PUT</c>.</summary>
 public sealed record RefundRequest(string? Kind, string? Amount, string? Date, string? Method, string? Reason, string? Version = null);
 
+/// <summary>Ciało <c>POST</c> i <c>PUT</c> korekty sprzedaży; <see cref="Version"/> tylko w <c>PUT</c>.</summary>
+public sealed record SalesCorrectionRequest(string? Amount, string? Date, string? Reason, string? Version = null);
+
 /// <summary>Odpowiedź dodania wpisu (201) i jego powtórzenia (200).</summary>
 public sealed record EntryCreatedResponse(Guid Id, string Version);
 
@@ -23,4 +26,7 @@ internal static class PaymentContracts
         request is null
             ? new RefundInput(null, null, null, null, null)
             : new RefundInput(request.Kind, request.Amount, request.Date, request.Method, request.Reason);
+
+    public static SalesCorrectionInput ToInput(SalesCorrectionRequest? request) =>
+        request is null ? new SalesCorrectionInput(null, null, null) : new SalesCorrectionInput(request.Amount, request.Date, request.Reason);
 }

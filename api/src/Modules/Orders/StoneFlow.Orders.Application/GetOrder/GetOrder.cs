@@ -26,6 +26,9 @@ public sealed record RefundEntryDto(
     DateTime CreatedAtUtc,
     byte[] Version);
 
+/// <summary>Korekta sprzedaży w szczegółach zamówienia.</summary>
+public sealed record SalesCorrectionEntryDto(Guid Id, decimal Amount, DateOnly Date, string Reason, DateTime CreatedAtUtc, byte[] Version);
+
 /// <summary>
 /// Szczegóły zamówienia; czasy techniczne w UTC, <see cref="Version"/> to <c>rowversion</c>. Wpisy
 /// są posortowane po dacie, czasie utworzenia i identyfikatorze (rosnąco).
@@ -47,8 +50,15 @@ public sealed record OrderDetailsDto(
     DateTime UpdatedAtUtc,
     byte[] Version,
     IReadOnlyList<PaymentEntryDto> Payments,
-    IReadOnlyList<RefundEntryDto> Refunds)
+    IReadOnlyList<RefundEntryDto> Refunds,
+    IReadOnlyList<SalesCorrectionEntryDto> SalesCorrections)
 {
+    /// <summary>Obniżenia sprzedaży i nadwyżka nad wartością (reguły w <see cref="SalesReductionRules"/>).</summary>
+    public SalesReductionSummary SalesReductions => SalesReductionRules.Summarize(
+        Value,
+        Refunds.Where(refund => refund.Kind == RefundKind.SalesReturn).Sum(refund => refund.Amount),
+        SalesCorrections.Sum(correction => correction.Amount));
+
     /// <summary>Podsumowanie płatności z wpisów zamówienia (reguły w <see cref="PaymentSummary"/>).</summary>
     public PaymentSummary Payment => PaymentSummary.Compute(
         Value,

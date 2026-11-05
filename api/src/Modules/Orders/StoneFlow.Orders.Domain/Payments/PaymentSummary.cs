@@ -47,11 +47,26 @@ public sealed record PaymentSummary(decimal Paid, PaymentState? State, decimal? 
     }
 }
 
-/// <summary>Sumy wpisów zamówienia (wpłat i zwrotów) policzone pod blokadą zamówienia.</summary>
+/// <summary>
+/// Sumy wpisów zamówienia policzone pod blokadą zamówienia: wpłaty i wszystkie zwroty (Zapłacono)
+/// oraz, dla limitu obniżeń sprzedaży, wartość zamówienia, zwroty sprzedaży i korekty sprzedaży.
+/// </summary>
 public readonly record struct EntryTotals(decimal Payments, decimal Refunds)
 {
-    /// <summary>„Zapłacono”.</summary>
+    /// <summary>Wartość zamówienia <c>V</c>.</summary>
+    public decimal Value { get; init; }
+
+    /// <summary>Suma zwrotów rodzaju <see cref="RefundKind.SalesReturn"/>.</summary>
+    public decimal SalesReturns { get; init; }
+
+    /// <summary>Suma korekt sprzedaży.</summary>
+    public decimal Corrections { get; init; }
+
+    /// <summary>„Zapłacono”. Korekty nie są operacją pieniężną i go nie zmieniają.</summary>
     public decimal Paid => Payments - Refunds;
+
+    /// <summary>Obniżenia sprzedaży <c>R</c>: zwroty sprzedaży i korekty.</summary>
+    public decimal Reductions => SalesReturns + Corrections;
 
     /// <summary>Sumy po zamianie kwoty wpłaty: dodanie (<paramref name="oldAmount"/> = 0), poprawa, usunięcie (<paramref name="newAmount"/> = 0).</summary>
     public EntryTotals ReplacingPayment(decimal oldAmount, decimal newAmount) => this with { Payments = Payments - oldAmount + newAmount };
@@ -60,8 +75,11 @@ public readonly record struct EntryTotals(decimal Payments, decimal Refunds)
     public EntryTotals ReplacingRefund(decimal oldAmount, decimal newAmount) => this with { Refunds = Refunds - oldAmount + newAmount };
 }
 
-public enum PaidRuleViolationKind
+public enum EntryRuleViolationKind
 {
+    /// <summary>Obniżenia sprzedaży po zmianie przekroczyłyby wartość zamówienia (SF-10).</summary>
+    SalesReductionLimitExceeded,
+
     /// <summary>Poprawa lub usunięcie wpłaty obniżyłyby Zapłacono poniżej 0 zł (najpierw zwrot).</summary>
     PaidWouldBeNegative,
 
@@ -69,8 +87,12 @@ public enum PaidRuleViolationKind
     RefundExceedsPaid,
 }
 
-/// <summary>Naruszenie reguły „Zapłacono po zmianie ≥ 0”; <see cref="Available"/> tylko dla zwrotu.</summary>
-public sealed record PaidRuleViolation(PaidRuleViolationKind Kind, decimal? Available);
+/// <summary>
+/// Naruszenie reguły wpisu: „Zapłacono po zmianie ≥ 0” (SF-9) albo limitu obniżeń sprzedaży
+/// (SF-10). <see cref="Available"/>: przy zwrocie ponad Zapłacono — kwota, do której zwrot może
+/// sięgnąć; przy limicie obniżeń — maksymalny wkład tego wpisu w obniżenia.
+/// </summary>
+public sealed record EntryRuleViolation(EntryRuleViolationKind Kind, decimal? Available);
 
 /// <summary>
 /// Reguła limitu wpisów: po każdej zmianie Zapłacono nie może być ujemne. Dodanie wpłaty
@@ -79,17 +101,58 @@ public sealed record PaidRuleViolation(PaidRuleViolationKind Kind, decimal? Avai
 public static class PaidRules
 {
     /// <summary>Poprawa (<paramref name="newAmount"/>) albo usunięcie (0) wpłaty o kwocie <paramref name="oldAmount"/>.</summary>
-    public static PaidRuleViolation? CheckPaymentChange(EntryTotals totals, decimal oldAmount, decimal newAmount) =>
+    public static EntryRuleViolation? CheckPaymentChange(EntryTotals totals, decimal oldAmount, decimal newAmount) =>
         totals.ReplacingPayment(oldAmount, newAmount).Paid < 0
-            ? new PaidRuleViolation(PaidRuleViolationKind.PaidWouldBeNegative, null)
+            ? new EntryRuleViolation(EntryRuleViolationKind.PaidWouldBeNegative, null)
             : null;
 
     /// <summary>
     /// Dodanie (<paramref name="oldAmount"/> = 0) albo poprawa zwrotu. <c>Available</c> to kwota,
     /// do której zwrot może sięgnąć: Zapłacono bez tego zwrotu.
     /// </summary>
-    public static PaidRuleViolation? CheckRefund(EntryTotals totals, decimal oldAmount, decimal newAmount) =>
+    public static EntryRuleViolation? CheckRefund(EntryTotals totals, decimal oldAmount, decimal newAmount) =>
         totals.ReplacingRefund(oldAmount, newAmount).Paid < 0
-            ? new PaidRuleViolation(PaidRuleViolationKind.RefundExceedsPaid, Math.Max(0, totals.ReplacingRefund(oldAmount, 0).Paid))
+            ? new EntryRuleViolation(EntryRuleViolationKind.RefundExceedsPaid, Math.Max(0, totals.ReplacingRefund(oldAmount, 0).Paid))
             : null;
+}
+
+/// <summary>Podsumowanie obniżeń sprzedaży; <see cref="Excess"/> = <c>R − V</c> tylko przy <c>R &gt; V</c>.</summary>
+public sealed record SalesReductionSummary(decimal ReturnsTotal, decimal CorrectionsTotal, decimal Total, decimal? Excess);
+
+/// <summary>
+/// Limit obniżeń sprzedaży (PRD „Limit obniżeń sprzedaży”, SF-10): suma zwrotów sprzedaży
+/// i korekt <c>R</c> nie może przekroczyć wartości zamówienia <c>V</c>. Jedna reguła dla korekt
+/// i zwrotów (plan SF-10, N1): zmiana jest odrzucana wtedy i tylko wtedy, gdy podnosi <c>R</c>
+/// i <c>R</c> po zmianie przekracza <c>V</c>. Zmiana, która nie podnosi <c>R</c>, przechodzi
+/// także przy istniejącej nadwyżce, żeby dało się z niej wyjść. Obowiązuje też dla zamówień
+/// anulowanych.
+/// </summary>
+public static class SalesReductionRules
+{
+    /// <summary>
+    /// Zmiana wkładu wpisu w obniżenia z <paramref name="oldContribution"/> na
+    /// <paramref name="newContribution"/> (dodanie: stary wkład 0; zwrot pieniędzy: wkład 0).
+    /// <c>Available</c> = <c>max(V − (R − stary wkład), 0)</c>.
+    /// </summary>
+    public static EntryRuleViolation? Check(EntryTotals totals, decimal oldContribution, decimal newContribution)
+    {
+        var after = totals.Reductions - oldContribution + newContribution;
+        return after > totals.Reductions && after > totals.Value
+            ? new EntryRuleViolation(EntryRuleViolationKind.SalesReductionLimitExceeded, Math.Max(totals.Value - (totals.Reductions - oldContribution), 0))
+            : null;
+    }
+
+    /// <summary>
+    /// Ręczna zmiana wartości zamówienia: obniżenie poniżej sumy obniżeń jest odrzucane; wynik to
+    /// minimalna dozwolona wartość (<c>R</c>), a <c>null</c> oznacza brak naruszenia. Podwyżka
+    /// przechodzi zawsze.
+    /// </summary>
+    public static decimal? MinimumValueFor(decimal oldValue, decimal newValue, decimal reductions) =>
+        newValue < oldValue && newValue < reductions ? reductions : null;
+
+    public static SalesReductionSummary Summarize(decimal value, decimal salesReturnsTotal, decimal correctionsTotal)
+    {
+        var total = salesReturnsTotal + correctionsTotal;
+        return new SalesReductionSummary(salesReturnsTotal, correctionsTotal, total, total > value ? total - value : null);
+    }
 }

@@ -109,6 +109,37 @@ export interface RefundInput {
   readonly reason: string;
 }
 
+/**
+ * Korekta sprzedaży (SF-10): oddany towar bez zwrotu pieniędzy. Obniża sprzedaż, nie ma metody
+ * i nie zmienia kwoty Zapłacono.
+ */
+export interface SalesCorrectionEntry {
+  readonly id: string;
+  readonly amount: string;
+  readonly date: string;
+  readonly reason: string;
+  readonly createdAtUtc: string;
+  readonly version: string;
+}
+
+/** Treść `POST /api/orders/{id}/sales-corrections`. */
+export interface SalesCorrectionInput {
+  readonly amount: string;
+  readonly date: string;
+  readonly reason: string;
+}
+
+/**
+ * Obniżenia sprzedaży wyliczone w backendzie: zwroty sprzedaży i korekty. `excess` to nadwyżka
+ * ponad wartość zamówienia albo `null`.
+ */
+export interface SalesReductions {
+  readonly returnsTotal: string;
+  readonly correctionsTotal: string;
+  readonly total: string;
+  readonly excess: string | null;
+}
+
 export interface EntryCreated {
   readonly id: string;
   readonly version: string;
@@ -155,6 +186,8 @@ export interface OrderDetails {
   /** Po dacie rosnąco, potem `createdAtUtc` i `id` (kolejność z backendu). */
   readonly payments: readonly PaymentEntry[];
   readonly refunds: readonly RefundEntry[];
+  readonly salesCorrections: readonly SalesCorrectionEntry[];
+  readonly salesReductions: SalesReductions;
 }
 
 export interface OrderCreated {
@@ -199,6 +232,7 @@ export const ENTRY_PROBLEM = {
   keyReused: 'idempotency_key_reused',
   paidWouldBeNegative: 'paid_would_be_negative',
   refundExceedsPaid: 'refund_exceeds_paid',
+  salesReductionLimitExceeded: 'sales_reduction_limit_exceeded',
 } as const;
 
 export const PAYMENT_METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {

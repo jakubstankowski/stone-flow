@@ -10,7 +10,12 @@ import {
   respondProblem,
   typeInto,
 } from '../../../testing/auth-testing';
-import { orderDetails, paymentEntry, refundEntry } from '../../../testing/orders-testing';
+import {
+  orderDetails,
+  paymentEntry,
+  refundEntry,
+  salesCorrectionEntry,
+} from '../../../testing/orders-testing';
 import { formatPln } from '../../shared/format/pl-format';
 import { OrderDetails } from './order-models';
 import { OrderDetailsPage } from './order-details-page';
@@ -125,6 +130,41 @@ describe('OrderDetailsPage', () => {
     expect(element().querySelector('[role="status"]')?.textContent).toContain(
       'Zamówienie zapisane.',
     );
+  });
+
+  it('explains the value correction and attaches the reduction limit to the value', async () => {
+    const page = await open(orderDetails({ salesCorrections: [salesCorrectionEntry()] }));
+    buttonByText(page.element(), 'Edytuj').click();
+    await page.stable();
+    expect(page.element().querySelector('#zamowienie-wartosc-pomoc')?.textContent).toContain(
+      'Korekta wartości zmienia wartość zamówienia w okresie jego daty. Oddany towar bez zwrotu pieniędzy zapisz korektą sprzedaży, a zwrócone pieniądze zwrotem.',
+    );
+
+    typeInto(page.element().querySelector('#zamowienie-wartosc') as HTMLInputElement, '400');
+    buttonByText(page.element(), 'Zapisz zmiany').click();
+    respondProblem(await nextRequest({ method: 'PUT', url: '/api/orders/a1' }), 422, {
+      code: 'sales_reduction_limit_exceeded',
+      minimumValue: '500.00',
+    });
+
+    await page.settle(() =>
+      expect(page.element().querySelector('#zamowienie-wartosc-blad')?.textContent).toContain(
+        `Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt (${formatPln('500.00')}).`,
+      ),
+    );
+    expect((page.element().querySelector('#zamowienie-wartosc') as HTMLInputElement).value).toBe(
+      '400',
+    );
+  });
+
+  it('disables order editing while a sales correction form is open', async () => {
+    const page = await open();
+    buttonByText(page.element(), 'Dodaj korektę sprzedaży').click();
+    await page.stable();
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
+    buttonByText(page.element(), 'Zamknij bez zapisu').click();
+    await page.stable();
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(false);
   });
 
   it('saves an edit with the version and reloads the order', async () => {

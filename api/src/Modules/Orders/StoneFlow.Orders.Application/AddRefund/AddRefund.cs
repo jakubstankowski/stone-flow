@@ -10,7 +10,9 @@ public sealed record AddRefundCommand(Guid AccountId, Guid OrderId, Guid Idempot
 
 /// <summary>
 /// Walidacja (400), a potem w jednej jednostce pracy: blokada zamówienia, klucz idempotencji (przed
-/// limitem), limit „zwrot ≤ Zapłacono” liczony pod blokadą (422 z <c>available</c>), zapis i audyt.
+/// limitem), limit „zwrot ≤ Zapłacono” liczony pod blokadą (422 <c>refund_exceeds_paid</c>), dla
+/// zwrotu sprzedaży limit obniżeń (422 <c>sales_reduction_limit_exceeded</c>), zapis i audyt. Obie
+/// reguły mają <c>available</c>; zwracana jest pierwsza naruszona.
 /// </summary>
 public sealed class AddRefundHandler(OrderEntryWriter<Refund> writer, TimeProvider timeProvider)
     : ICommandHandler<AddRefundCommand, EntryWriteResult>
@@ -32,7 +34,8 @@ public sealed class AddRefundHandler(OrderEntryWriter<Refund> writer, TimeProvid
             command.OrderId,
             command.IdempotencyKey,
             requestHash,
-            totals => PaidRules.CheckRefund(totals, 0, details.Amount),
+            // Kolejność (SF-10): najpierw „zwrot ≤ Zapłacono”, potem limit obniżeń dla zwrotu sprzedaży.
+            totals => PaidRules.CheckRefund(totals, 0, details.Amount) ?? SalesReductionRules.Check(totals, 0, details.SalesReduction),
             nowUtc => Refund.Create(Guid.NewGuid(), command.OrderId, details, command.IdempotencyKey, requestHash, nowUtc),
             cancellationToken);
     }

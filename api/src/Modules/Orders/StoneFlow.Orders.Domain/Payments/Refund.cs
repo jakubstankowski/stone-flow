@@ -1,7 +1,11 @@
 namespace StoneFlow.Orders.Domain.Payments;
 
 /// <summary>Dane zwrotu z formularza, już znormalizowane (powód przycięty).</summary>
-public sealed record RefundDetails(RefundKind Kind, decimal Amount, DateOnly Date, RefundMethod Method, string Reason);
+public sealed record RefundDetails(RefundKind Kind, decimal Amount, DateOnly Date, RefundMethod Method, string Reason)
+{
+    /// <summary>Wkład w obniżenia sprzedaży: kwota zwrotu sprzedaży, 0 dla zwrotu pieniędzy.</summary>
+    public decimal SalesReduction => Kind == RefundKind.SalesReturn ? Amount : 0;
+}
 
 /// <summary>
 /// Zwrot pieniędzy klientowi. Rodzaj można zmienić poprawką (z audytem); limit obniżeń sprzedaży
@@ -30,6 +34,9 @@ public sealed class Refund : OrderEntry
     public RefundMethod Method { get; private set; }
 
     public string Reason { get; private set; }
+
+    /// <summary>Wkład w obniżenia sprzedaży: kwota zwrotu sprzedaży, 0 dla zwrotu pieniędzy.</summary>
+    public decimal SalesReduction => Kind == RefundKind.SalesReturn ? Amount : 0;
 
     /// <exception cref="ArgumentException">Dane naruszają reguły, które sprawdza walidacja przed utworzeniem.</exception>
     public static Refund Create(
