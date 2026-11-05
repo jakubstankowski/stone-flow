@@ -169,6 +169,48 @@ public sealed class SalesCorrectionsApiTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task Edit_order_value_in_excess_rejects_decrease_and_allows_partial_increase()
+    {
+        // Nadwyżka jak po synchronizacji: wartość 300 przy obniżeniach 500.
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+        var order = await test.CreateOrderAsync(Order("1000.00"));
+        await AddCorrectionAsync(test, order.Id, "500.00");
+        await test.ExecuteSqlAsync($"UPDATE orders.Orders SET Value = 300.00 WHERE Id = '{order.Id}';");
+        var seededVersion = (await test.GetJsonAsync($"/api/orders/{order.Id}")).GetProperty("version").GetString()!;
+
+        using var decrease = await test.SendAsync(HttpMethod.Put, $"/api/orders/{order.Id}", Order("200.00", version: seededVersion));
+        var increased = await test.EditAsync(order.Id, Order("400.00", version: seededVersion));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, decrease.StatusCode);
+        var problem = await Json(decrease);
+        Assert.Equal(OrderProblems.SalesReductionLimitExceededCode, problem.GetProperty("code").GetString());
+        Assert.Equal("500.00", problem.GetProperty("minimumValue").GetString());
+        var details = await test.GetJsonAsync($"/api/orders/{order.Id}");
+        Assert.Equal(("400.00", increased), (details.GetProperty("value").GetString(), details.GetProperty("version").GetString()));
+        Assert.Equal(("0.00", "500.00", "500.00", "100.00"), await ReductionsAsync(test, order.Id));
+    }
+
+    [Fact]
+    public async Task Refund_edit_violating_both_rules_reports_refund_exceeds_paid_first()
+    {
+        // Plan SF-10, N3: przy poprawie zwrotu kolejność jak przy dodaniu — najpierw Zapłacono.
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+        var order = await test.CreateOrderAsync(Order("1000.00"));
+        await AddPaymentAsync(test, order.Id, "1000.00");
+        await AddCorrectionAsync(test, order.Id, "500.00");
+        var refund = await AddRefundAsync(test, order.Id, "600.00", kind: "moneyReturn");
+
+        // Zwrot sprzedaży 1100: Zapłacono byłoby −100, a obniżenia 1600 > 1000.
+        using var both = await test.SendAsync(
+            HttpMethod.Put, $"/api/orders/{order.Id}/refunds/{refund.Id}", Refund("1100.00", kind: "salesReturn", version: refund.Version));
+
+        await AssertProblemAsync(both, HttpStatusCode.UnprocessableEntity, OrderProblems.RefundExceedsPaidCode);
+        Assert.Equal("1000.00", (await Json(both)).GetProperty("available").GetString());
+        var stored = (await test.GetJsonAsync($"/api/orders/{order.Id}")).GetProperty("refunds")[0];
+        Assert.Equal(("600.00", "moneyReturn", refund.Version), (stored.GetProperty("amount").GetString(), stored.GetProperty("kind").GetString(), stored.GetProperty("version").GetString()));
+    }
+
+    [Fact]
     public async Task Cancelled_and_shop_orders_accept_corrections_with_the_same_limit()
     {
         await using var test = await OrdersTest.CreateAsync(sqlServer);

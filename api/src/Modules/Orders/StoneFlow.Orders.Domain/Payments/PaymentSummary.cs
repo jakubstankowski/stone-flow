@@ -143,12 +143,18 @@ public static class SalesReductionRules
     }
 
     /// <summary>
+    /// Czy ręczna zmiana wartości ją obniża — tylko taka zmiana podlega limitowi (i tylko wtedy
+    /// <c>EditOrder</c> bierze blokadę zamówienia).
+    /// </summary>
+    public static bool LowersValue(decimal oldValue, decimal newValue) => newValue < oldValue;
+
+    /// <summary>
     /// Ręczna zmiana wartości zamówienia: obniżenie poniżej sumy obniżeń jest odrzucane; wynik to
     /// minimalna dozwolona wartość (<c>R</c>), a <c>null</c> oznacza brak naruszenia. Podwyżka
-    /// przechodzi zawsze.
+    /// przechodzi zawsze, także przy istniejącej nadwyżce.
     /// </summary>
     public static decimal? MinimumValueFor(decimal oldValue, decimal newValue, decimal reductions) =>
-        newValue < oldValue && newValue < reductions ? reductions : null;
+        LowersValue(oldValue, newValue) && newValue < reductions ? reductions : null;
 
     public static SalesReductionSummary Summarize(decimal value, decimal salesReturnsTotal, decimal correctionsTotal)
     {

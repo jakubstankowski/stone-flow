@@ -151,7 +151,7 @@ public sealed class EditOrderHandler(
         Guid orderId, IReadOnlyList<OrderFieldChange> changes, CancellationToken cancellationToken)
     {
         if (changes.FirstOrDefault(change => change.Field == OrderField.Value) is not { OldValue: decimal oldValue, NewValue: decimal newValue }
-            || newValue >= oldValue)
+            || !SalesReductionRules.LowersValue(oldValue, newValue))
         {
             return null;
         }

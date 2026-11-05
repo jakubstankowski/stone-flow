@@ -71,8 +71,8 @@ public sealed record LockedOrder(
     bool IsCancelled,
     decimal PaymentsTotal,
     decimal RefundsTotal,
-    decimal SalesReturnsTotal = 0,
-    decimal CorrectionsTotal = 0)
+    decimal SalesReturnsTotal,
+    decimal CorrectionsTotal)
 {
     public EntryTotals Totals => new(PaymentsTotal, RefundsTotal)
     {

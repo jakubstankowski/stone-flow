@@ -265,6 +265,55 @@ describe('SalesCorrections', () => {
     expect(page.host.active()).toBe(false);
   });
 
+  it('returns focus to the opener after adding a correction', async () => {
+    const page = await setup();
+    const opener = buttonByText(page.section(), 'Dodaj korektę sprzedaży');
+    opener.focus();
+    opener.click();
+    await page.settle(() => expect(document.activeElement?.id).toBe('korekta-kwota'));
+    typeInto(page.element.querySelector('#korekta-kwota') as HTMLInputElement, '500');
+    const reason = page.element.querySelector('#korekta-powod') as HTMLTextAreaElement;
+    reason.value = 'Oddany towar';
+    reason.dispatchEvent(new Event('input', { bubbles: true }));
+    buttonByText(page.element, 'Zapisz korektę').click();
+    page.host.next = WITH_CORRECTION;
+    (await nextRequest({ method: 'POST', url: '/api/orders/a1/sales-corrections' })).flush(
+      { id: 'k1', version: 'v1' },
+      { status: 201, statusText: 'Created' },
+    );
+    await page.settle(() => expect(document.activeElement).toBe(opener));
+  });
+
+  it('moves focus to the corrections heading when the edited row is gone after saving', async () => {
+    const page = await setup((host) => host.order.set(WITH_CORRECTION));
+    const opener = buttonByText(page.section(), 'Popraw korektę z 31.10.2026');
+    opener.focus();
+    opener.click();
+    await page.settle(() => expect(document.activeElement?.id).toBe('korekta-kwota'));
+    buttonByText(page.element, 'Zapisz zmiany').click();
+    // Po odświeżeniu wiersza z przyciskiem „Popraw” już nie ma (np. inny wpis po zmianie w drugiej karcie).
+    page.host.next = orderDetails();
+    (await nextRequest({ method: 'PUT', url: '/api/orders/a1/sales-corrections/k1' })).flush({
+      version: 'v2',
+    });
+    await page.settle(() => expect(document.activeElement?.id).toBe('korekty-naglowek'));
+  });
+
+  it('moves focus to the corrections heading after deleting a correction', async () => {
+    const page = await setup((host) => host.order.set(WITH_CORRECTION));
+    const opener = buttonByText(page.section(), 'Usuń korektę z 31.10.2026');
+    opener.focus();
+    opener.click();
+    await page.stable();
+    buttonByText(page.element.querySelector('dialog') as HTMLDialogElement, 'Usuń').click();
+    page.host.next = orderDetails();
+    respondNoContent(
+      await nextRequest({ method: 'DELETE', url: '/api/orders/a1/sales-corrections/k1' }),
+    );
+    await page.settle(() => expect(document.activeElement?.id).toBe('korekty-naglowek'));
+    expect(page.section().textContent).toContain('Korekta sprzedaży usunięta.');
+  });
+
   it('disables correction actions while the order is being edited', async () => {
     const { section } = await setup((host) => {
       host.locked.set(true);

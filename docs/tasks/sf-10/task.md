@@ -1,12 +1,12 @@
 ---
 id: SF-10
 title: Korekta sprzedaży i limit obniżeń
-status: planned
+status: done
 risk: high
 depends_on: [SF-9]
 parts: []
 spec_review: PASS WITH ISSUES
-code_review: null
+code_review: PASS WITH ISSUES
 source: https://standev.youtrack.cloud/issue/SF-10
 created: 2026-11-05
 updated: 2026-11-05

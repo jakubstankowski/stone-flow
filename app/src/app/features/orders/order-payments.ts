@@ -1,6 +1,5 @@
 import {
   Component,
-  ElementRef,
   Injector,
   afterNextRender,
   computed,
@@ -104,6 +103,12 @@ const NOTICES: Readonly<Record<EntryType, { saved: string; deleted: string }>> =
   salesCorrection: { saved: 'Korekta sprzedaży zapisana.', deleted: 'Korekta sprzedaży usunięta.' },
 };
 
+/** Nagłówki sekcji (`tabindex="-1"`) jako cel fokusu, gdy przycisk akcji zniknął. */
+const SECTION_HEADINGS: Readonly<Record<EntrySection, string>> = {
+  payments: 'platnosci-naglowek',
+  corrections: 'korekty-naglowek',
+};
+
 function sectionOf(type: EntryType): EntrySection {
   return type === 'salesCorrection' ? 'corrections' : 'payments';
 }
@@ -170,7 +175,6 @@ export class OrderPayments {
   protected readonly formatPln = formatPln;
 
   private readonly deleteDialog = viewChild<ConfirmDialog>('deleteDialog');
-  private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   private returnFocusTo: HTMLElement | null = null;
 
   constructor() {
@@ -236,16 +240,36 @@ export class OrderPayments {
   }
 
   protected closeForm(): void {
+    const focus = this.detachForm();
+    this.restoreFocus(focus.target, focus.section);
+  }
+
+  /** Zamyka formularz i zwraca cel fokusu (przycisk otwierający i sekcję wpisu). */
+  private detachForm(): { target: HTMLElement | null; section: EntrySection } {
+    const section = sectionOf(this.openForm()?.type ?? 'payment');
     this.openForm.set(null);
     this.alert.set(null);
     const target = this.returnFocusTo;
     this.returnFocusTo = null;
+    return { target, section };
+  }
+
+  /**
+   * Po renderowaniu fokus wraca na przycisk, który otworzył akcję; gdy go już nie ma (np. wiersz
+   * usuniętego wpisu), trafia na nagłówek sekcji tego wpisu.
+   */
+  private restoreFocus(target: HTMLElement | null, section: EntrySection): void {
     afterNextRender(
       () => {
-        if (target?.isConnected && !(target as HTMLButtonElement).disabled) {
+        const usable =
+          target !== null &&
+          target !== document.body &&
+          target.isConnected &&
+          !(target as HTMLButtonElement).disabled;
+        if (usable) {
           target.focus();
         } else {
-          this.heading()?.nativeElement.focus();
+          document.getElementById(SECTION_HEADINGS[section])?.focus();
         }
       },
       { injector: this.injector },
@@ -409,11 +433,17 @@ export class OrderPayments {
    * Formularz zamyka się już w trakcie operacji, więc „Edytuj” pozostaje zablokowane bez
    * przerwy do końca odświeżenia.
    */
-  private closeAndReload(): Promise<void> {
-    return this.track(async () => {
-      this.closeForm();
+  private async closeAndReload(): Promise<void> {
+    let focus: { target: HTMLElement | null; section: EntrySection } | null = null;
+    await this.track(async () => {
+      focus = this.detachForm();
       await this.reload()();
     });
+    // Fokus dopiero po odświeżeniu: wtedy wiadomo, czy przycisk otwierający jeszcze istnieje.
+    if (focus) {
+      const { target, section } = focus;
+      this.restoreFocus(target, section);
+    }
   }
 
   private async track(operation: () => Promise<void>): Promise<void> {
@@ -430,10 +460,15 @@ export class OrderPayments {
       return;
     }
     // Od otwarcia dialogu do końca odświeżenia trwa operacja wpisu.
-    await this.track(() => this.confirmAndDelete(pending));
+    // Przycisk „Usuń” w wierszu: po usunięciu wiersza fokus trafi na nagłówek sekcji.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    await this.track(() => this.confirmAndDelete(pending, opener));
   }
 
-  private async confirmAndDelete(pending: PendingDelete): Promise<void> {
+  private async confirmAndDelete(
+    pending: PendingDelete,
+    opener: HTMLElement | null,
+  ): Promise<void> {
     this.pendingDelete.set(pending);
     if (!(await this.deleteDialog()?.open())) {
       return;
@@ -449,6 +484,7 @@ export class OrderPayments {
         case 'saved':
           await this.reload()();
           this.notice.set({ section, text: NOTICES[type].deleted });
+          this.restoreFocus(opener, section);
           return;
         case 'conflict':
           this.alert.set({ section, text: ENTRY_CONFLICT_MESSAGE, reload: true });
