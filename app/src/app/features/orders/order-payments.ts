@@ -158,6 +158,8 @@ export class OrderPayments {
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
   protected readonly deletingId = signal<string | null>(null);
+  /** Formularz, którego zapis właśnie trwa (żądanie i odświeżenie); wtedy nie można go zamknąć. */
+  protected readonly savingForm = signal<OpenForm | null>(null);
   /** Liczba trwających operacji wpisów poza formularzem (usuwanie, odświeżenie). */
   private readonly operations = signal(0);
   private readonly active = computed(() => this.openForm() !== null || this.operations() > 0);
@@ -240,6 +242,10 @@ export class OrderPayments {
   }
 
   protected closeForm(): void {
+    if (this.savingForm() !== null) {
+      // Trwający zapis kończy się sam; zamknięcie w trakcie zgubiłoby jego wynik.
+      return;
+    }
     const focus = this.detachForm();
     this.restoreFocus(focus.target, focus.section);
   }
@@ -389,14 +395,32 @@ export class OrderPayments {
     this.closeForm();
   }
 
+  /**
+   * Cały zapis (żądanie i odświeżenie) jest operacją wpisu: `activeChange` zostaje `true`,
+   * inne akcje i „Edytuj” są wyłączone, a formularza nie da się zamknąć. Wynik dotyczy tylko
+   * formularza, z którego wyszło żądanie.
+   */
   private async save<T extends EntryType>(
     type: T,
     input: EntryInputs[T],
   ): Promise<EntryFormOutcome> {
     const current = this.openForm();
-    if (!current || current.type !== type) {
+    if (!current || current.type !== type || this.savingForm() !== null) {
       return null;
     }
+    this.savingForm.set(current);
+    try {
+      return await this.track(() => this.submit(current, type, input));
+    } finally {
+      this.savingForm.set(null);
+    }
+  }
+
+  private async submit<T extends EntryType>(
+    current: OpenForm,
+    type: T,
+    input: EntryInputs[T],
+  ): Promise<EntryFormOutcome> {
     const orderId = this.order().id;
     const section = sectionOf(type);
     this.alert.set(null);
@@ -406,11 +430,11 @@ export class OrderPayments {
 
     switch (outcome.kind) {
       case 'saved':
-        await this.closeAndReload();
+        await this.closeAndReload(current);
         this.notice.set({ section, text: NOTICES[type].saved });
         return null;
       case 'keyReused':
-        await this.closeAndReload();
+        await this.closeAndReload(current);
         this.alert.set({ section, text: ENTRY_KEY_REUSED_MESSAGE, reload: false });
         return null;
       case 'conflict':
@@ -420,7 +444,7 @@ export class OrderPayments {
         this.alert.set({ section, text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
         return null;
       case 'orderNotFound':
-        await this.closeAndReload();
+        await this.closeAndReload(current);
         return null;
       case 'rejected':
         return { message: outcome.message };
@@ -433,10 +457,13 @@ export class OrderPayments {
    * Formularz zamyka się już w trakcie operacji, więc „Edytuj” pozostaje zablokowane bez
    * przerwy do końca odświeżenia.
    */
-  private async closeAndReload(): Promise<void> {
+  private async closeAndReload(form: OpenForm): Promise<void> {
     let focus: { target: HTMLElement | null; section: EntrySection } | null = null;
     await this.track(async () => {
-      focus = this.detachForm();
+      // Zamyka tylko formularz, z którego wyszło żądanie, nigdy inny otwarty później.
+      if (this.openForm() === form) {
+        focus = this.detachForm();
+      }
       await this.reload()();
     });
     // Fokus dopiero po odświeżeniu: wtedy wiadomo, czy przycisk otwierający jeszcze istnieje.
@@ -446,10 +473,10 @@ export class OrderPayments {
     }
   }
 
-  private async track(operation: () => Promise<void>): Promise<void> {
+  private async track<T>(operation: () => Promise<T>): Promise<T> {
     this.operations.update((count) => count + 1);
     try {
-      await operation();
+      return await operation();
     } finally {
       this.operations.update((count) => count - 1);
     }

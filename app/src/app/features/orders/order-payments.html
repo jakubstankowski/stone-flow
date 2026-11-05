@@ -89,7 +89,9 @@
             [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz wpłatę'"
             [action]="savePayment"
           >
-            <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
           </app-payment-form>
         } @else if (form.type === 'refund') {
           <app-refund-form
@@ -97,7 +99,9 @@
             [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz zwrot'"
             [action]="saveRefund"
           >
-            <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
           </app-refund-form>
         }
       </div>
@@ -278,7 +282,9 @@
             [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz korektę'"
             [action]="saveCorrection"
           >
-            <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
           </app-sales-correction-form>
         </div>
       }

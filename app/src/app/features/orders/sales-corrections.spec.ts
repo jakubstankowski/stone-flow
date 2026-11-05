@@ -314,6 +314,39 @@ describe('SalesCorrections', () => {
     expect(page.section().textContent).toContain('Korekta sprzedaży usunięta.');
   });
 
+  it('keeps the form and all entry actions locked while a POST is pending', async () => {
+    const page = await setup((host) =>
+      host.order.set(orderDetails({ payments: [paymentEntry()] })),
+    );
+    buttonByText(page.section(), 'Dodaj korektę sprzedaży').click();
+    await page.stable();
+    typeInto(page.element.querySelector('#korekta-kwota') as HTMLInputElement, '500');
+    const reason = page.element.querySelector('#korekta-powod') as HTMLTextAreaElement;
+    reason.value = 'Oddany towar';
+    reason.dispatchEvent(new Event('input', { bubbles: true }));
+    buttonByText(page.element, 'Zapisz korektę').click();
+
+    const post = await nextRequest({ method: 'POST', url: '/api/orders/a1/sales-corrections' });
+    await page.stable();
+    const close = buttonByText(page.element, 'Zamknij bez zapisu');
+    expect(close.disabled).toBe(true);
+    close.click();
+    await page.stable();
+    expect(page.element.querySelector('#korekta-kwota')).not.toBeNull();
+    expect(page.host.active()).toBe(true);
+    expect(buttonByText(page.section(), 'Dodaj korektę sprzedaży').disabled).toBe(true);
+    expect(buttonByText(page.element, 'Dodaj wpłatę').disabled).toBe(true);
+    expect(buttonByText(page.element, 'Usuń wpłatę z 29.10.2026').disabled).toBe(true);
+
+    page.host.next = WITH_CORRECTION;
+    post.flush({ id: 'k1', version: 'v1' }, { status: 201, statusText: 'Created' });
+    await page.settle(() => expect(page.host.active()).toBe(false));
+    expect(page.host.reloads).toBe(1);
+    expect(page.element.querySelector('#korekta-kwota')).toBeNull();
+    expect(buttonByText(page.section(), 'Dodaj korektę sprzedaży').disabled).toBe(false);
+    expect(buttonByText(page.element, 'Dodaj wpłatę').disabled).toBe(false);
+  });
+
   it('disables correction actions while the order is being edited', async () => {
     const { section } = await setup((host) => {
       host.locked.set(true);

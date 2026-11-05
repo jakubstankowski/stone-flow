@@ -395,6 +395,10 @@ describe('OrderDetailsPage', () => {
 
     const post = await nextRequest({ method: 'POST', url: '/api/orders/a1/payments' });
     expect(post.request.body.amount).toBe('300.00');
+    // Żądanie w toku: formularza nie da się zamknąć, a „Edytuj” pozostaje wyłączone.
+    await page.stable();
+    expect(buttonByText(page.element(), 'Zamknij bez zapisu').disabled).toBe(true);
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
     post.flush({ id: 'p1', version: 'v1' }, { status: 201, statusText: 'Created' });
     const reload = await nextRequest({ method: 'GET', url: '/api/orders/a1' });
     // Formularz wpisu jest już zamknięty, ale do końca odświeżenia „Edytuj” pozostaje wyłączone.
