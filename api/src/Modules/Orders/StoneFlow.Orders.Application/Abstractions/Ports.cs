@@ -8,11 +8,13 @@ namespace StoneFlow.Orders.Application.Abstractions;
 /// <summary>Zamówienie wczytane do zmiany razem z zapisaną wersją (token współbieżności).</summary>
 public sealed record StoredOrder(Order Order, byte[] Version);
 
-public enum OrderSaveStatus
+/// <summary>Wynik zapisu przez port zapisu zamówień albo wpisów (wpłat, zwrotów).</summary>
+public enum StoreSaveStatus
 {
+    /// <summary>Zapisano (także usunięto wpis).</summary>
     Saved,
 
-    /// <summary>Wersja w bazie różni się od oczekiwanej: ktoś zmienił zamówienie w międzyczasie.</summary>
+    /// <summary>Wersja w bazie różni się od oczekiwanej: ktoś zmienił zamówienie albo wpis w międzyczasie.</summary>
     Conflict,
 
     /// <summary>
@@ -23,10 +25,10 @@ public enum OrderSaveStatus
 }
 
 /// <summary>
-/// Wynik zapisu zamówienia albo wpisu (wpłaty, zwrotu): nowa wersja po <see cref="OrderSaveStatus.Saved"/>; oryginalny wyjątek bazy po
-/// <see cref="OrderSaveStatus.DuplicateRequest"/>, aby wywołujący mógł go ponownie zgłosić.
+/// Wynik zapisu zamówienia albo wpisu (wpłaty, zwrotu): nowa wersja po <see cref="StoreSaveStatus.Saved"/>; oryginalny wyjątek bazy po
+/// <see cref="StoreSaveStatus.DuplicateRequest"/>, aby wywołujący mógł go ponownie zgłosić.
 /// </summary>
-public sealed record OrderSaveResult(OrderSaveStatus Status, byte[]? Version = null, Exception? Error = null);
+public sealed record StoreSaveResult(StoreSaveStatus Status, byte[]? Version = null, Exception? Error = null);
 
 /// <summary>Zapis zamówień w transakcji jednostki pracy.</summary>
 public interface IOrderStore
@@ -34,10 +36,10 @@ public interface IOrderStore
     /// <summary>Wczytuje zamówienie do zmiany; <c>null</c>, gdy nie istnieje.</summary>
     Task<StoredOrder?> LoadAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<OrderSaveResult> AddAsync(Order order, CancellationToken cancellationToken);
+    Task<StoreSaveResult> AddAsync(Order order, CancellationToken cancellationToken);
 
     /// <summary>Zapisuje zmiany wczytanego zamówienia, o ile wersja w bazie równa się <paramref name="expectedVersion"/>.</summary>
-    Task<OrderSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken);
+    Task<StoreSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken);
 }
 
 /// <summary>Kolejny numer zamówienia w roku, w transakcji jednostki pracy (wycofanie cofa licznik).</summary>
@@ -96,13 +98,13 @@ public interface IOrderEntryStore<TEntry>
     /// <summary>Wczytuje wpis do zmiany; <c>null</c>, gdy nie istnieje. Przynależność do zamówienia sprawdza wywołujący.</summary>
     Task<StoredEntry<TEntry>?> LoadAsync(Guid id, CancellationToken cancellationToken);
 
-    Task<OrderSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken);
+    Task<StoreSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken);
 
     /// <summary>Zapisuje zmiany wczytanego wpisu, o ile wersja w bazie równa się <paramref name="expectedVersion"/>.</summary>
-    Task<OrderSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken);
+    Task<StoreSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken);
 
     /// <summary>Usuwa wpis fizycznie, o ile wersja w bazie równa się <paramref name="expectedVersion"/>.</summary>
-    Task<OrderSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken);
+    Task<StoreSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken);
 
     Task<EntryCreationMatch?> FindByCreationRequestAsync(Guid creationRequestId, CancellationToken cancellationToken);
 }

@@ -62,7 +62,7 @@
           </app-order-form>
         } @else {
           <div class="flex flex-wrap gap-3">
-            <app-button variant="primary" [disabled]="entryFormOpen()" (pressed)="startEdit()">
+            <app-button variant="primary" [disabled]="entryActive()" (pressed)="startEdit()">
               Edytuj
             </app-button>
             @if (cancelled()) {
@@ -86,9 +86,10 @@
             }
             <app-button (pressed)="goToList()">Wróć do listy</app-button>
           </div>
-          @if (entryFormOpen()) {
+          @if (entryActive()) {
             <p class="text-(--sf-muted)">
-              Zapisz albo zamknij formularz wpłaty lub zwrotu, aby edytować zamówienie.
+              Edycja zamówienia będzie dostępna po zamknięciu formularza wpłaty lub zwrotu i
+              zakończeniu zapisu albo usuwania wpisu.
             </p>
           }
 
@@ -229,7 +230,7 @@
           [order]="order"
           [locked]="editing()"
           [reload]="reloadOrder"
-          (formOpenChange)="onEntryFormOpen($event)"
+          (activeChange)="onEntryActive($event)"
         />
 
         @if (cancelled()) {
@@ -259,8 +260,8 @@
             </p>
             @if (order.payments.length > 0) {
               <p class="mt-3 rounded-box border border-(--sf-warning) bg-base-100 p-3 font-medium">
-                Zamówienie ma wpłaty: Zapłacono {{ formatPln(order.payment.paid) }}. Wpłaty
-                pozostaną, a pieniądze rozlicz zwrotem.
+                Zamówienie ma wpłaty (Zapłacono {{ formatPln(order.payment.paid) }}). Wpłaty
+                pozostaną; ewentualną kwotę rozlicz zwrotem.
               </p>
             }
           </app-confirm-dialog>

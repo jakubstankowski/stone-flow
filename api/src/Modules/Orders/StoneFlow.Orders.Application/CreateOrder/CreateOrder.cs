@@ -98,7 +98,7 @@ public sealed class CreateOrderHandler(
         var order = Order.CreateManual(Guid.NewGuid(), number, content, command.IdempotencyKey, requestHash, now.UtcDateTime);
 
         var saved = await store.AddAsync(order, cancellationToken);
-        if (saved.Status != OrderSaveStatus.Saved)
+        if (saved.Status != StoreSaveStatus.Saved)
         {
             return new Attempt(null, null, saved.Error ?? new InvalidOperationException("Nie udało się zapisać zamówienia."));
         }

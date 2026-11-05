@@ -20,13 +20,13 @@ import { OrderPayments } from './order-payments';
     [order]="order()"
     [locked]="locked()"
     [reload]="reload"
-    (formOpenChange)="formOpen.set($event)"
+    (activeChange)="active.set($event)"
   />`,
 })
 class Host {
   readonly order = signal<OrderDetails>(orderDetails());
   readonly locked = signal(false);
-  readonly formOpen = signal(false);
+  readonly active = signal(false);
   reloads = 0;
   next: OrderDetails | null = null;
   readonly reload = async (): Promise<OrderDetails | null> => {
@@ -187,7 +187,7 @@ describe('OrderPayments', () => {
     opener.focus();
     opener.click();
     await page.settle(() => expect(document.activeElement?.id).toBe('wplata-kwota'));
-    expect(page.host.formOpen()).toBe(true);
+    expect(page.host.active()).toBe(true);
     expect(buttonByText(page.element, 'Dodaj zwrot').disabled).toBe(true);
 
     typeInto(page.element.querySelector('#wplata-kwota') as HTMLInputElement, '300');
@@ -213,7 +213,7 @@ describe('OrderPayments', () => {
       ),
     );
     expect(page.host.reloads).toBe(1);
-    expect(page.host.formOpen()).toBe(false);
+    expect(page.host.active()).toBe(false);
     expect(page.element.querySelector('#wplata-kwota')).toBeNull();
     expect(page.element.textContent).toContain('Częściowo opłacone');
     await vi.waitFor(() => expect(document.activeElement).toBe(opener));
@@ -256,6 +256,7 @@ describe('OrderPayments', () => {
     const page = await setup((host) =>
       host.order.set(orderDetails({ payment: PAID, payments: [paymentEntry()] })),
     );
+    const randomUuid = vi.spyOn(crypto, 'randomUUID');
     buttonByText(page.element, 'Popraw wpłatę z 29.10.2026').click();
     await page.stable();
     const amount = () => page.element.querySelector('#wplata-kwota') as HTMLInputElement;
@@ -264,6 +265,9 @@ describe('OrderPayments', () => {
     buttonByText(page.element, 'Zapisz zmiany').click();
 
     const put = await nextRequest({ method: 'PUT', url: '/api/orders/a1/payments/p1' });
+    expect(put.request.headers.has('Idempotency-Key')).toBe(false);
+    expect(randomUuid).not.toHaveBeenCalled();
+    randomUuid.mockRestore();
     expect(put.request.body).toEqual({
       amount: '250.00',
       date: '2026-10-29',

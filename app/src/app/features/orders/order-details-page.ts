@@ -72,8 +72,11 @@ export class OrderDetailsPage {
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
   protected readonly actionBusy = signal<'cancel' | 'restore' | null>(null);
-  /** W sekcji „Płatności” jest otwarty formularz wpisu (wtedy „Edytuj” jest wyłączone). */
-  protected readonly entryFormOpen = signal(false);
+  /**
+   * W sekcji „Płatności” trwa praca z wpisem: formularz, usuwanie albo odświeżenie po zapisie
+   * (wtedy „Edytuj” jest wyłączone).
+   */
+  protected readonly entryActive = signal(false);
 
   protected readonly cancelled = computed(() => this.order()?.fulfillmentStatus === 'cancelled');
   protected readonly statusLabels = STATUS_LABELS;
@@ -92,7 +95,7 @@ export class OrderDetailsPage {
   protected readonly save = (input: OrderInput): Promise<OrderFormOutcome> => this.update(input);
   /** Odświeżenie po zmianie wpisu płatności; zwraca wczytane zamówienie albo `null`. */
   protected readonly reloadOrder = async (): Promise<OrderDetails | null> => {
-    await this.load(this.id(), { keepView: true });
+    await this.load(this.id(), { keepView: true, keepOrderForm: true });
     return this.status() === 'loaded' && !this.alert() ? this.order() : null;
   };
 
@@ -119,7 +122,7 @@ export class OrderDetailsPage {
 
   protected startEdit(): void {
     const order = this.order();
-    if (!order || this.entryFormOpen()) {
+    if (!order || this.entryActive()) {
       return;
     }
     this.notice.set(null);
@@ -133,9 +136,10 @@ export class OrderDetailsPage {
     this.alert.set(null);
   }
 
-  protected onEntryFormOpen(open: boolean): void {
-    this.entryFormOpen.set(open);
-    if (open) {
+  protected onEntryActive(active: boolean): void {
+    const started = active && !this.entryActive();
+    this.entryActive.set(active);
+    if (started) {
       this.notice.set(null);
       this.alert.set(null);
     }
@@ -229,7 +233,14 @@ export class OrderDetailsPage {
     }
   }
 
-  private async load(id: string, options: { keepView?: boolean } = {}): Promise<void> {
+  /**
+   * `keepOrderForm`: odświeżenie po zmianie wpisu nigdy nie nadpisuje otwartej edycji
+   * zamówienia (stan formularza i alert zostają).
+   */
+  private async load(
+    id: string,
+    options: { keepView?: boolean; keepOrderForm?: boolean } = {},
+  ): Promise<void> {
     if (!options.keepView) {
       this.status.set('loading');
     }
@@ -240,8 +251,10 @@ export class OrderDetailsPage {
     switch (outcome.kind) {
       case 'loaded':
         this.order.set(outcome.order);
-        this.formInitial.set(orderFormFrom(outcome.order));
-        this.alert.set(null);
+        if (!(options.keepOrderForm && this.editing())) {
+          this.formInitial.set(orderFormFrom(outcome.order));
+          this.alert.set(null);
+        }
         this.status.set('loaded');
         return;
       case 'notFound':

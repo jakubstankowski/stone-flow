@@ -20,7 +20,7 @@ internal sealed class OrderStore(OrdersDbContext context) : IOrderStore
         return order is null ? null : new StoredOrder(order, Version(order));
     }
 
-    public async Task<OrderSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
     {
         context.Orders.Add(order);
         try
@@ -30,13 +30,13 @@ internal sealed class OrderStore(OrdersDbContext context) : IOrderStore
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: UniqueIndexViolation or UniqueConstraintViolation })
         {
             // Wynik z oryginalnym wyjątkiem: wywołujący po wycofaniu rozstrzyga, czy to klucz idempotencji.
-            return new OrderSaveResult(OrderSaveStatus.DuplicateRequest, Error: exception);
+            return new StoreSaveResult(StoreSaveStatus.DuplicateRequest, Error: exception);
         }
 
-        return new OrderSaveResult(OrderSaveStatus.Saved, Version(order));
+        return new StoreSaveResult(StoreSaveStatus.Saved, Version(order));
     }
 
-    public async Task<OrderSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
     {
         // UPDATE … WHERE Version = @wersja klienta: wiersz zmieniony w międzyczasie nie zostanie nadpisany.
         context.Entry(order).Property<byte[]>(OrderConfiguration.VersionProperty).OriginalValue = expectedVersion;
@@ -46,10 +46,10 @@ internal sealed class OrderStore(OrdersDbContext context) : IOrderStore
         }
         catch (DbUpdateConcurrencyException)
         {
-            return new OrderSaveResult(OrderSaveStatus.Conflict);
+            return new StoreSaveResult(StoreSaveStatus.Conflict);
         }
 
-        return new OrderSaveResult(OrderSaveStatus.Saved, Version(order));
+        return new StoreSaveResult(StoreSaveStatus.Saved, Version(order));
     }
 
     private byte[] Version(Order order) =>

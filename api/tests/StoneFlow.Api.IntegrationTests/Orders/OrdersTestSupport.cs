@@ -259,7 +259,7 @@ internal sealed class HookedOrderStore(IOrderStore inner, StoreHooks hooks) : IO
 
     public Task<StoredOrder?> LoadAsync(Guid id, CancellationToken cancellationToken) => inner.LoadAsync(id, cancellationToken);
 
-    public async Task<OrderSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> AddAsync(Order order, CancellationToken cancellationToken)
     {
         if (hooks.BeforeAdd is { } beforeAdd)
         {
@@ -269,7 +269,7 @@ internal sealed class HookedOrderStore(IOrderStore inner, StoreHooks hooks) : IO
         return await inner.AddAsync(order, cancellationToken);
     }
 
-    public async Task<OrderSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> SaveAsync(Order order, byte[] expectedVersion, CancellationToken cancellationToken)
     {
         if (hooks.BeforeSave is { } beforeSave)
         {
@@ -303,7 +303,7 @@ internal sealed class HookedEntryStore<TEntry>(IOrderEntryStore<TEntry> inner, E
 {
     public Task<StoredEntry<TEntry>?> LoadAsync(Guid id, CancellationToken cancellationToken) => inner.LoadAsync(id, cancellationToken);
 
-    public async Task<OrderSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken)
     {
         if (hooks.BeforeAdd is { } beforeAdd)
         {
@@ -313,7 +313,7 @@ internal sealed class HookedEntryStore<TEntry>(IOrderEntryStore<TEntry> inner, E
         return await inner.AddAsync(entry, cancellationToken);
     }
 
-    public async Task<OrderSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken)
     {
         if (hooks.BeforeSave is { } beforeSave)
         {
@@ -323,7 +323,7 @@ internal sealed class HookedEntryStore<TEntry>(IOrderEntryStore<TEntry> inner, E
         return await inner.SaveAsync(entry, expectedVersion, cancellationToken);
     }
 
-    public async Task<OrderSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken)
     {
         if (hooks.BeforeDelete is { } beforeDelete)
         {

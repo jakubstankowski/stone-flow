@@ -1,10 +1,12 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import {
   nextRequest,
   provideTestHttp,
+  respondNoContent,
   respondProblem,
   typeInto,
 } from '../../../testing/auth-testing';
@@ -12,6 +14,7 @@ import { orderDetails, paymentEntry, refundEntry } from '../../../testing/orders
 import { formatPln } from '../../shared/format/pl-format';
 import { OrderDetails } from './order-models';
 import { OrderDetailsPage } from './order-details-page';
+import { OrderPayments } from './order-payments';
 import { OrdersService } from './orders.service';
 
 function buttonByText(root: ParentNode, text: string): HTMLButtonElement {
@@ -71,7 +74,7 @@ describe('OrderDetailsPage', () => {
     }
     await navigation;
     await settle(() => expect(element().querySelector('.skeleton')).toBeNull());
-    return { element, stable, settle };
+    return { harness, element, stable, settle };
   }
 
   it('shows all fields, the status and source markers, and no order delete action', async () => {
@@ -301,7 +304,7 @@ describe('OrderDetailsPage', () => {
 
     const dialog = dialogWith(page.element(), 'Anulować zamówienie');
     expect(dialog.textContent).toContain(
-      `Zamówienie ma wpłaty: Zapłacono ${formatPln('0.00')}. Wpłaty pozostaną, a pieniądze rozlicz zwrotem.`,
+      `Zamówienie ma wpłaty (Zapłacono ${formatPln('0.00')}). Wpłaty pozostaną; ewentualną kwotę rozlicz zwrotem.`,
     );
     buttonByText(dialog, 'Anuluj').click();
     await page.stable();
@@ -331,7 +334,7 @@ describe('OrderDetailsPage', () => {
 
     expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
     expect(page.element().textContent).toContain(
-      'Zapisz albo zamknij formularz wpłaty lub zwrotu, aby edytować zamówienie.',
+      'Edycja zamówienia będzie dostępna po zamknięciu formularza wpłaty lub zwrotu i zakończeniu zapisu albo usuwania wpisu.',
     );
 
     buttonByText(page.element(), 'Zamknij bez zapisu').click();
@@ -353,7 +356,11 @@ describe('OrderDetailsPage', () => {
     const post = await nextRequest({ method: 'POST', url: '/api/orders/a1/payments' });
     expect(post.request.body.amount).toBe('300.00');
     post.flush({ id: 'p1', version: 'v1' }, { status: 201, statusText: 'Created' });
-    (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(
+    const reload = await nextRequest({ method: 'GET', url: '/api/orders/a1' });
+    // Formularz wpisu jest już zamknięty, ale do końca odświeżenia „Edytuj” pozostaje wyłączone.
+    await page.settle(() => expect(page.element().querySelector('#wplata-kwota')).toBeNull());
+    expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(true);
+    reload.flush(
       orderDetails({
         payment: {
           paid: '300.00',
@@ -370,5 +377,59 @@ describe('OrderDetailsPage', () => {
     expect(page.element().textContent).toContain('Częściowo opłacone');
     expect(page.element().textContent).toContain(formatPln('934.50'));
     expect(buttonByText(page.element(), 'Edytuj').disabled).toBe(false);
+  });
+
+  it('keeps „Edytuj” disabled from the delete confirmation until the reload ends', async () => {
+    const page = await open(orderDetails({ payments: [paymentEntry()] }));
+    const edit = () => buttonByText(page.element(), 'Edytuj');
+    const dialog = () => dialogWith(page.element(), 'Usunąć wpłatę?');
+
+    buttonByText(page.element(), 'Usuń wpłatę z 29.10.2026').click();
+    await page.settle(() => expect(edit().disabled).toBe(true));
+    expect(dialog().open).toBe(true);
+    buttonByText(dialog(), 'Anuluj').click();
+    await page.settle(() => expect(edit().disabled).toBe(false));
+
+    buttonByText(page.element(), 'Usuń wpłatę z 29.10.2026').click();
+    await page.stable();
+    buttonByText(dialog(), 'Usuń').click();
+    const removal = await nextRequest({ method: 'DELETE', url: '/api/orders/a1/payments/p1' });
+    await page.stable();
+    expect(edit().disabled).toBe(true);
+    respondNoContent(removal);
+
+    const reload = await nextRequest({ method: 'GET', url: '/api/orders/a1' });
+    await page.stable();
+    expect(edit().disabled).toBe(true);
+    reload.flush(orderDetails());
+
+    await page.settle(() => expect(page.element().textContent).toContain('Wpłata usunięta.'));
+    expect(edit().disabled).toBe(false);
+  });
+
+  it('never resets an open order edit when the payments section reloads the order', async () => {
+    const page = await open();
+    buttonByText(page.element(), 'Edytuj').click();
+    await page.stable();
+    const name = () => page.element().querySelector('#zamowienie-klient-nazwa') as HTMLInputElement;
+    typeInto(name(), 'Jan Niezapisany');
+    await page.stable();
+
+    const payments = page.harness.fixture.debugElement.query(By.directive(OrderPayments))
+      .componentInstance as OrderPayments;
+    const reloading = payments.reload()();
+    (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(
+      orderDetails({
+        customer: { ...orderDetails().customer, name: 'Jan Z Serwera' },
+        payments: [paymentEntry()],
+      }),
+    );
+    await reloading;
+    await page.stable();
+
+    expect(name().value).toBe('Jan Niezapisany');
+    expect(page.element().querySelector('app-order-payments')?.textContent).toContain(
+      formatPln('300.00'),
+    );
   });
 });

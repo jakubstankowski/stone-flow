@@ -258,20 +258,11 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
         // też dojdzie do zapisu (najwyżej 2 s): bez blokady zamówienia oba przeszłyby sprawdzenie
         // limitu; z blokadą drugi czeka na pierwszy i widzi już jego zwrot.
         var hooks = new EntryStoreHooks();
-        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: services => hooks.Register(services));
+        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: hooks.Register);
         var order = await test.CreateOrderAsync(Order("1000.00"));
         await AddPaymentAsync(test, order.Id, "1000.00");
-        var arrived = 0;
-        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        hooks.BeforeAdd = async _ =>
-        {
-            if (Interlocked.Increment(ref arrived) == 2)
-            {
-                both.TrySetResult();
-            }
-
-            await Task.WhenAny(both.Task, Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
-        };
+        var barrier = Barrier();
+        hooks.BeforeAdd = _ => barrier();
 
         var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => SendRefundAsync(test, order.Id, Refund("600.00"))));
         try
@@ -290,6 +281,73 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
                 response.Dispose();
             }
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Parallel_payment_changes_cannot_make_paid_negative(bool delete)
+    {
+        // Wpłaty A i B oraz zwrot dobrane tak, że każda zmiana osobno zostawia Zapłacono ≥ 0, a obie
+        // razem dałyby wynik ujemny: poprawa 300 → 200 przy zwrocie 500 (Zapłacono 100) albo
+        // usunięcie wpłaty 300 przy zwrocie 300 (Zapłacono 300). Dekorator czeka przed zapisem, aż
+        // druga zmiana też do niego dojdzie (najwyżej 2 s): bez blokady zamówienia obie przeszłyby
+        // regułę; z blokadą druga czeka i liczy sumy już po pierwszej.
+        var hooks = new EntryStoreHooks();
+        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: hooks.Register);
+        var order = await test.CreateOrderAsync(Order("1000.00"));
+        var first = await AddPaymentAsync(test, order.Id, "300.00");
+        var second = await AddPaymentAsync(test, order.Id, "300.00");
+        await AddRefundAsync(test, order.Id, delete ? "300.00" : "500.00");
+        var barrier = Barrier();
+        if (delete)
+        {
+            hooks.BeforeDelete = _ => barrier();
+        }
+        else
+        {
+            hooks.BeforeSave = _ => barrier();
+        }
+
+        var responses = await Task.WhenAll(new[] { first, second }.Select(payment => delete
+            ? test.SendAsync(HttpMethod.Delete, $"/api/orders/{order.Id}/payments/{payment.Id}", new { version = payment.Version })
+            : test.SendAsync(HttpMethod.Put, $"/api/orders/{order.Id}/payments/{payment.Id}", Payment("200.00", version: payment.Version))));
+        try
+        {
+            Assert.Single(responses, r => r.StatusCode == (delete ? HttpStatusCode.NoContent : HttpStatusCode.OK));
+            var rejected = Assert.Single(responses, r => r.StatusCode == HttpStatusCode.UnprocessableEntity);
+            Assert.Equal(OrderProblems.PaidWouldBeNegativeCode, (await Json(rejected)).GetProperty("code").GetString());
+            var summary = Summary(await PaymentAsync(test, order.Id));
+            Assert.Equal(("0.00", "unpaid"), (summary.Paid, summary.State));
+            Assert.Equal(delete ? 1 : 2, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Payments"));
+            Assert.Equal(4, (await EntryAuditRowsAsync(test, order.Id)).Count);
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Amount_columns_are_decimal_18_2()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer);
+
+        var columns = await test.RowsAsync(
+            "SELECT TABLE_SCHEMA + N'.' + TABLE_NAME + N'.' + COLUMN_NAME, DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE "
+            + "FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = N'orders' AND COLUMN_NAME IN (N'Amount', N'Value') ORDER BY 1",
+            reader => (reader.GetString(0), reader.GetString(1), (int)reader.GetByte(2), (int)reader.GetInt32(3)));
+
+        Assert.Equal(
+            [
+                ("orders.Orders.Value", "decimal", 18, 2),
+                ("orders.Payments.Amount", "decimal", 18, 2),
+                ("orders.Refunds.Amount", "decimal", 18, 2),
+            ],
+            columns);
     }
 
     [Fact]
@@ -357,7 +415,7 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
         // Wpis z tym samym kluczem powstaje „równolegle” (np. w innym zamówieniu, bez wspólnej
         // blokady) już po kroku szukania po kluczu: zapis trafia na unikalny indeks.
         var hooks = new EntryStoreHooks();
-        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: services => hooks.Register(services));
+        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: hooks.Register);
         var order = await test.CreateOrderAsync(Order("1000.00"));
         var key = Guid.NewGuid();
         var racing = Guid.NewGuid();
@@ -416,7 +474,7 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
         // Wiersz wpisu zmieniony innym połączeniem już po wczytaniu w jednostce pracy: UPDATE/DELETE
         // z wersją klienta (OriginalValue) nie trafia w wiersz, port zwraca konflikt.
         var hooks = new EntryStoreHooks();
-        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: services => hooks.Register(services));
+        await using var test = await OrdersTest.CreateAsync(sqlServer, configureServices: hooks.Register);
         var order = await test.CreateOrderAsync(Order("1000.00"));
         var payment = await AddPaymentAsync(test, order.Id, "300.00");
         await AddPaymentAsync(test, order.Id, "500.00", date: "2026-11-04");
@@ -466,7 +524,7 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
             commitWhen: _ => false,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal((OrderSaveStatus.Conflict, OrderSaveStatus.Conflict), results);
+        Assert.Equal((StoreSaveStatus.Conflict, StoreSaveStatus.Conflict), results);
         var details = await test.GetJsonAsync($"/api/orders/{order.Id}");
         Assert.Equal(("350.00", current), (details.GetProperty("payments")[0].GetProperty("amount").GetString(), details.GetProperty("payments")[0].GetProperty("version").GetString()));
     }
@@ -766,6 +824,22 @@ public sealed class PaymentsApiTests(SqlServerFixture sqlServer)
         (HttpMethod.Put, $"/api/orders/{orderId}/refunds/{refund.Id}", Refund("2.00", version: refund.Version)),
         (HttpMethod.Delete, $"/api/orders/{orderId}/refunds/{refund.Id}", new { version = refund.Version }),
     ];
+
+    /// <summary>Akcja dekoratora: czeka, aż dwa żądania dojdą do zapisu, najwyżej 2 s.</summary>
+    private static Func<Task> Barrier()
+    {
+        var arrived = 0;
+        var both = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        return async () =>
+        {
+            if (Interlocked.Increment(ref arrived) == 2)
+            {
+                both.TrySetResult();
+            }
+
+            await Task.WhenAny(both.Task, Task.Delay(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        };
+    }
 
     private static object Order(string value, string? comment = null, string? version = null) => new
     {

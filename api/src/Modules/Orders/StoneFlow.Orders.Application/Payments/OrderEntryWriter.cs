@@ -105,7 +105,7 @@ public sealed class OrderEntryWriter<TEntry>(
 
                 var entry = create(timeProvider.GetUtcNow().UtcDateTime);
                 var saved = await store.AddAsync(entry, ct);
-                if (saved.Status != OrderSaveStatus.Saved)
+                if (saved.Status != StoreSaveStatus.Saved)
                 {
                     return new AddAttempt(null, saved.Error ?? new InvalidOperationException("Nie udało się zapisać wpisu."));
                 }
@@ -163,7 +163,7 @@ public sealed class OrderEntryWriter<TEntry>(
                 }
 
                 var saved = await store.SaveAsync(stored.Entry, version, ct);
-                if (saved.Status == OrderSaveStatus.Conflict)
+                if (saved.Status == StoreSaveStatus.Conflict)
                 {
                     return new EntryWriteResult(EntryWriteOutcome.Conflict);
                 }
@@ -194,7 +194,7 @@ public sealed class OrderEntryWriter<TEntry>(
             async (order, stored, ct) =>
             {
                 var deleted = await store.DeleteAsync(stored.Entry, version, ct);
-                if (deleted.Status == OrderSaveStatus.Conflict)
+                if (deleted.Status == StoreSaveStatus.Conflict)
                 {
                     return new EntryWriteResult(EntryWriteOutcome.Conflict);
                 }

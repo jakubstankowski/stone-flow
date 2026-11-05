@@ -436,10 +436,10 @@ public sealed class OrdersApiTests(SqlServerFixture sqlServer)
                 Assert.True(stored.Order.Cancel(DateTime.UtcNow).Succeeded);
                 return await store.SaveAsync(stored.Order, Convert.FromBase64String(created.Version), cancellationToken);
             },
-            commitWhen: saved => saved.Status == OrderSaveStatus.Saved,
+            commitWhen: saved => saved.Status == StoreSaveStatus.Saved,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(OrderSaveStatus.Conflict, result.Status);
+        Assert.Equal(StoreSaveStatus.Conflict, result.Status);
         var details = await test.GetJsonAsync($"/api/orders/{created.Id}");
         Assert.Equal("inProgress", details.GetProperty("fulfillmentStatus").GetString());
         Assert.Equal(current, details.GetProperty("version").GetString());

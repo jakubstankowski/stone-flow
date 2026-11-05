@@ -4,10 +4,12 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { formatDate, formatPln } from '../../shared/format/pl-format';
@@ -53,13 +55,14 @@ type OpenForm =
       readonly type: 'payment';
       readonly entry: PaymentEntry | null;
       readonly initial: PaymentFormModel;
-      readonly key: string;
+      /** Klucz idempotencji tylko przy dodaniu; poprawa używa `version`. */
+      readonly key: string | null;
     }
   | {
       readonly type: 'refund';
       readonly entry: RefundEntry | null;
       readonly initial: RefundFormModel;
-      readonly key: string;
+      readonly key: string | null;
     };
 
 type PendingDelete =
@@ -96,8 +99,11 @@ export class OrderPayments {
    * `order` odświeża się dopiero przy kolejnym renderowaniu) albo `null`, gdy się nie udało.
    */
   readonly reload = input.required<() => Promise<OrderDetails | null>>();
-  /** Otwarcie i zamknięcie formularza wpisu (strona blokuje wtedy „Edytuj”). */
-  readonly formOpenChange = output<boolean>();
+  /**
+   * Praca z wpisem trwa (otwarty formularz, dialog usuwania, żądanie albo odświeżenie po nim).
+   * Strona blokuje wtedy „Edytuj”, żeby odświeżenie nie trafiło w otwartą edycję zamówienia.
+   */
+  readonly activeChange = output<boolean>();
 
   private readonly orders = inject(OrdersService);
   private readonly injector = inject(Injector);
@@ -108,12 +114,13 @@ export class OrderPayments {
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
   protected readonly deletingId = signal<string | null>(null);
+  /** Liczba trwających operacji wpisów poza formularzem (usuwanie, odświeżenie). */
+  private readonly operations = signal(0);
+  private readonly active = computed(() => this.openForm() !== null || this.operations() > 0);
 
   protected readonly cancelled = computed(() => this.order().fulfillmentStatus === 'cancelled');
   /** Akcje wpisów są niedostępne podczas edycji zamówienia, formularza wpisu i usuwania. */
-  protected readonly actionsDisabled = computed(
-    () => this.locked() || this.openForm() !== null || this.deletingId() !== null,
-  );
+  protected readonly actionsDisabled = computed(() => this.locked() || this.active());
 
   protected readonly stateLabels = PAYMENT_STATE_LABELS;
   protected readonly stateTones = PAYMENT_STATE_TONES;
@@ -126,6 +133,13 @@ export class OrderPayments {
   private readonly deleteDialog = viewChild<ConfirmDialog>('deleteDialog');
   private readonly heading = viewChild<ElementRef<HTMLElement>>('heading');
   private returnFocusTo: HTMLElement | null = null;
+
+  constructor() {
+    effect(() => {
+      const active = this.active();
+      untracked(() => this.activeChange.emit(active));
+    });
+  }
 
   protected readonly savePayment = (input: PaymentInput): Promise<EntryFormOutcome> =>
     this.save('payment', input);
@@ -141,17 +155,16 @@ export class OrderPayments {
   }
 
   protected editPayment(entry: PaymentEntry): void {
-    this.open({ type: 'payment', entry, initial: paymentFormFrom(entry), key: newKey() });
+    this.open({ type: 'payment', entry, initial: paymentFormFrom(entry), key: null });
   }
 
   protected editRefund(entry: RefundEntry): void {
-    this.open({ type: 'refund', entry, initial: refundFormFrom(entry), key: newKey() });
+    this.open({ type: 'refund', entry, initial: refundFormFrom(entry), key: null });
   }
 
   protected closeForm(): void {
     this.openForm.set(null);
     this.alert.set(null);
-    this.formOpenChange.emit(false);
     const target = this.returnFocusTo;
     this.returnFocusTo = null;
     afterNextRender(
@@ -170,15 +183,17 @@ export class OrderPayments {
   protected async reloadCurrent(): Promise<void> {
     this.reloading.set(true);
     try {
-      const fresh = await this.reload()();
-      if (!fresh) {
-        return;
-      }
-      this.alert.set(null);
-      const current = this.openForm();
-      if (current?.entry) {
-        this.refreshOpenEntry(current, fresh);
-      }
+      await this.track(async () => {
+        const fresh = await this.reload()();
+        if (!fresh) {
+          return;
+        }
+        this.alert.set(null);
+        const current = this.openForm();
+        if (current?.entry) {
+          this.refreshOpenEntry(current, fresh);
+        }
+      });
     } finally {
       this.reloading.set(false);
     }
@@ -229,7 +244,6 @@ export class OrderPayments {
     this.notice.set(null);
     this.alert.set(null);
     this.openForm.set(form);
-    this.formOpenChange.emit(true);
   }
 
   private refreshOpenEntry(current: OpenForm, order: OrderDetails): void {
@@ -261,17 +275,15 @@ export class OrderPayments {
     this.alert.set(null);
     const outcome: EntryOutcome = current.entry
       ? await this.orders.updateEntry(type, orderId, current.entry.id, input, current.entry.version)
-      : await this.orders.addEntry(type, orderId, input, current.key);
+      : await this.orders.addEntry(type, orderId, input, current.key ?? newKey());
 
     switch (outcome.kind) {
       case 'saved':
-        this.closeForm();
-        await this.reload()();
+        await this.closeAndReload();
         this.notice.set(NOTICES[type].saved);
         return null;
       case 'keyReused':
-        this.closeForm();
-        await this.reload()();
+        await this.closeAndReload();
         this.alert.set({ text: ENTRY_KEY_REUSED_MESSAGE, reload: false });
         return null;
       case 'conflict':
@@ -281,8 +293,7 @@ export class OrderPayments {
         this.alert.set({ text: ENTRY_NOT_FOUND_MESSAGE, reload: true });
         return null;
       case 'orderNotFound':
-        this.closeForm();
-        await this.reload()();
+        await this.closeAndReload();
         return null;
       case 'rejected':
         return { message: outcome.message };
@@ -291,10 +302,35 @@ export class OrderPayments {
     }
   }
 
+  /**
+   * Formularz zamyka się już w trakcie operacji, więc „Edytuj” pozostaje zablokowane bez
+   * przerwy do końca odświeżenia.
+   */
+  private closeAndReload(): Promise<void> {
+    return this.track(async () => {
+      this.closeForm();
+      await this.reload()();
+    });
+  }
+
+  private async track(operation: () => Promise<void>): Promise<void> {
+    this.operations.update((count) => count + 1);
+    try {
+      await operation();
+    } finally {
+      this.operations.update((count) => count - 1);
+    }
+  }
+
   private async delete(pending: PendingDelete): Promise<void> {
     if (this.actionsDisabled()) {
       return;
     }
+    // Od otwarcia dialogu do końca odświeżenia trwa operacja wpisu.
+    await this.track(() => this.confirmAndDelete(pending));
+  }
+
+  private async confirmAndDelete(pending: PendingDelete): Promise<void> {
     this.pendingDelete.set(pending);
     if (!(await this.deleteDialog()?.open())) {
       return;

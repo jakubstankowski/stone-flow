@@ -24,7 +24,7 @@ internal sealed class OrderEntryStore<TEntry>(OrdersDbContext context) : IOrderE
         return entry is null ? null : new StoredEntry<TEntry>(entry, Version(entry));
     }
 
-    public async Task<OrderSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken)
+    public async Task<StoreSaveResult> AddAsync(TEntry entry, CancellationToken cancellationToken)
     {
         Entries.Add(entry);
         try
@@ -34,16 +34,16 @@ internal sealed class OrderEntryStore<TEntry>(OrdersDbContext context) : IOrderE
         catch (DbUpdateException exception) when (exception.InnerException is SqlException { Number: UniqueIndexViolation or UniqueConstraintViolation })
         {
             // Wynik z oryginalnym wyjątkiem: wywołujący po wycofaniu rozstrzyga, czy to klucz idempotencji.
-            return new OrderSaveResult(OrderSaveStatus.DuplicateRequest, Error: exception);
+            return new StoreSaveResult(StoreSaveStatus.DuplicateRequest, Error: exception);
         }
 
-        return new OrderSaveResult(OrderSaveStatus.Saved, Version(entry));
+        return new StoreSaveResult(StoreSaveStatus.Saved, Version(entry));
     }
 
-    public Task<OrderSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken) =>
+    public Task<StoreSaveResult> SaveAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken) =>
         SaveWithVersionAsync(entry, expectedVersion, remove: false, cancellationToken);
 
-    public Task<OrderSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken) =>
+    public Task<StoreSaveResult> DeleteAsync(TEntry entry, byte[] expectedVersion, CancellationToken cancellationToken) =>
         SaveWithVersionAsync(entry, expectedVersion, remove: true, cancellationToken);
 
     public async Task<EntryCreationMatch?> FindByCreationRequestAsync(Guid creationRequestId, CancellationToken cancellationToken)
@@ -56,7 +56,7 @@ internal sealed class OrderEntryStore<TEntry>(OrdersDbContext context) : IOrderE
         return row is null ? null : new EntryCreationMatch(row.Id, row.OrderId, row.CreationRequestHash ?? [], row.Version);
     }
 
-    private async Task<OrderSaveResult> SaveWithVersionAsync(TEntry entry, byte[] expectedVersion, bool remove, CancellationToken cancellationToken)
+    private async Task<StoreSaveResult> SaveWithVersionAsync(TEntry entry, byte[] expectedVersion, bool remove, CancellationToken cancellationToken)
     {
         // UPDATE/DELETE … WHERE Version = @wersja klienta: wiersz zmieniony w międzyczasie nie zostanie nadpisany ani usunięty.
         context.Entry(entry).Property<byte[]>(OrderEntryConfiguration.VersionProperty).OriginalValue = expectedVersion;
@@ -71,10 +71,10 @@ internal sealed class OrderEntryStore<TEntry>(OrdersDbContext context) : IOrderE
         }
         catch (DbUpdateConcurrencyException)
         {
-            return new OrderSaveResult(OrderSaveStatus.Conflict);
+            return new StoreSaveResult(StoreSaveStatus.Conflict);
         }
 
-        return new OrderSaveResult(OrderSaveStatus.Saved, remove ? null : Version(entry));
+        return new StoreSaveResult(StoreSaveStatus.Saved, remove ? null : Version(entry));
     }
 
     private byte[] Version(TEntry entry) =>
