@@ -23,12 +23,12 @@ import {
 import { Button } from '../../shared/ui/button';
 import { Field } from '../../shared/ui/field';
 import {
-  ENTRY_LIMITS,
   ENTRY_MESSAGES,
   EntryFormOutcome,
   RefundFormModel,
   entryAmountError,
   entryDateError,
+  entryReasonError,
   toRefundInput,
 } from './entry-form-model';
 import { EntryField, focusById, outcomeErrors, shownError, summaryOf } from './entry-form-support';
@@ -78,13 +78,9 @@ export class RefundForm {
     validate(path.method, ({ value }) =>
       message(value() === '' ? ENTRY_MESSAGES.methodRequired : null),
     );
-    validate(path.reason, ({ value }) => {
-      const reason = value().trim();
-      if (reason === '') {
-        return message(ENTRY_MESSAGES.reasonRequired);
-      }
-      return message(reason.length > ENTRY_LIMITS.reason ? ENTRY_MESSAGES.reasonTooLong : null);
-    });
+    validate(path.reason, ({ value }) =>
+      message(entryReasonError(value(), ENTRY_MESSAGES.reasonRequired)),
+    );
   });
 
   private readonly fields: readonly EntryField[] = [

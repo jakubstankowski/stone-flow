@@ -288,6 +288,43 @@ describe('OrdersService', () => {
     expect(await updating).toEqual(expected);
   });
 
+  it('maps the sales reduction limit on a correction or a refund with the available amount', async () => {
+    const adding = service.addEntry(
+      'salesCorrection',
+      'a1',
+      { amount: '1000.01', date: '2026-10-31', reason: 'X' },
+      'key-k',
+    );
+    respondProblem(await nextRequest('/api/orders/a1/sales-corrections'), 422, {
+      code: 'sales_reduction_limit_exceeded',
+      available: '1000.00',
+    });
+    expect(await adding).toEqual({
+      kind: 'rejected',
+      message: `Suma zwrotów sprzedaży i korekt nie może przekroczyć wartości zamówienia. Dostępna kwota: ${formatPln('1000.00')}.`,
+    });
+  });
+
+  it('attaches the sales reduction limit on an order edit to the value field', async () => {
+    const updating = service.update('a1', INPUT, 'v1');
+    respondProblem(await nextRequest('/api/orders/a1'), 422, {
+      code: 'sales_reduction_limit_exceeded',
+      minimumValue: '500.00',
+    });
+    expect(await updating).toEqual({
+      kind: 'error',
+      error: {
+        kind: 'validation',
+        fieldErrors: {
+          value: [
+            `Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt (${formatPln('500.00')}).`,
+          ],
+        },
+        detail: null,
+      },
+    });
+  });
+
   it('deletes an entry with the version in the body', async () => {
     const deleting = service.deleteEntry('payment', 'a1', 'p1', 'v1');
     const request = await nextRequest('/api/orders/a1/payments/p1');

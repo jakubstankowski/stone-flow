@@ -289,11 +289,12 @@ internal sealed class EntryStoreHooks
 
     public Func<OrderEntry, Task>? BeforeDelete { get; set; }
 
-    /// <summary>Podmienia porty wpłat i zwrotów na dekoratory z tymi akcjami.</summary>
+    /// <summary>Podmienia porty wpłat, zwrotów i korekt sprzedaży na dekoratory z tymi akcjami.</summary>
     public void Register(IServiceCollection services)
     {
         HookedEntryStore<Payment>.Register(services, this);
         HookedEntryStore<Refund>.Register(services, this);
+        HookedEntryStore<SalesCorrection>.Register(services, this);
     }
 }
 

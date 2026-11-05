@@ -119,6 +119,35 @@ describe('RefundForm', () => {
     ]);
   });
 
+  it('points to a sales correction when goods came back without money', async () => {
+    const { element } = await setup();
+    const hint = element.querySelector('#zwrot-rodzaj-wskazowka');
+    expect(hint?.textContent?.trim()).toBe(
+      'Jeżeli towar wrócił, a pieniądze nie, dodaj korektę sprzedaży zamiast zwrotu.',
+    );
+    expect(element.querySelector('fieldset')?.getAttribute('aria-describedby')).toContain(
+      'zwrot-rodzaj-wskazowka',
+    );
+  });
+
+  it('shows the sales reduction limit returned for a sales return', async () => {
+    const { element, host, submit } = await setup((host) => {
+      host.outcome = {
+        message:
+          'Suma zwrotów sprzedaży i korekt nie może przekroczyć wartości zamówienia. Dostępna kwota: 1000,00 zł.',
+      };
+    });
+    radio(element, 'salesReturn').click();
+    type(element, '#zwrot-kwota', '1200');
+    choose(element, '#zwrot-metoda', 'transfer');
+    type(element, '#zwrot-powod', 'Oddany towar');
+    await submit();
+    expect(host.submitted).toHaveLength(1);
+    expect(element.querySelector('[role="alert"][tabindex="-1"]')?.textContent).toContain(
+      'Dostępna kwota: 1000,00 zł.',
+    );
+  });
+
   it('edits an entry, including a change of kind', async () => {
     const { element, host, submit } = await setup((host) =>
       host.initial.set(refundFormFrom(refundEntry())),

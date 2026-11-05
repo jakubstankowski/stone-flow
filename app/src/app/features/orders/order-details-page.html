@@ -53,6 +53,7 @@
         @if (editing() && formInitial(); as initial) {
           <app-order-form
             submitLabel="Zapisz zmiany"
+            [editingExisting]="true"
             [initial]="initial"
             [shopOwnedFields]="order.shopOwnedFields"
             [cancelled]="cancelled()"

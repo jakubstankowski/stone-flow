@@ -2,17 +2,17 @@
   class="flex min-w-0 flex-col gap-5 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
   aria-labelledby="platnosci-naglowek"
 >
-  <h2 #heading id="platnosci-naglowek" tabindex="-1" class="text-xl font-semibold">Płatności</h2>
+  <h2 id="platnosci-naglowek" tabindex="-1" class="text-xl font-semibold">Płatności</h2>
 
   <div role="status" aria-live="polite">
-    @if (notice(); as text) {
+    @if (noticeIn('payments'); as text) {
       <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
         {{ text }}
       </p>
     }
   </div>
   <div role="alert">
-    @if (alert(); as current) {
+    @if (alertIn('payments'); as current) {
       <div
         class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
       >
@@ -73,33 +73,39 @@
   </div>
 
   @if (openForm(); as form) {
-    <div
-      class="flex flex-col gap-4 rounded-box border border-(--sf-border-strong) bg-base-100 p-4"
-      role="group"
-      aria-labelledby="platnosci-formularz-naglowek"
-    >
-      <h3 id="platnosci-formularz-naglowek" class="text-lg font-semibold">
-        {{ formHeading(form) }}
-      </h3>
-      @if (form.type === 'payment') {
-        <app-payment-form
-          [initial]="form.initial"
-          [cancelledWarning]="cancelled() && form.entry === null"
-          [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz wpłatę'"
-          [action]="savePayment"
-        >
-          <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
-        </app-payment-form>
-      } @else {
-        <app-refund-form
-          [initial]="form.initial"
-          [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz zwrot'"
-          [action]="saveRefund"
-        >
-          <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
-        </app-refund-form>
-      }
-    </div>
+    @if (form.type !== 'salesCorrection') {
+      <div
+        class="flex flex-col gap-4 rounded-box border border-(--sf-border-strong) bg-base-100 p-4"
+        role="group"
+        aria-labelledby="platnosci-formularz-naglowek"
+      >
+        <h3 id="platnosci-formularz-naglowek" class="text-lg font-semibold">
+          {{ formHeading(form) }}
+        </h3>
+        @if (form.type === 'payment') {
+          <app-payment-form
+            [initial]="form.initial"
+            [cancelledWarning]="cancelled() && form.entry === null"
+            [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz wpłatę'"
+            [action]="savePayment"
+          >
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
+          </app-payment-form>
+        } @else if (form.type === 'refund') {
+          <app-refund-form
+            [initial]="form.initial"
+            [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz zwrot'"
+            [action]="saveRefund"
+          >
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
+          </app-refund-form>
+        }
+      </div>
+    }
   }
 
   <div class="flex min-w-0 flex-col gap-2">
@@ -223,9 +229,65 @@
   >
     @if (pending) {
       <p>{{ deleteSubject(pending) }}</p>
-      <p class="mt-2">
-        Zmieni się kwota Zapłacono i stan płatności. Ślad usunięcia zostanie w historii zmian.
-      </p>
+      <p class="mt-2">{{ deleteEffect(pending) }}</p>
     }
   </app-confirm-dialog>
 </section>
+
+<app-sales-corrections
+  [order]="order()"
+  [locked]="locked()"
+  [actionsDisabled]="actionsDisabled()"
+  [deletingId]="deletingId()"
+  (add)="addCorrection()"
+  (edit)="editCorrection($event)"
+  (remove)="deleteCorrection($event)"
+>
+  <div sectionMessages class="contents">
+    <div role="status" aria-live="polite">
+      @if (noticeIn('corrections'); as text) {
+        <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+          {{ text }}
+        </p>
+      }
+    </div>
+    <div role="alert">
+      @if (alertIn('corrections'); as current) {
+        <div
+          class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+        >
+          <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+          @if (current.reload) {
+            <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+              Wczytaj aktualne dane
+            </app-button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+  <div sectionForm class="contents">
+    @if (openForm(); as form) {
+      @if (form.type === 'salesCorrection') {
+        <div
+          class="flex flex-col gap-4 rounded-box border border-(--sf-border-strong) bg-base-100 p-4"
+          role="group"
+          aria-labelledby="korekty-formularz-naglowek"
+        >
+          <h3 id="korekty-formularz-naglowek" class="text-lg font-semibold">
+            {{ formHeading(form) }}
+          </h3>
+          <app-sales-correction-form
+            [initial]="form.initial"
+            [submitLabel]="form.entry ? 'Zapisz zmiany' : 'Zapisz korektę'"
+            [action]="saveCorrection"
+          >
+            <app-button formActions [disabled]="savingForm() !== null" (pressed)="closeForm()">
+              Zamknij bez zapisu
+            </app-button>
+          </app-sales-correction-form>
+        </div>
+      }
+    }
+  </div>
+</app-sales-corrections>

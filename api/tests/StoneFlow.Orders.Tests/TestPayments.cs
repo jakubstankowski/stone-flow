@@ -24,4 +24,13 @@ internal static class TestPayments
             Guid.NewGuid(),
             new byte[32],
             TestOrders.CreatedAt);
+
+    public static SalesCorrection NewCorrection(decimal amount = 500m) =>
+        SalesCorrection.Create(
+            Guid.NewGuid(),
+            OrderId,
+            new SalesCorrectionDetails(amount, new DateOnly(2026, 11, 3), "Oddany kamień"),
+            Guid.NewGuid(),
+            new byte[32],
+            TestOrders.CreatedAt);
 }

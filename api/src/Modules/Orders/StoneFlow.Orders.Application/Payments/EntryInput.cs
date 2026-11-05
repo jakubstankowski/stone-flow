@@ -62,6 +62,22 @@ internal static class EntryInput
         return date;
     }
 
+    /// <summary>Powód: wymagany, po przycięciu najwyżej <paramref name="maxLength"/> znaków.</summary>
+    public static string? ValidateReason(string? text, int maxLength, string requiredMessage, string tooLongMessage, FieldErrors errors)
+    {
+        var reason = OrderInput.Text(text);
+        if (reason is null)
+        {
+            errors.Add(EntryFieldKeys.Reason, requiredMessage);
+        }
+        else if (reason.Length > maxLength)
+        {
+            errors.Add(EntryFieldKeys.Reason, tooLongMessage);
+        }
+
+        return reason;
+    }
+
     /// <summary>Wersja wpisu z żądania (<c>PUT</c>, <c>DELETE</c>); błąd pod kluczem <c>version</c>.</summary>
     public static byte[]? ValidateVersion(string? text, FieldErrors errors) =>
         OrderVersion.Validate(text, errors, EntryMessages.VersionRequired, EntryMessages.VersionInvalid);
@@ -105,6 +121,8 @@ public static class EntryMessages
     public const string KindUnknown = "Nieznany rodzaj zwrotu.";
     public const string ReasonRequired = "Podaj powód zwrotu.";
     public const string ReasonTooLong = "Powód zwrotu może mieć najwyżej 500 znaków.";
+    public const string CorrectionReasonRequired = "Podaj powód korekty.";
+    public const string CorrectionReasonTooLong = "Powód korekty może mieć najwyżej 500 znaków.";
     public const string VersionRequired = "Brak wersji wpisu. Wczytaj zamówienie ponownie.";
     public const string VersionInvalid = "Nieprawidłowa wersja wpisu. Wczytaj zamówienie ponownie.";
 }

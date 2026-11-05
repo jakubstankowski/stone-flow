@@ -4,6 +4,7 @@ import {
   OrderListPage,
   PaymentEntry,
   RefundEntry,
+  SalesCorrectionEntry,
 } from '../app/features/orders/order-models';
 
 /** Fikcyjne dane zamówień do testów (bez danych identyfikujących). Tylko specyfikacje. */
@@ -50,6 +51,13 @@ export function orderDetails(overrides: Partial<OrderDetails> = {}): OrderDetail
     },
     payments: [],
     refunds: [],
+    salesCorrections: [],
+    salesReductions: {
+      returnsTotal: '0.00',
+      correctionsTotal: '0.00',
+      total: '0.00',
+      excess: null,
+    },
     ...overrides,
   };
 }
@@ -93,6 +101,20 @@ export function refundEntry(overrides: Partial<RefundEntry> = {}): RefundEntry {
     reason: 'Zwrot nadpłaty',
     createdAtUtc: '2026-10-30T09:00:00Z',
     version: 'AAAAAAAAD1E=',
+    ...overrides,
+  };
+}
+
+export function salesCorrectionEntry(
+  overrides: Partial<SalesCorrectionEntry> = {},
+): SalesCorrectionEntry {
+  return {
+    id: 'k1',
+    amount: '500.00',
+    date: '2026-10-31',
+    reason: 'Oddany towar bez zwrotu pieniędzy',
+    createdAtUtc: '2026-10-31T09:00:00Z',
+    version: 'AAAAAAAAE1E=',
     ...overrides,
   };
 }

@@ -87,6 +87,23 @@ export const PAID_WOULD_BE_NEGATIVE_MESSAGE =
   'Zapłacono spadłoby poniżej 0 zł. Najpierw popraw lub usuń zwrot.';
 export const REFUND_EXCEEDS_PAID_MESSAGE = 'Zwrot nie może przekroczyć kwoty Zapłacono.';
 
+export const SALES_REDUCTION_LIMIT_MESSAGE =
+  'Suma zwrotów sprzedaży i korekt nie może przekroczyć wartości zamówienia.';
+
+/** Komunikat `422 sales_reduction_limit_exceeded` przy korekcie i zwrocie, z kwotą `available`. */
+export function salesReductionLimitMessage(available: string | null): string {
+  return available === null
+    ? SALES_REDUCTION_LIMIT_MESSAGE
+    : `${SALES_REDUCTION_LIMIT_MESSAGE} Dostępna kwota: ${formatPln(available)}.`;
+}
+
+/** Komunikat limitu przy obniżeniu wartości zamówienia, z kwotą `minimumValue`. */
+export function minimumValueMessage(minimumValue: string | null): string {
+  return minimumValue === null
+    ? 'Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt.'
+    : `Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt (${formatPln(minimumValue)}).`;
+}
+
 /** Komunikat `422 refund_exceeds_paid` z kwotą z backendu (bez liczenia we frontendzie). */
 export function refundExceedsPaidMessage(available: string | null): string {
   return available === null
@@ -328,6 +345,10 @@ export class OrdersService {
     } catch (error) {
       const apiError = toApiError(error);
       if (apiError.kind === 'problem') {
+        if (apiError.code === ENTRY_PROBLEM.salesReductionLimitExceeded) {
+          // SF-10: obniżenie wartości poniżej sumy obniżeń; komunikat trafia do pola `value`.
+          return { kind: 'error', error: valueLimitError(error) };
+        }
         if (apiError.code === ORDER_PROBLEM.conflict) {
           return { kind: 'conflict' };
         }
@@ -414,7 +435,15 @@ function entryFailure(error: unknown): EntryOutcome {
     case ENTRY_PROBLEM.paidWouldBeNegative:
       return { kind: 'rejected', message: PAID_WOULD_BE_NEGATIVE_MESSAGE };
     case ENTRY_PROBLEM.refundExceedsPaid:
-      return { kind: 'rejected', message: refundExceedsPaidMessage(availableOf(error)) };
+      return {
+        kind: 'rejected',
+        message: refundExceedsPaidMessage(extensionOf(error, 'available')),
+      };
+    case ENTRY_PROBLEM.salesReductionLimitExceeded:
+      return {
+        kind: 'rejected',
+        message: salesReductionLimitMessage(extensionOf(error, 'available')),
+      };
   }
   if (apiError.status === 404) {
     return { kind: 'orderNotFound' };
@@ -422,7 +451,8 @@ function entryFailure(error: unknown): EntryOutcome {
   return { kind: 'error', error: apiError };
 }
 
-function availableOf(error: unknown): string | null {
+/** Tekstowe rozszerzenie Problem Details (`available`, `minimumValue`) albo `null`. */
+function extensionOf(error: unknown, name: string): string | null {
   if (!(error instanceof HttpErrorResponse)) {
     return null;
   }
@@ -430,6 +460,15 @@ function availableOf(error: unknown): string | null {
   if (typeof body !== 'object' || body === null) {
     return null;
   }
-  const { available } = body as Record<string, unknown>;
-  return typeof available === 'string' ? available : null;
+  const value = (body as Record<string, unknown>)[name];
+  return typeof value === 'string' ? value : null;
+}
+
+/** `422 sales_reduction_limit_exceeded` przy edycji zamówienia → błąd pola `value` z `minimumValue`. */
+function valueLimitError(error: unknown): ApiError {
+  return {
+    kind: 'validation',
+    fieldErrors: { value: [minimumValueMessage(extensionOf(error, 'minimumValue'))] },
+    detail: null,
+  };
 }

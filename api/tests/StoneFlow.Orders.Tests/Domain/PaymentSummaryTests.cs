@@ -67,7 +67,7 @@ public sealed class PaymentSummaryTests
         Assert.Equal(rejected, violation is not null);
         if (violation is not null)
         {
-            Assert.Equal(PaidRuleViolationKind.PaidWouldBeNegative, violation.Kind);
+            Assert.Equal(EntryRuleViolationKind.PaidWouldBeNegative, violation.Kind);
             Assert.Null(violation.Available);
         }
     }
@@ -91,7 +91,7 @@ public sealed class PaymentSummaryTests
         else
         {
             Assert.NotNull(violation);
-            Assert.Equal(PaidRuleViolationKind.RefundExceedsPaid, violation.Kind);
+            Assert.Equal(EntryRuleViolationKind.RefundExceedsPaid, violation.Kind);
             Assert.Equal((decimal)available.Value, violation.Available);
         }
     }

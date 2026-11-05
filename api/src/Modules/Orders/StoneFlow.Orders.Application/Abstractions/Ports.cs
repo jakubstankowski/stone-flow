@@ -65,15 +65,27 @@ public interface IOrderReader
 /// Zamówienie zablokowane do końca jednostki pracy (<c>UPDLOCK</c>) razem z sumami wpisów
 /// policzonymi już po uzyskaniu blokady. Numer służy do etykiety audytu wpisu.
 /// </summary>
-public sealed record LockedOrder(string Number, decimal Value, bool IsCancelled, decimal PaymentsTotal, decimal RefundsTotal)
+public sealed record LockedOrder(
+    string Number,
+    decimal Value,
+    bool IsCancelled,
+    decimal PaymentsTotal,
+    decimal RefundsTotal,
+    decimal SalesReturnsTotal,
+    decimal CorrectionsTotal)
 {
-    public EntryTotals Totals => new(PaymentsTotal, RefundsTotal);
+    public EntryTotals Totals => new(PaymentsTotal, RefundsTotal)
+    {
+        Value = Value,
+        SalesReturns = SalesReturnsTotal,
+        Corrections = CorrectionsTotal,
+    };
 }
 
 /// <summary>
-/// Blokada wiersza zamówienia: jedyna droga serializacji zapisów wpisów pieniężnych zamówienia
-/// (wpłaty, zwroty, a w SF-10 korekty sprzedaży). Każdy taki zapis zaczyna jednostkę pracy od
-/// tego wywołania, przed liczeniem sum. Blokada nie zmienia wersji zamówienia.
+/// Blokada wiersza zamówienia: jedyna droga serializacji zapisów wpisów zamówienia (wpłaty,
+/// zwroty, korekty sprzedaży) i obniżenia jego wartości (limit obniżeń, SF-10). Każdy taki zapis
+/// bierze blokadę przed liczeniem sum. Blokada nie zmienia wersji zamówienia.
 /// </summary>
 public interface IOrderLock
 {

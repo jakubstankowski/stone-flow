@@ -12,8 +12,9 @@ public sealed record EditRefundCommand(Guid AccountId, Guid OrderId, Guid EntryI
 /// <summary>
 /// Walidacja (400), a potem w jednej jednostce pracy: blokada, wpis tego zamówienia (404), wersja
 /// (409), limit: Zapłacono po poprawie nie może być ujemne (422 z <c>available</c>, czyli kwotą, do
-/// której można podnieść zwrot), zapis i audyt <c>Updated</c>. Zmiana rodzaju nie sprawdza limitu
-/// obniżeń sprzedaży (SF-10).
+/// której można podnieść zwrot), limit obniżeń sprzedaży dla wkładu zwrotu sprzedaży (422
+/// <c>sales_reduction_limit_exceeded</c>, także przy zmianie rodzaju na „Zwrot sprzedaży”), zapis
+/// i audyt <c>Updated</c>.
 /// </summary>
 public sealed class EditRefundHandler(OrderEntryWriter<Refund> writer, TimeProvider timeProvider)
     : ICommandHandler<EditRefundCommand, EntryWriteResult>
@@ -36,7 +37,10 @@ public sealed class EditRefundHandler(OrderEntryWriter<Refund> writer, TimeProvi
             command.OrderId,
             command.EntryId,
             version,
-            (refund, totals) => PaidRules.CheckRefund(totals, refund.Amount, details.Amount),
+            // Kolejność jak przy dodaniu (plan SF-10, N3): najpierw Zapłacono, potem limit obniżeń
+            // dla starego i nowego wkładu (zmiana rodzaju też zmienia wkład).
+            (refund, totals) => PaidRules.CheckRefund(totals, refund.Amount, details.Amount)
+                ?? SalesReductionRules.Check(totals, refund.SalesReduction, details.SalesReduction),
             (refund, nowUtc) => refund.Edit(details, nowUtc),
             cancellationToken);
     }

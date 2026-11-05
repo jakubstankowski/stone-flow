@@ -54,6 +54,11 @@ import {
   ShopOwnedField,
 } from './order-models';
 
+/** Opis pola wartości przy edycji (SF-10): korekta wartości, zwrot i korekta sprzedaży. */
+export const VALUE_CORRECTION_HINT =
+  'Np. 1 234,50. Korekta wartości zmienia wartość zamówienia w okresie jego daty. Oddany towar ' +
+  'bez zwrotu pieniędzy zapisz korektą sprzedaży, a zwrócone pieniądze zwrotem.';
+
 /** Wynik zapisu przekazany formularzowi: `null`, gdy rodzic obsłużył wynik sam. */
 export type OrderFormOutcome = null | { readonly error: ApiError };
 export type OrderFormAction = (input: OrderInput) => Promise<OrderFormOutcome>;
@@ -110,6 +115,8 @@ export class OrderForm {
   readonly shopOwnedFields = input<readonly string[]>([]);
   readonly cancelled = input(false);
   readonly submitLabel = input('Zapisz');
+  /** Edycja istniejącego zamówienia: pole wartości wyjaśnia różnicę korekty wartości (SF-10). */
+  readonly editingExisting = input(false);
   readonly action = input.required<OrderFormAction>();
 
   protected readonly channels = CHANNELS;
@@ -276,6 +283,9 @@ export class OrderForm {
   protected readonly ownsOrderDate = computed(() => this.owns('orderDate'));
   protected readonly ownsChannel = computed(() => this.owns('channel'));
   protected readonly ownsValue = computed(() => this.owns('value'));
+  protected readonly valueHint = computed(() =>
+    this.editingExisting() ? VALUE_CORRECTION_HINT : 'Np. 1 234,50. Wartość 0 zł jest dozwolona.',
+  );
   protected readonly hasShopFields = computed(() => this.shopOwnedFields().length > 0);
 
   /** Podsumowanie pokazuje się po nieudanej próbie zapisu i znika po poprawieniu błędów. */

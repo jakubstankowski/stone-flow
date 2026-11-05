@@ -1,0 +1,99 @@
+<section
+  class="flex min-w-0 flex-col gap-5 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+  aria-labelledby="korekty-naglowek"
+>
+  <h2 id="korekty-naglowek" tabindex="-1" class="text-xl font-semibold">Korekty sprzedaży</h2>
+  <p class="text-(--sf-muted)">
+    Korekta obniża sprzedaż, gdy towar wrócił bez zwrotu pieniędzy. Nie zmienia kwoty Zapłacono ani
+    stanu płatności. Zwrócone pieniądze zapisz zwrotem w sekcji „Płatności”.
+  </p>
+
+  <ng-content select="[sectionMessages]" />
+
+  @let reductions = order().salesReductions;
+  <dl class="grid gap-3 sm:grid-cols-3">
+    <div>
+      <dt class="text-sm text-(--sf-muted)">Obniżenia sprzedaży razem</dt>
+      <dd class="text-lg font-semibold tabular-nums">{{ formatPln(reductions.total) }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-(--sf-muted)">Zwroty sprzedaży</dt>
+      <dd class="tabular-nums">{{ formatPln(reductions.returnsTotal) }}</dd>
+    </div>
+    <div>
+      <dt class="text-sm text-(--sf-muted)">Korekty sprzedaży</dt>
+      <dd class="tabular-nums">{{ formatPln(reductions.correctionsTotal) }}</dd>
+    </div>
+  </dl>
+
+  @if (locked()) {
+    <p class="text-(--sf-muted)">
+      Zapisz albo zamknij edycję zamówienia, aby dodawać, poprawiać i usuwać korekty sprzedaży.
+    </p>
+  }
+
+  <div class="flex flex-wrap gap-3">
+    <app-button [disabled]="actionsDisabled()" (pressed)="add.emit()">
+      Dodaj korektę sprzedaży
+    </app-button>
+  </div>
+
+  <ng-content select="[sectionForm]" />
+
+  @if (reductions.excess; as excess) {
+    <p class="rounded-box border border-(--sf-warning) bg-base-100 p-4 font-medium">
+      Obniżenia sprzedaży przekraczają wartość o {{ formatPln(excess) }}. Popraw zwroty sprzedaży
+      lub korekty.
+    </p>
+  }
+
+  @if (order().salesCorrections.length === 0) {
+    <p class="text-(--sf-muted)">Brak korekt sprzedaży.</p>
+  } @else {
+    <div class="overflow-x-auto">
+      <table class="table">
+        <caption class="sr-only">
+          Korekty sprzedaży zamówienia
+          {{
+            order().number
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col" class="text-right">Kwota</th>
+            <th scope="col">Powód</th>
+            <th scope="col"><span class="sr-only">Akcje</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of order().salesCorrections; track entry.id) {
+            <tr>
+              <td class="whitespace-nowrap">{{ formatDate(entry.date) }}</td>
+              <td class="text-right whitespace-nowrap tabular-nums">
+                {{ formatPln(entry.amount) }}
+              </td>
+              <td class="min-w-48 break-words whitespace-pre-line">{{ entry.reason }}</td>
+              <td>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <app-button [disabled]="actionsDisabled()" (pressed)="edit.emit(entry)">
+                    Popraw<span class="sr-only"> korektę z {{ formatDate(entry.date) }}</span>
+                  </app-button>
+                  <app-button
+                    variant="danger"
+                    busyLabel="Usuwanie…"
+                    [busy]="deletingId() === entry.id"
+                    [disabled]="actionsDisabled() && deletingId() !== entry.id"
+                    (pressed)="remove.emit(entry)"
+                  >
+                    Usuń<span class="sr-only"> korektę z {{ formatDate(entry.date) }}</span>
+                  </app-button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

@@ -20,7 +20,7 @@ namespace StoneFlow.Orders.Api.Endpoints;
 /// Endpointy <c>/api/orders</c>. Bez logiki biznesowej: każde wywołanie przez dyspozytor, wynik
 /// mapowany na odpowiedź HTTP. Wszystkie wymagają sesji (polityka domyślna hosta), a zapisy tokenu
 /// XSRF (globalny middleware). Usuwania zamówień nie ma: <c>DELETE /api/orders/{id}</c> nie jest
-/// zmapowany (usuwać można tylko wpłaty i zwroty, <see cref="PaymentsEndpoints"/>).
+/// zmapowany (usuwać można tylko wpłaty, zwroty i korekty sprzedaży, <see cref="PaymentsEndpoints"/>).
 /// </summary>
 internal static class OrdersEndpoints
 {
@@ -116,6 +116,8 @@ internal static class OrdersEndpoints
             EditOrderOutcome.Conflict => OrderProblems.Conflict(),
             EditOrderOutcome.FieldOwnedByShop => OrderProblems.FieldOwnedByShop([.. (result.Fields ?? []).Select(OrderCodes.Of)]),
             EditOrderOutcome.StatusChangeRequiresAction => OrderProblems.StatusChangeRequiresAction(),
+            EditOrderOutcome.SalesReductionLimitExceeded =>
+                OrderProblems.ValueBelowSalesReductions(result.MinimumValue!.Value, OrderInput.FormatValue(result.MinimumValue.Value)),
             _ => ValidationProblem(result.Errors),
         };
     }

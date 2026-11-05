@@ -22,6 +22,7 @@ public static class OrderProblems
     public const string EntryConflictCode = "entry_conflict";
     public const string PaidWouldBeNegativeCode = "paid_would_be_negative";
     public const string RefundExceedsPaidCode = "refund_exceeds_paid";
+    public const string SalesReductionLimitExceededCode = "sales_reduction_limit_exceeded";
 
     public const string NotFoundDetail = "Nie znaleziono zamówienia.";
     public const string ConflictDetail = "Zamówienie zostało zmienione w międzyczasie. Wczytaj aktualne dane.";
@@ -88,6 +89,22 @@ public static class OrderProblems
             $"Zwrot nie może przekroczyć kwoty Zapłacono ({available.ToString("N2", Polish)} zł).",
             RefundExceedsPaidCode,
             new Dictionary<string, object?> { ["available"] = availableText });
+
+    /// <summary>Wpis podniósłby obniżenia sprzedaży ponad wartość; <c>available</c> to maksymalny wkład wpisu (<c>500.00</c>).</summary>
+    public static ProblemHttpResult SalesReductionLimitExceeded(decimal available, string availableText) =>
+        Problem(
+            StatusCodes.Status422UnprocessableEntity,
+            $"Suma zwrotów sprzedaży i korekt nie może przekroczyć wartości zamówienia. Dostępna kwota: {available.ToString("N2", Polish)} zł.",
+            SalesReductionLimitExceededCode,
+            new Dictionary<string, object?> { ["available"] = availableText });
+
+    /// <summary>Wartość niższa od sumy obniżeń sprzedaży; <c>minimumValue</c> to ta suma (<c>500.00</c>).</summary>
+    public static ProblemHttpResult ValueBelowSalesReductions(decimal minimumValue, string minimumValueText) =>
+        Problem(
+            StatusCodes.Status422UnprocessableEntity,
+            $"Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt ({minimumValue.ToString("N2", Polish)} zł).",
+            SalesReductionLimitExceededCode,
+            new Dictionary<string, object?> { ["minimumValue"] = minimumValueText });
 
     private static ProblemHttpResult Problem(int status, string detail, string code, Dictionary<string, object?>? extensions = null)
     {

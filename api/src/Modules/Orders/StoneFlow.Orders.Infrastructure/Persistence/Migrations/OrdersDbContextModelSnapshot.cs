@@ -322,6 +322,61 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("StoneFlow.Orders.Domain.Payments.SalesCorrection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("CreationRequestHash")
+                        .HasColumnType("binary(32)");
+
+                    b.Property<Guid?>("CreationRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("CorrectedOn");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreationRequestId")
+                        .IsUnique()
+                        .HasFilter("[CreationRequestId] IS NOT NULL");
+
+                    b.HasIndex("OrderId");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("OrderId"), new[] { "Amount" });
+
+                    b.ToTable("SalesCorrections", "orders", t =>
+                        {
+                            t.HasCheckConstraint("CK_SalesCorrections_Amount", "[Amount] > 0");
+                        });
+                });
+
             modelBuilder.Entity("StoneFlow.Orders.Infrastructure.Persistence.OrderNumberCounter", b =>
                 {
                     b.Property<int>("Year")
@@ -345,6 +400,15 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("StoneFlow.Orders.Domain.Payments.Refund", b =>
+                {
+                    b.HasOne("StoneFlow.Orders.Domain.Orders.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("StoneFlow.Orders.Domain.Payments.SalesCorrection", b =>
                 {
                     b.HasOne("StoneFlow.Orders.Domain.Orders.Order", null)
                         .WithMany()

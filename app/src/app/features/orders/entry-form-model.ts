@@ -9,6 +9,8 @@ import {
   RefundInput,
   RefundKind,
   RefundMethod,
+  SalesCorrectionEntry,
+  SalesCorrectionInput,
 } from './order-models';
 
 /** Model formularza wpłaty: kwota jako tekst wpisany po polsku. */
@@ -25,6 +27,13 @@ export interface RefundFormModel {
   amount: string;
   date: string;
   method: RefundMethod | '';
+  reason: string;
+}
+
+/** Model formularza korekty sprzedaży (SF-10): bez metody, bo korekta nie przenosi pieniędzy. */
+export interface SalesCorrectionFormModel {
+  amount: string;
+  date: string;
   reason: string;
 }
 
@@ -52,12 +61,17 @@ export const ENTRY_MESSAGES = {
   receivedByTooLong: `Pole „Przyjął” może mieć najwyżej ${ENTRY_LIMITS.receivedBy} znaków.`,
   kindRequired: 'Wybierz rodzaj zwrotu.',
   reasonRequired: 'Podaj powód zwrotu.',
+  correctionReasonRequired: 'Podaj powód korekty.',
   reasonTooLong: `Powód może mieć najwyżej ${ENTRY_LIMITS.reason} znaków.`,
   saveFailed: 'Nie udało się zapisać wpisu.',
 } as const;
 
 export function emptyPaymentForm(date = todayInWarsaw()): PaymentFormModel {
   return { amount: '', date, method: '', receivedBy: '' };
+}
+
+export function emptySalesCorrectionForm(date = todayInWarsaw()): SalesCorrectionFormModel {
+  return { amount: '', date, reason: '' };
 }
 
 export function emptyRefundForm(date = todayInWarsaw()): RefundFormModel {
@@ -72,6 +86,10 @@ export function paymentFormFrom(entry: PaymentEntry): PaymentFormModel {
     method: entry.method,
     receivedBy: entry.receivedBy ?? '',
   };
+}
+
+export function salesCorrectionFormFrom(entry: SalesCorrectionEntry): SalesCorrectionFormModel {
+  return { amount: entry.amount.replace('.', ','), date: entry.date, reason: entry.reason };
 }
 
 export function refundFormFrom(entry: RefundEntry): RefundFormModel {
@@ -92,6 +110,23 @@ export function toPaymentInput(model: PaymentFormModel): PaymentInput {
     method: model.method as PaymentMethod,
     receivedBy: model.method === 'cash' ? textOrNull(model.receivedBy) : null,
   };
+}
+
+export function toSalesCorrectionInput(model: SalesCorrectionFormModel): SalesCorrectionInput {
+  return {
+    amount: parsePlnAmount(model.amount) ?? model.amount.trim(),
+    date: model.date,
+    reason: model.reason.trim(),
+  };
+}
+
+/** Powód wpisu: wymagany po przycięciu i najwyżej 500 znaków. */
+export function entryReasonError(text: string, required: string): string | null {
+  const reason = text.trim();
+  if (reason === '') {
+    return required;
+  }
+  return reason.length > ENTRY_LIMITS.reason ? ENTRY_MESSAGES.reasonTooLong : null;
 }
 
 export function toRefundInput(model: RefundFormModel): RefundInput {

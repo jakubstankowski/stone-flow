@@ -375,6 +375,36 @@ describe('OrderPayments', () => {
     await page.settle(() => expect(page.element.textContent).toContain('Brak wpłat.'));
   });
 
+  it('keeps the edit form open and locked while a PUT is pending, then releases it', async () => {
+    const page = await setup((host) =>
+      host.order.set(orderDetails({ payment: PAID, payments: [paymentEntry()] })),
+    );
+    buttonByText(page.element, 'Popraw wpłatę z 29.10.2026').click();
+    await page.stable();
+    buttonByText(page.element, 'Zapisz zmiany').click();
+
+    const put = await nextRequest({ method: 'PUT', url: '/api/orders/a1/payments/p1' });
+    await page.stable();
+    const close = buttonByText(page.element, 'Zamknij bez zapisu');
+    expect(close.disabled).toBe(true);
+    close.click();
+    await page.stable();
+    expect(page.element.querySelector('#wplata-kwota')).not.toBeNull();
+    expect(page.host.active()).toBe(true);
+    expect(buttonByText(page.element, 'Dodaj zwrot').disabled).toBe(true);
+    expect(buttonByText(page.element, 'Dodaj korektę sprzedaży').disabled).toBe(true);
+
+    // Konflikt: formularz zostaje z danymi, zamknięcie znów jest dostępne.
+    respondProblem(put, 409, { code: 'entry_conflict' });
+    await page.settle(() => expect(close.disabled).toBe(false));
+    expect(page.host.active()).toBe(true);
+    expect(page.host.reloads).toBe(0);
+    close.click();
+    await page.settle(() => expect(page.host.active()).toBe(false));
+    expect(page.element.querySelector('#wplata-kwota')).toBeNull();
+    expect(buttonByText(page.element, 'Dodaj zwrot').disabled).toBe(false);
+  });
+
   it('disables entry actions while the order is locked', async () => {
     const { element } = await setup((host) => {
       host.locked.set(true);

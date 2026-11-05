@@ -28,7 +28,9 @@
 
   <fieldset
     class="flex flex-col gap-2"
-    [attr.aria-describedby]="errorOf(form.kind) ? 'zwrot-rodzaj-blad' : null"
+    [attr.aria-describedby]="
+      errorOf(form.kind) ? 'zwrot-rodzaj-wskazowka zwrot-rodzaj-blad' : 'zwrot-rodzaj-wskazowka'
+    "
   >
     <legend class="text-base font-medium">
       Rodzaj zwrotu <span class="font-normal text-(--sf-muted)">(wymagane)</span>
@@ -54,6 +56,9 @@
         </div>
       </div>
     }
+    <p id="zwrot-rodzaj-wskazowka" class="text-sm text-(--sf-muted)">
+      Jeżeli towar wrócił, a pieniądze nie, dodaj korektę sprzedaży zamiast zwrotu.
+    </p>
     @if (errorOf(form.kind); as kindError) {
       <p id="zwrot-rodzaj-blad" class="text-sm font-medium text-(--sf-error)">{{ kindError }}</p>
     }

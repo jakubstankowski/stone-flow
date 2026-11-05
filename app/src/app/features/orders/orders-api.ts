@@ -12,6 +12,7 @@ import {
   OrderVersion,
   PaymentInput,
   RefundInput,
+  SalesCorrectionInput,
 } from './order-models';
 
 const BASE = '/api/orders';
@@ -22,18 +23,20 @@ export interface CreateResponse {
   readonly order: OrderCreated;
 }
 
-/** Rodzaj wpisu płatności zamówienia (SF-9). */
-export type EntryType = 'payment' | 'refund';
+/** Rodzaj wpisu zamówienia: wpłata i zwrot (SF-9) albo korekta sprzedaży (SF-10). */
+export type EntryType = 'payment' | 'refund' | 'salesCorrection';
 
 /** Treść zapisu danego rodzaju wpisu. */
 export interface EntryInputs {
   readonly payment: PaymentInput;
   readonly refund: RefundInput;
+  readonly salesCorrection: SalesCorrectionInput;
 }
 
 const ENTRY_SEGMENTS: Readonly<Record<EntryType, string>> = {
   payment: 'payments',
   refund: 'refunds',
+  salesCorrection: 'sales-corrections',
 };
 
 /** Endpointy `/api/orders` (względne adresy, JSON camelCase). Błędy jako `HttpErrorResponse`. */

@@ -14,6 +14,8 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
 
     public DbSet<Refund> Refunds => Set<Refund>();
 
+    public DbSet<SalesCorrection> SalesCorrections => Set<SalesCorrection>();
+
     internal DbSet<OrderNumberCounter> OrderNumberCounters => Set<OrderNumberCounter>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
