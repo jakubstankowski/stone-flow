@@ -224,13 +224,51 @@ W panelu sklepu (WooCommerce → Ustawienia → Zaawansowane → Webhooki) czter
   wyłączenia webhooka po kilku kolejnych błędach — po awarii sprawdź status webhooków w panelu
   i włącz je ponownie; brakujące zmiany uzupełni dzienne uzupełnianie (SF-13).
 - Nie potwierdzono, czy WooCommerce ponawia dostawę po `503`. Usunięcie odebrane przy awarii bazy
-  może przepaść (REST nie zwraca trwale usuniętych zamówień) — do decyzji właściciela po próbie.
+  może przepaść — patrz „Znane ograniczenie” niżej.
+- Nieczytelna dostawa z ID zamówienia i błąd zapisu trafiają do historii błędów (SF-13); udany zapis
+  tego zamówienia z dowolnego źródła zamyka błąd.
+
+### Dzienne uzupełnianie przez REST (SF-13)
+
+Zadanie `woocommerce-backfill` (23:00 Europe/Warsaw, maks. 30 min, sekcja 10) pobiera zamówienia
+zmienione od ostatniego sukcesu (pierwsze: od daty uruchomienia) oraz wszystkie zamówienia z kosza.
+Bez kluczy REST zadanie kończy się bez działania, a „Synchronizuj teraz” i „Ponów” zwracają `409`.
+
+1. W panelu sklepu: WooCommerce → Ustawienia → Zaawansowane → REST API → „Dodaj klucz”, opis
+   „Stone Flow”, uprawnienia **„Odczyt” (Read)**. Klucz i sekret są widoczne tylko raz.
+2. W `appsettings.Production.json` na serwerze (razem albo wcale; brak części zatrzymuje start API):
+   - `StoneFlow:WooCommerce:BaseUrl` — `https://<adres-sklepu>` (tylko `https`, bez parametrów),
+   - `StoneFlow:WooCommerce:ConsumerKey` — `ck_…`,
+   - `StoneFlow:WooCommerce:ConsumerSecret` — `cs_…`,
+   - opcjonalnie `StoneFlow:WooCommerce:RequestTimeout` (domyślnie `00:00:30`, maks. 5 min).
+3. API wysyła klucze wyłącznie w nagłówku `Authorization: Basic` przez `https`, nigdy w adresie.
+   Jeśli przebieg kończy się „Sklep odrzucił klucze REST (HTTP 401)” mimo poprawnego klucza, hosting
+   sklepu prawdopodobnie obcina nagłówek `Authorization` — napraw to w konfiguracji serwera sklepu
+   (np. przekazanie nagłówka do PHP); **nie** przenoś kluczy do parametrów adresu (trafiłyby do logów).
+4. Stan: `GET /api/integrations/woocommerce/status` (ostatni sukces, ostatni przebieg, otwarte
+   błędy), lista błędów `GET /api/integrations/woocommerce/errors`. Nieudany przebieg nie przesuwa
+   kursora — kolejny (ponowienie harmonogramu po 15 min / 1 h albo „Synchronizuj teraz”) pobiera dane
+   od tego samego miejsca.
+
+**Znane ograniczenie (decyzja właściciela z 06.11.2026):** REST API nie zwraca zamówień trwale
+usuniętych w sklepie. Jeśli zginie webhook takiego usunięcia (np. przy awarii API), ERP się o nim nie
+dowie i zamówienie zostanie w sprzedaży — trzeba je anulować ręcznie. Przeniesienie do kosza (zwykła
+droga usunięcia) uzupełnianie wykrywa. Porównanie list ID to ewentualne osobne zadanie.
 
 ## 12. Otwarte do weryfikacji na środowiskach
 
 - SF-12 / SF-2: przed włączeniem webhooków próba na kopii testowej sklepu — podpis na prawdziwym
   payloadzie, ping (czy jest podpisany), kosz, przywrócenie i trwałe usunięcie, kolejność dostaw,
   różnica zegarów sklepu i serwera, ponawianie po `503`, obecność meta NIP w REST.
+
+- SF-13 / SF-2: parametry REST (`modified_after`/`modified_before` z `dates_are_gmt=true`,
+  `status=any` bez kosza, `status=trash`, `orderby=modified`, nagłówki `X-WP-Total`/`X-WP-TotalPages`)
+  i kod `404` nieistniejącego zamówienia (`woocommerce_rest_shop_order_invalid_id` lub
+  `woocommerce_rest_invalid_id`) są przyjęte według dokumentacji. Kopii testowej sklepu nie ma, więc
+  weryfikacja odbywa się na produkcji **tylko do odczytu**: klucz z uprawnieniem „Odczyt”, pierwsze
+  uzupełnienie („Synchronizuj teraz”) w godzinach małego ruchu, potem porównanie liczby zamówień
+  z panelem sklepu. ERP zapisuje wyłącznie własne zamówienia; w sklepie nic się nie zmienia. Próby
+  kosza i `404` wymagają operacji na zamówieniu — tylko za zgodą właściciela.
 
 - D-08 pkt 2 (harmonogram odporny na restart i usypianie): dowód z hostingu wymaga zarejestrowanego
   zadania, więc zbiera się go przy pierwszym wdrożeniu SF-13 lub SF-16 — przebiegi w `GET /api/jobs`

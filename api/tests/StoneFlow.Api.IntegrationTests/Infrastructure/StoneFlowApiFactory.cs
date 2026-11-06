@@ -32,6 +32,10 @@ public sealed class StoneFlowApiFactory : WebApplicationFactory<Program>
         ["StoneFlow:Email:Smtp:Host"] = "localhost",
         ["StoneFlow:Email:Smtp:Port"] = "2525",
         ["StoneFlow:Email:Smtp:FromAddress"] = "noreply@example.com",
+
+        // Pętla harmonogramu poza testami SF-11 wyłączona: zadanie uzupełniania (SF-13) jest
+        // rejestrowane zawsze i nie może startować samo w testach innych obszarów.
+        ["Scheduling:Enabled"] = "false",
     };
 
     public StoneFlowApiFactory()

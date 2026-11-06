@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderLock, OrderLock>();
         services.AddScoped<IShopOrderStore, ShopOrderStore>();
         services.AddScoped<IShopOrderSync, ShopOrderSync>();
+        services.AddScoped<IShopOrderLookup, ShopOrderLookup>();
         services.AddScoped<IOrderEntryStore<Payment>, OrderEntryStore<Payment>>();
         services.AddScoped<IOrderEntryStore<Refund>, OrderEntryStore<Refund>>();
         services.AddScoped<IOrderEntryStore<SalesCorrection>, OrderEntryStore<SalesCorrection>>();

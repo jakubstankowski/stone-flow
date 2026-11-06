@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using StoneFlow.Integrations.Domain.WooCommerce;
 using StoneFlow.Shared.Application.Cqrs;
 using StoneFlow.Shared.Application.ShopOrders;
 
@@ -54,13 +55,15 @@ public interface IWooCommerceWebhookEvents
     void UnexpectedCurrency(string externalId, string currency);
 
     void UnknownStatus(string externalId, string status);
-
-    void Failed(Exception exception, string topic, string? deliveryId, string externalId);
 }
 
+/// <summary>
+/// Przyjęcie dostawy webhooka (SF-12). Od SF-13 nieczytelna treść z ID i błąd zapisu trafiają do
+/// historii błędów, a udany zapis zamyka otwarty błąd zamówienia; kody odpowiedzi bez zmian.
+/// </summary>
 public sealed partial class ReceiveWooCommerceWebhookHandler(
     IWooCommerceWebhookSettings settings,
-    IShopOrderSyncRunner sync,
+    OrderOutcome outcome,
     IWooCommerceWebhookEvents events) : ICommandHandler<ReceiveWooCommerceWebhookCommand, WebhookOutcome>
 {
     // Kopia listy z Orders.Domain.ShopStatuses tylko do diagnostyki w logu: moduł nie odwołuje się
@@ -97,10 +100,16 @@ public sealed partial class ReceiveWooCommerceWebhookHandler(
             return WebhookOutcome.Accepted;
         }
 
+        var context = Context(topicHeader!, deliveryId);
         var read = WooCommerceOrderPayload.Read(topic, command.Body);
         if (read.Snapshot is not { } snapshot)
         {
             events.Unreadable(topicHeader, deliveryId, read.Problem ?? "nieczytelna treść");
+            if (read.ExternalId is not null)
+            {
+                await outcome.RecordUnreadableAsync(read, OrderErrorSource.Webhook, context, cancellationToken);
+            }
+
             return WebhookOutcome.Accepted;
         }
 
@@ -114,18 +123,19 @@ public sealed partial class ReceiveWooCommerceWebhookHandler(
             events.UnknownStatus(snapshot.ExternalId, Clip(status)!);
         }
 
-        try
+        // Wyjątek zapisu loguje OrderOutcome (raz); nieudany zapis historii błędu nie zmienia kodu odpowiedzi.
+        var applied = await outcome.ApplyAsync(snapshot, OrderErrorSource.Webhook, context, cancellationToken);
+        if (applied.SyncResult is { } result)
         {
-            var result = await sync.ApplyAsync(snapshot, cancellationToken);
             events.Applied(topicHeader!, deliveryId, snapshot.ExternalId, result);
-            return result == ShopOrderSyncResult.RetryRequired ? WebhookOutcome.Unavailable : WebhookOutcome.Accepted;
         }
-        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
-        {
-            events.Failed(exception, topicHeader!, deliveryId, snapshot.ExternalId);
-            return WebhookOutcome.Unavailable;
-        }
+
+        return applied.Status == OrderApplyStatus.Applied ? WebhookOutcome.Accepted : WebhookOutcome.Unavailable;
     }
+
+    /// <summary>Kontekst błędu: temat i ID dostawy (nagłówki już przycięte do 64 znaków).</summary>
+    private static string Context(string topic, string? deliveryId) =>
+        deliveryId is null ? topic : $"{topic}, dostawa {deliveryId}";
 
     private static ShopOrderTopic? Topic(string? header) => header switch
     {
