@@ -81,6 +81,25 @@ The host `api/src/StoneFlow.Api` composes the modules. `api/src/Shared/` holds t
 abstractions and dispatcher, the launch date (`ILaunchDate`) and the shared EF Core provider
 setup (`UseModuleSqlServer`). These boundaries are enforced by `StoneFlow.Architecture.Tests`.
 
+Scheduled jobs (SF-11) are the one shared part with its own data: the contract
+(`IScheduledJob`, `JobDefinition`, `JobSchedule`, `IJobRunner`, `GetJobStatusesQuery`) lives in
+`StoneFlow.Shared.Application/Scheduling`, the runner, `SchedulingDbContext` (schema `scheduling`,
+migrations in `Scheduling/Migrations`) and the `BackgroundService` in
+`StoneFlow.Shared.Infrastructure/Scheduling`. The scheduler holds no module logic. Its endpoint
+`GET /api/jobs` is mapped by the host (`StoneFlow.Api/Scheduling`), because it belongs to no module.
+
+- A module registers a job in its `DependencyInjection.cs` with
+  `services.AddScheduledJob<TJob>(new JobDefinition(key, JobSchedule.DailyAt(...), maxDuration))`.
+  Keys are stable, `[a-z0-9-]`; the schedule is a daily local time in Europe/Warsaw.
+- A job must stop and write nothing after its token is cancelled, must be safe to rerun after an
+  interrupted run (invariant 4), and must keep secrets and personal data out of exception messages
+  (they are stored in the run history). It runs in a fresh DI scope; for several units of work it
+  creates its own scopes with `IServiceScopeFactory`.
+- `JobRunContext.LastSuccessStartedAt` is the scheduler's last successful run, not a business
+  cursor such as the sync "since last success" — a job keeps its own cursor in its module.
+- Manual runs ("Synchronizuj teraz") go through `IJobRunner.TryRunNowAsync`, which uses the same
+  lease; never add a second lock for the same job.
+
 ### Layer responsibilities
 
 | Layer | Responsible for | Not responsible for |
@@ -170,7 +189,8 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
 
 - Projects and namespaces: `StoneFlow.{Module}.{Layer}`; shared code `StoneFlow.Shared.{Kernel|Application|Infrastructure}`.
 - SQL schema = module name in lower case (`access`, `orders`, `expenses`, `reporting`, `integrations`);
-  each module keeps its migration history in `{schema}.__EFMigrationsHistory`.
+  each module keeps its migration history in `{schema}.__EFMigrationsHistory`. The shared scheduler
+  uses schema `scheduling` the same way.
 - Private fields `_camelCase`, constants and `static readonly` fields `PascalCase`, interfaces
   `I`-prefixed (`.editorconfig`).
 - Endpoints (decided in SF-6): Minimal API in `StoneFlow.{Module}.Api`; `Map{Module}Endpoints`
@@ -239,7 +259,9 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
   no parallel queries in one scope (no `Task.WhenAll` over queries, no interleaved streaming), no
   `EnableRetryOnFailure`, no direct `Database.BeginTransaction` — use `IUnitOfWork`. A background
   job or sync creates a new DI scope per unit of work; after a rolled-back unit of work the scope
-  does no further writes.
+  does no further writes. `SchedulingDbContext` is the exception: it has its own connection (not
+  `ModuleConnection`) and uses transactions of its own context for the job lease, so scheduler
+  writes never join a job's unit of work.
 - Migrations run before the new code is published (SF-4), so every migration must work with the
   previous API version (expand/contract: add first, remove in a later deployment). Never edit an
   applied migration; fix forward. A new module with a database is appended to

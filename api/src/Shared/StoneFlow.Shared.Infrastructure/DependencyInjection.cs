@@ -7,6 +7,7 @@ using StoneFlow.Shared.Application.Persistence;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.LaunchDate;
 using StoneFlow.Shared.Infrastructure.Persistence;
+using StoneFlow.Shared.Infrastructure.Scheduling;
 
 namespace StoneFlow.Shared.Infrastructure;
 
@@ -26,6 +27,10 @@ public static class DependencyInjection
             .BindConfiguration(LaunchDateOptions.SectionName)
             .ValidateOnStart();
         services.AddSingleton<ILaunchDate, ConfiguredLaunchDate>();
+
+        // Harmonogram zadań automatycznych (SF-11) i jego zapytanie stanu.
+        services.AddScheduling();
+        services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 
         return services;
     }

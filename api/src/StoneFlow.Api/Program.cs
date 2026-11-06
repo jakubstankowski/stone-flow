@@ -2,6 +2,7 @@ using StoneFlow.Access.Api;
 using StoneFlow.Access.Infrastructure;
 using StoneFlow.Api.Health;
 using StoneFlow.Api.Observability;
+using StoneFlow.Api.Scheduling;
 using StoneFlow.Api.Security;
 using StoneFlow.Expenses.Api;
 using StoneFlow.Expenses.Infrastructure;
@@ -58,6 +59,7 @@ app.MapOrdersEndpoints();
 app.MapExpensesEndpoints();
 app.MapReportingEndpoints();
 app.MapIntegrationsEndpoints();
+app.MapJobsEndpoints();
 
 await app.RunAsync();
 
