@@ -120,3 +120,25 @@ public interface IOrderEntryStore<TEntry>
 
     Task<EntryCreationMatch?> FindByCreationRequestAsync(Guid creationRequestId, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// Zamówienia ze sklepu i znaczniki usunięcia (SF-12), w transakcji jednostki pracy. Blokada po ID
+/// zewnętrznym obejmuje też zamówienie, którego jeszcze nie ma, więc równoczesne dostawy tego samego
+/// zamówienia się szeregują.
+/// </summary>
+public interface IShopOrderStore
+{
+    /// <summary>Blokada wyłączna na ID zamówienia w sklepie do końca transakcji.</summary>
+    Task LockAsync(string externalId, CancellationToken cancellationToken);
+
+    /// <summary>Zamówienie ze sklepu do zmiany; <c>null</c>, gdy go nie ma.</summary>
+    Task<StoredOrder?> FindAsync(string externalId, CancellationToken cancellationToken);
+
+    /// <summary>Czas odbioru usunięcia zamówienia, którego ERP nie miał; <c>null</c>, gdy brak znacznika.</summary>
+    Task<DateTime?> FindDeletionAsync(string externalId, CancellationToken cancellationToken);
+
+    /// <summary>Zapisuje znacznik usunięcia, jeśli go nie ma (ponowienie nie zmienia czasu).</summary>
+    Task<StoreSaveStatus> RecordDeletionAsync(string externalId, DateTime receivedAtUtc, CancellationToken cancellationToken);
+
+    Task RemoveDeletionAsync(string externalId, CancellationToken cancellationToken);
+}

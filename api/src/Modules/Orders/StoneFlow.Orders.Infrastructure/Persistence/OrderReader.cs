@@ -41,7 +41,8 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 o.Value,
                 o.FulfillmentStatus,
                 context.Payments.Where(p => p.OrderId == o.Id).Sum(p => p.Amount),
-                context.Refunds.Where(r => r.OrderId == o.Id).Sum(r => r.Amount)))
+                context.Refunds.Where(r => r.OrderId == o.Id).Sum(r => r.Amount),
+                o.ShopStatus))
             .ToListAsync(cancellationToken);
 
         return new OrderListPageDto(items, criteria.Page, criteria.PageSize, total);
@@ -67,6 +68,9 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 o.Comment,
                 o.CreatedAtUtc,
                 o.UpdatedAtUtc,
+                o.ShopModifiedAtUtc,
+                o.ShopDeletedAtUtc,
+                o.ShopRefundedAmount,
                 Version = EF.Property<byte[]>(o, OrderConfiguration.VersionProperty),
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -133,8 +137,15 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 row.Version,
                 [.. payments.Select(p => p with { CreatedAtUtc = DateTime.SpecifyKind(p.CreatedAtUtc, DateTimeKind.Utc) })],
                 [.. refunds.Select(r => r with { CreatedAtUtc = DateTime.SpecifyKind(r.CreatedAtUtc, DateTimeKind.Utc) })],
-                [.. corrections.Select(c => c with { CreatedAtUtc = DateTime.SpecifyKind(c.CreatedAtUtc, DateTimeKind.Utc) })]);
+                [.. corrections.Select(c => c with { CreatedAtUtc = DateTime.SpecifyKind(c.CreatedAtUtc, DateTimeKind.Utc) })])
+        {
+            ShopModifiedAtUtc = Utc(row.ShopModifiedAtUtc),
+            ShopDeletedAtUtc = Utc(row.ShopDeletedAtUtc),
+            ShopRefundedAmount = row.ShopRefundedAmount,
+        };
     }
+
+    private static DateTime? Utc(DateTime? value) => value is { } v ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : null;
 
     public async Task<CreationRequestMatch?> FindByCreationRequestAsync(Guid creationRequestId, CancellationToken cancellationToken)
     {
@@ -149,6 +160,12 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
     private static IQueryable<Order> Filter(
         IQueryable<Order> orders, OrderListCriteria criteria, IQueryable<Payment> payments, IQueryable<Refund> refunds)
     {
+        if (!criteria.IncludeHiddenShopStatuses)
+        {
+            var hidden = ShopStatuses.HiddenByDefault.ToArray();
+            orders = orders.Where(o => o.ShopStatus == null || !hidden.Contains(o.ShopStatus));
+        }
+
         if (criteria.DateFrom is { } from)
         {
             orders = orders.Where(o => o.OrderDate >= from);

@@ -18,6 +18,7 @@ const QUERY: OrderListQuery = {
   statuses: ['inProgress', 'problem'],
   paymentStates: ['unpaid', 'none'],
   search: 'Jan',
+  includeHiddenShopStatuses: false,
 };
 
 const INPUT: OrderInput = {
@@ -70,6 +71,15 @@ describe('OrdersApi', () => {
     );
     request.flush({ items: [], page: 2, pageSize: 25, total: 30 });
     expect((await result).total).toBe(30);
+  });
+
+  it('asks for hidden shop statuses only when requested', async () => {
+    const result = api.list({ ...QUERY, includeHiddenShopStatuses: true });
+    const request = http.expectOne((candidate) => candidate.url === '/api/orders');
+
+    expect(request.request.params.get('includeHiddenShopStatuses')).toBe('true');
+    request.flush({ items: [], page: 2, pageSize: 25, total: 0 });
+    await result;
   });
 
   it('omits empty filters', async () => {

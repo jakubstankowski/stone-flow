@@ -198,6 +198,10 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
   response DTOs next to it. Handlers use `TypedResults`, call only `IDispatcher` and map the result
   to HTTP — no business logic. Names `.WithName("{Module}.{Action}")`.
 - All API routes start with `/api` (except `/health`), so the frontend proxy forwards one branch.
+  Exception: server-to-server webhooks under `/webhooks/*` (SF-12, `POST /webhooks/woocommerce/orders`).
+  They are called by the shop directly (not through Vercel), carry no cookies, are outside the
+  CSRF check and authenticate with an HMAC signature of the raw body; each one is listed in
+  `EndpointSecurityTests.AllowedAnonymous` and has its own rate-limit policy.
 
 ### Access and security (SF-6)
 

@@ -3,10 +3,18 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace StoneFlow.Integrations.Api;
 
-/// <summary>Rejestracja modułu w hoście. Moduł nie ma jeszcze endpointów.</summary>
+/// <summary>Rejestracja modułu w hoście: webhook zamówień WooCommerce (SF-12).</summary>
 public static class IntegrationsModule
 {
-    public static IServiceCollection AddIntegrationsModule(this IServiceCollection services) => services;
+    public static IServiceCollection AddIntegrationsModule(this IServiceCollection services)
+    {
+        WooCommerceWebhookEndpoint.AddRateLimit(services);
+        return services;
+    }
 
-    public static IEndpointRouteBuilder MapIntegrationsEndpoints(this IEndpointRouteBuilder endpoints) => endpoints;
+    public static IEndpointRouteBuilder MapIntegrationsEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        WooCommerceWebhookEndpoint.Map(endpoints);
+        return endpoints;
+    }
 }

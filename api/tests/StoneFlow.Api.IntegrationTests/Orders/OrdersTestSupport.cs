@@ -46,7 +46,11 @@ internal sealed class OrdersTest : IAsyncDisposable
     /// (deterministyczne wyścigi); <paramref name="configureServices"/> pozwala podmienić inne porty.
     /// </summary>
     public static async Task<OrdersTest> CreateAsync(
-        SqlServerFixture sqlServer, DateTimeOffset? now = null, StoreHooks? hooks = null, Action<IServiceCollection>? configureServices = null)
+        SqlServerFixture sqlServer,
+        DateTimeOffset? now = null,
+        StoreHooks? hooks = null,
+        Action<IServiceCollection>? configureServices = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
     {
         var connectionString = sqlServer.NewDatabase("orders");
         var factory = new StoneFlowApiFactory
@@ -62,6 +66,11 @@ internal sealed class OrdersTest : IAsyncDisposable
                 configureServices?.Invoke(services);
             },
         }.WithDatabase(connectionString);
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>())
+        {
+            factory.With(key, value);
+        }
+
         await TestDatabase.MigrateAsync(factory);
         var client = AuthClient.Create(factory);
         await client.SetUpOwnerAsync(factory);

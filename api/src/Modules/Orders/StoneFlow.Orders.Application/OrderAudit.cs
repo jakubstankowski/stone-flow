@@ -21,9 +21,13 @@ public static class OrderAudit
     };
 
     /// <summary>Utworzenie: nowe wartości pól, bez pól pustych; wartości logiczne zawsze.</summary>
-    public static AuditEntry Created(Order order, Guid accountId)
+    public static AuditEntry Created(Order order, Guid accountId) => Created(order, AuditAuthor.Account(accountId));
+
+    /// <summary>Utworzenie z podanym autorem (np. „Synchronizacja WooCommerce”).</summary>
+    public static AuditEntry Created(Order order, AuditAuthor author)
     {
         ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(author);
 
         var changes = order.Snapshot()
             .Select(field => (field.Field, Value: Format(field.Value)))
@@ -31,17 +35,22 @@ public static class OrderAudit
             .Select(field => Change(field.Field, null, field.Value))
             .ToList();
 
-        return new AuditEntry(AuditAuthor.Account(accountId), Object(order), AuditOperation.Created, changes);
+        return new AuditEntry(author, Object(order), AuditOperation.Created, changes);
     }
 
     /// <summary>Zmiana: tylko zmienione pola, wartości stare i nowe.</summary>
-    public static AuditEntry Updated(Order order, IReadOnlyList<OrderFieldChange> changes, Guid accountId)
+    public static AuditEntry Updated(Order order, IReadOnlyList<OrderFieldChange> changes, Guid accountId) =>
+        Updated(order, changes, AuditAuthor.Account(accountId));
+
+    /// <summary>Zmiana z podanym autorem (np. „Synchronizacja WooCommerce”).</summary>
+    public static AuditEntry Updated(Order order, IReadOnlyList<OrderFieldChange> changes, AuditAuthor author)
     {
         ArgumentNullException.ThrowIfNull(order);
         ArgumentNullException.ThrowIfNull(changes);
+        ArgumentNullException.ThrowIfNull(author);
 
         return new AuditEntry(
-            AuditAuthor.Account(accountId),
+            author,
             Object(order),
             AuditOperation.Updated,
             [.. changes.Select(change => Change(change.Field, Format(change.OldValue), Format(change.NewValue)))]);

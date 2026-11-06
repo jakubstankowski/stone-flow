@@ -157,4 +157,4 @@ Additional implementation not covered by the original documents:
   - krok 500 ms rzeczywistego czasu w `Waiting.AdvanceUntilAsync`;
   - T-3: brak przypadków `isRunning = true`, `lastRun = null` i mapowania `running` → `abandoned` w `JobsEndpointTests`;
   - T-5: brak testu dwóch kolejnych błędów bazy przy przedłużaniu.
-- D-08 pkt 2: dowód z hostingu przy wdrożeniu SF-13 lub SF-16 (`docs/wdrozenia.md` sekcja 11).
+- D-08 pkt 2: dowód z hostingu przy wdrożeniu SF-13 lub SF-16 (`docs/wdrozenia.md` sekcja „Otwarte do weryfikacji na środowiskach”).

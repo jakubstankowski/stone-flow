@@ -128,6 +128,18 @@ public sealed class Order
     /// <summary>SHA-256 znormalizowanej komendy utworzenia (32 bajty).</summary>
     public byte[]? CreationRequestHash { get; private set; }
 
+    /// <summary>Data modyfikacji w sklepie z ostatnio zastosowanej dostawy (kolejność dostaw).</summary>
+    public DateTime? ShopModifiedAtUtc { get; private set; }
+
+    /// <summary>Usunięcie zamówienia w sklepie (czas odbioru dostawy usunięcia).</summary>
+    public DateTime? ShopDeletedAtUtc { get; private set; }
+
+    /// <summary>Suma zwrotów w sklepie — informacja, nie tworzy wypływu.</summary>
+    public decimal ShopRefundedAmount { get; private set; }
+
+    /// <summary>„Zakończone w sklepie”: usunięte, anulowane albo w koszu.</summary>
+    public bool IsTerminalInShop => Source == OrderSource.WooCommerce && ShopStatuses.IsTerminal(ShopStatus, ShopDeletedAtUtc);
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime UpdatedAtUtc { get; private set; }
@@ -180,6 +192,87 @@ public sealed class Order
         ArgumentException.ThrowIfNullOrWhiteSpace(externalId);
         Require(id, number, content);
         return new Order(id, number, OrderSource.WooCommerce, externalId, shopStatus, content, nowUtc);
+    }
+
+    /// <summary>
+    /// Zamówienie zaimportowane ze sklepu (SF-12): numer <c>WC-{id}</c>, kanał „sklep”, „Anulowane”,
+    /// gdy jest zakończone w sklepie, inaczej „W trakcie”. <paramref name="deletedAtUtc"/> — znacznik
+    /// usunięcia odebranego przed utworzeniem.
+    /// </summary>
+    public static Order ImportFromShop(Guid id, string externalId, ShopOrderData data, DateTime? deletedAtUtc, DateTime nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        var terminal = ShopStatuses.IsTerminal(data.Status, deletedAtUtc);
+        var content = new OrderContent(
+            data.OrderDate,
+            OrderChannel.Shop,
+            data.Value,
+            terminal ? FulfillmentStatus.Cancelled : FulfillmentStatus.InProgress,
+            data.Customer,
+            OperationalData.Empty,
+            Comment: null);
+        var order = CreateFromShop(id, ShopNumber(externalId), externalId, data.Status, content, nowUtc);
+        order.ShopModifiedAtUtc = data.ModifiedAtUtc;
+        order.ShopDeletedAtUtc = deletedAtUtc;
+        order.ShopRefundedAmount = data.RefundedAmount;
+        return order;
+    }
+
+    /// <summary>Numer ERP zamówienia ze sklepu: <c>WC-{id ze sklepu}</c>.</summary>
+    public static string ShopNumber(string externalId) => "WC-" + externalId;
+
+    /// <summary>
+    /// Zastosowanie dostawy ze sklepu (SF-12, „Zastosowanie snapshotu”). Zmienia tylko pola sklepu,
+    /// a status realizacji wyłącznie jednorazowym przejściem na „Anulowane”, gdy zamówienie przechodzi
+    /// z aktywnego w sklepie na zakończone w sklepie.
+    /// </summary>
+    /// <param name="delivery">Rodzaj dostawy (temat webhooka).</param>
+    /// <param name="data">Dane pełnego zamówienia; <c>null</c> tylko dla <see cref="ShopDelivery.Deleted"/>.</param>
+    /// <param name="nowUtc">Bieżący czas UTC (czas odbioru usunięcia).</param>
+    public ShopApplyResult ApplyFromShop(ShopDelivery delivery, ShopOrderData? data, DateTime nowUtc)
+    {
+        if (Source != OrderSource.WooCommerce)
+        {
+            throw new InvalidOperationException("Dostawa ze sklepu dotyczy wyłącznie zamówień ze sklepu.");
+        }
+
+        var wasTerminal = IsTerminalInShop;
+        var before = Snapshot();
+        var modifiedBefore = ShopModifiedAtUtc;
+
+        if (delivery == ShopDelivery.Deleted)
+        {
+            ShopDeletedAtUtc ??= nowUtc;
+        }
+        else
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            if (ShopModifiedAtUtc is { } stored && data.ModifiedAtUtc < stored)
+            {
+                return ShopApplyResult.Skip(ShopDeliverySkip.Older);
+            }
+
+            if (ShopDeletedAtUtc is { } deleted && data.ModifiedAtUtc <= deleted)
+            {
+                return ShopApplyResult.Skip(ShopDeliverySkip.BeforeDeletion);
+            }
+
+            ShopDeletedAtUtc = null;
+            ShopModifiedAtUtc = data.ModifiedAtUtc;
+            OrderDate = data.OrderDate;
+            Value = data.Value;
+            Customer = data.Customer;
+            ShopStatus = data.Status;
+            ShopRefundedAmount = data.RefundedAmount;
+        }
+
+        if (!wasTerminal && IsTerminalInShop)
+        {
+            FulfillmentStatus = FulfillmentStatus.Cancelled;
+        }
+
+        var result = Changed(before, nowUtc);
+        return new ShopApplyResult(result.Changes, result.Changes.Count > 0 || ShopModifiedAtUtc != modifiedBefore, Skipped: null);
     }
 
     /// <summary>
@@ -279,6 +372,9 @@ public sealed class Order
         new(OrderField.HasReview, Operational.HasReview),
         new(OrderField.Notes, Operational.Notes),
         new(OrderField.Comment, Comment),
+        new(OrderField.ShopStatus, ShopStatus),
+        new(OrderField.ShopDeleted, Source == OrderSource.WooCommerce ? ShopDeletedAtUtc is not null : null),
+        new(OrderField.ShopRefundedAmount, Source == OrderSource.WooCommerce ? ShopRefundedAmount : null),
     ];
 
     private static void Require(Guid id, string number, OrderContent content)

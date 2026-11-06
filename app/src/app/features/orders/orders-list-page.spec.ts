@@ -221,6 +221,66 @@ describe('OrdersListPage', () => {
     await respond(page, cleared, listPage([listItem()], 1));
   });
 
+  it('asks for hidden shop statuses only while the toggle is on', async () => {
+    const page = await open();
+    const first = await listRequest();
+    expect(first.request.params.has('includeHiddenShopStatuses')).toBe(false);
+    await respond(page, first, listPage([listItem()], 1));
+
+    const label = Array.from(page.element.querySelectorAll('label')).find(
+      (candidate) =>
+        candidate.textContent?.trim() === 'Pokaż oczekujące, nieudane i szkice ze sklepu',
+    );
+    const toggle = label?.querySelector('input') as HTMLInputElement;
+    expect(toggle.type).toBe('checkbox');
+    expect(toggle.checked).toBe(false);
+
+    toggle.click();
+    const shown = await listRequest();
+    expect(shown.request.params.get('includeHiddenShopStatuses')).toBe('true');
+    expect(shown.request.params.get('page')).toBe('1');
+    await respond(page, shown, listPage([listItem()], 1));
+    expect(toggle.checked).toBe(true);
+    expect(page.element.textContent).toContain('Ze sklepu także: oczekujące, nieudane i szkice');
+
+    toggle.click();
+    const hidden = await listRequest();
+    expect(hidden.request.params.has('includeHiddenShopStatuses')).toBe(false);
+    await respond(page, hidden, listPage([listItem()], 1));
+    expect(toggle.checked).toBe(false);
+  });
+
+  it('shows the Polish shop status under the fulfillment status for shop orders', async () => {
+    const page = await open();
+    await respond(
+      page,
+      await listRequest(),
+      listPage(
+        [
+          listItem({ source: 'wooCommerce', channel: 'shop', shopStatus: 'pending' }),
+          listItem({
+            id: 'a2',
+            number: 'ZR-2026-0002',
+            source: 'wooCommerce',
+            shopStatus: 'x-own',
+          }),
+          listItem({ id: 'a3', number: 'ZR-2026-0003' }),
+        ],
+        3,
+      ),
+    );
+
+    const statusCells = Array.from(page.element.querySelectorAll('tbody tr')).map((row) =>
+      Array.from(row.querySelectorAll('td')).at(-1),
+    );
+    const shopBadge = statusCells[0]?.querySelector('.badge-ghost');
+    expect(shopBadge?.textContent?.trim()).toBe('Status w sklepie: Oczekuje na płatność');
+    expect(shopBadge?.querySelector('.sr-only')?.textContent).toBe('Status w sklepie: ');
+    expect(statusCells[0]?.textContent).toContain('W trakcie');
+    expect(statusCells[1]?.querySelector('.badge-ghost')?.textContent).toContain('x-own');
+    expect(statusCells[2]?.querySelector('.badge-ghost')).toBeNull();
+  });
+
   it('searches on change and does not query a reversed date range', async () => {
     const page = await open();
     await respond(page, await listRequest(), listPage([listItem()], 1));

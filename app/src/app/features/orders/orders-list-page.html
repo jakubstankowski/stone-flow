@@ -133,6 +133,17 @@
             }
           </div>
         </fieldset>
+        <div class="md:col-span-2 xl:col-span-4">
+          <label class="flex min-h-11 items-center gap-2">
+            <input
+              class="checkbox"
+              type="checkbox"
+              [checked]="orders.filters().includeHiddenShopStatuses"
+              (change)="onHiddenShopStatuses($event)"
+            />
+            {{ hiddenShopStatusesLabel }}
+          </label>
+        </div>
       </form>
 
       <ng-template appTableCell="number" [appTableCellOf]="orders.items()" let-row>
@@ -155,6 +166,14 @@
           [tone]="statusTones[row.fulfillmentStatus]"
           [marker]="row.fulfillmentStatus === 'cancelled'"
         />
+        @if (row.shopStatus; as shopStatus) {
+          <span class="mt-1 block">
+            <span class="badge badge-ghost badge-sm"
+              ><span class="sr-only">Status w sklepie: </span
+              >{{ shopStatusLabel(shopStatus) }}</span
+            >
+          </span>
+        }
       </ng-template>
     </app-data-table>
   }

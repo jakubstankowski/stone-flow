@@ -50,6 +50,19 @@
           </div>
         </header>
 
+        @if (shopWarnings().length > 0) {
+          <div role="status" aria-label="Ostrzeżenia ze sklepu" class="flex flex-col gap-3">
+            @for (warning of shopWarnings(); track warning.code) {
+              <p
+                class="rounded-box border border-(--sf-warning) bg-base-100 p-4 font-medium"
+                [attr.data-shop-warning]="warning.code"
+              >
+                {{ warning.text }}
+              </p>
+            }
+          </div>
+        }
+
         @if (editing() && formInitial(); as initial) {
           <app-order-form
             submitLabel="Zapisz zmiany"
@@ -157,7 +170,7 @@
                 @if (order.shopStatus) {
                   <div>
                     <dt class="text-sm text-(--sf-muted)">Status w sklepie</dt>
-                    <dd>{{ order.shopStatus }}</dd>
+                    <dd>{{ shopStatusLabel(order.shopStatus) }}</dd>
                   </div>
                 }
               </dl>

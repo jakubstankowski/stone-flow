@@ -55,7 +55,8 @@ public sealed record OrderListItemResponse(
     string Value,
     string FulfillmentStatus,
     string Paid,
-    string? PaymentState);
+    string? PaymentState,
+    string? ShopStatus);
 
 public sealed record OrderListPageResponse(IReadOnlyList<OrderListItemResponse> Items, int Page, int PageSize, int Total);
 
@@ -98,7 +99,11 @@ public sealed record OrderDetailsResponse(
     IReadOnlyList<PaymentEntryResponse> Payments,
     IReadOnlyList<RefundEntryResponse> Refunds,
     IReadOnlyList<SalesCorrectionEntryResponse> SalesCorrections,
-    SalesReductionsResponse SalesReductions);
+    SalesReductionsResponse SalesReductions,
+    DateTime? ShopModifiedAtUtc,
+    DateTime? ShopDeletedAtUtc,
+    string ShopRefundedAmount,
+    IReadOnlyList<string> ShopWarnings);
 
 public sealed record SalesCorrectionEntryResponse(Guid Id, string Amount, string Date, string Reason, DateTime CreatedAtUtc, string Version);
 
@@ -171,7 +176,8 @@ internal static class OrderContracts
                 OrderInput.FormatValue(item.Value),
                 OrderCodes.Of(item.FulfillmentStatus),
                 OrderInput.FormatValue(item.Payment.Paid),
-                item.Payment.State is { } state ? OrderCodes.Of(state) : null)),
+                item.Payment.State is { } state ? OrderCodes.Of(state) : null,
+                item.ShopStatus)),
         ],
         page.Page,
         page.PageSize,
@@ -243,7 +249,11 @@ internal static class OrderContracts
             OrderInput.FormatValue(order.SalesReductions.ReturnsTotal),
             OrderInput.FormatValue(order.SalesReductions.CorrectionsTotal),
             OrderInput.FormatValue(order.SalesReductions.Total),
-            Amount(order.SalesReductions.Excess)));
+            Amount(order.SalesReductions.Excess)),
+        order.ShopModifiedAtUtc,
+        order.ShopDeletedAtUtc,
+        OrderInput.FormatValue(order.ShopRefundedAmount),
+        [.. order.ShopWarnings.Select(OrderCodes.Of)]);
 
     private static OrderPaymentSummaryResponse ToResponse(PaymentSummary summary) => new(
         OrderInput.FormatValue(summary.Paid),

@@ -6,3 +6,6 @@ e573b1ef3f35d0b32a4823e4da251bf31e7391ea:api/tests/StoneFlow.Access.Tests/Applic
 e573b1ef3f35d0b32a4823e4da251bf31e7391ea:api/tests/StoneFlow.Access.Tests/Application/PasswordResetHandlerTests.cs:generic-api-key:173
 c9f09a540d32350dfeaff096002df422faf3d4f1:api/tests/StoneFlow.Access.Tests/Application/LoginLogoutHandlerTests.cs:generic-api-key:20
 c9f09a540d32350dfeaff096002df422faf3d4f1:api/tests/StoneFlow.Access.Tests/Application/LoginLogoutHandlerTests.cs:generic-api-key:32
+# Fikcyjny sekret webhooka w testach SF-12 (reguła generic-api-key).
+4fde4b1a89d8c018bebdfb072ca96b0a623ff3d1:api/tests/StoneFlow.Api.IntegrationTests/Orders/WooCommerceWebhookTests.cs:generic-api-key:16
+4fde4b1a89d8c018bebdfb072ca96b0a623ff3d1:api/tests/StoneFlow.Integrations.Tests/WooCommerce/WooCommercePayloadTests.cs:generic-api-key:10

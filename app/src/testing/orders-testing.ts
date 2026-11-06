@@ -58,6 +58,10 @@ export function orderDetails(overrides: Partial<OrderDetails> = {}): OrderDetail
       total: '0.00',
       excess: null,
     },
+    shopModifiedAtUtc: null,
+    shopDeletedAtUtc: null,
+    shopRefundedAmount: '0.00',
+    shopWarnings: [],
     ...overrides,
   };
 }
@@ -74,6 +78,7 @@ export function listItem(overrides: Partial<OrderListItem> = {}): OrderListItem 
     fulfillmentStatus: 'inProgress',
     paid: '0.00',
     paymentState: 'unpaid',
+    shopStatus: null,
     ...overrides,
   };
 }

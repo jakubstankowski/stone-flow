@@ -33,6 +33,8 @@ export interface OrderFilters {
   readonly statuses: readonly FulfillmentStatus[];
   readonly paymentStates: readonly PaymentStateFilter[];
   readonly search: string;
+  /** Pokazuje zamówienia ze sklepu ukryte domyślnie (pending, failed, checkout-draft). */
+  readonly includeHiddenShopStatuses: boolean;
 }
 
 export const EMPTY_FILTERS: OrderFilters = {
@@ -43,7 +45,10 @@ export const EMPTY_FILTERS: OrderFilters = {
   statuses: [],
   paymentStates: [],
   search: '',
+  includeHiddenShopStatuses: false,
 };
+
+export const HIDDEN_SHOP_STATUSES_LABEL = 'Pokaż oczekujące, nieudane i szkice ze sklepu';
 
 const DEFAULT_SORT: SortState = { key: 'orderDate', direction: 'desc' };
 const SORT_KEYS: readonly OrderSort[] = ['orderDate', 'number', 'customer', 'value'];
@@ -174,6 +179,12 @@ export class OrdersService {
     }
     if (filters.search.trim()) {
       active.push({ id: 'search', label: `Szukaj: ${filters.search.trim()}` });
+    }
+    if (filters.includeHiddenShopStatuses) {
+      active.push({
+        id: 'includeHiddenShopStatuses',
+        label: 'Ze sklepu także: oczekujące, nieudane i szkice',
+      });
     }
     return active;
   });
@@ -391,6 +402,7 @@ export class OrdersService {
       statuses: filters.statuses,
       paymentStates: filters.paymentStates,
       search: search ? search.slice(0, SEARCH_MAX_LENGTH) : null,
+      includeHiddenShopStatuses: filters.includeHiddenShopStatuses,
     };
   }
 }

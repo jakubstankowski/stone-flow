@@ -196,7 +196,41 @@ przy starcie i co 5 minut. Uśpiony proces budzi każde żądanie HTTP, dlatego:
   (domyślnie `00:05:00`, od 1 do 15 min). `Scheduling:Enabled` służy tylko testom — nie wyłączaj go
   na produkcji.
 
-## 11. Otwarte do weryfikacji na środowiskach
+## 11. Webhooki WooCommerce (SF-12)
+
+Zamówienia ze sklepu przychodzą webhookami. Integracja jest **wyłączona**, dopóki w
+`appsettings.Production.json` nie ma sekretu (`StoneFlow:WooCommerce:WebhookSecret`, co najmniej
+16 znaków; zbyt krótki zatrzymuje start API). Włączenie dopiero po próbie z SF-2 (sekcja 12).
+
+W panelu sklepu (WooCommerce → Ustawienia → Zaawansowane → Webhooki) cztery webhooki:
+
+| Nazwa | Temat | Adres | API |
+|---|---|---|---|
+| Stone Flow — utworzenie | Zamówienie utworzone | `https://<adres-api>/webhooks/woocommerce/orders` | WP REST API v3 |
+| Stone Flow — zmiana | Zamówienie zaktualizowane | jak wyżej | v3 |
+| Stone Flow — usunięcie | Zamówienie usunięte | jak wyżej | v3 |
+| Stone Flow — przywrócenie | Zamówienie przywrócone | jak wyżej | v3 |
+
+- Każdy z tym samym sekretem co w konfiguracji API; status „Aktywny”. Sekret: losowy, co najmniej
+  32 znaki alfanumeryczne (bez spacji i znaków specjalnych, które panel może przekształcić).
+- Limit 300 żądań/min liczony jest per adres wyjściowy sklepu (wszystkie dostawy z jednego adresu).
+  Masowa zmiana statusów w panelu sklepu może go przekroczyć — rozłóż ją w czasie albo po niej
+  sprawdź, czy webhooki nie zostały wyłączone.
+- Adres wskazuje bezpośrednio API (nie Vercel); ścieżka jest poza `/api`, bez ciasteczek i CSRF,
+  uwierzytelnia ją podpis HMAC.
+- Odpowiedzi: `200` — przyjęte (także dostawa pominięta lub nieczytelna, opisana w logu);
+  `401` — zły podpis; `404` — integracja wyłączona; `413` — treść > 1 MB; `429` — ponad 300
+  żądań/min z jednego adresu; `503` — błąd zapisu. Kody inne niż `2xx` liczą się w WooCommerce do
+  wyłączenia webhooka po kilku kolejnych błędach — po awarii sprawdź status webhooków w panelu
+  i włącz je ponownie; brakujące zmiany uzupełni dzienne uzupełnianie (SF-13).
+- Nie potwierdzono, czy WooCommerce ponawia dostawę po `503`. Usunięcie odebrane przy awarii bazy
+  może przepaść (REST nie zwraca trwale usuniętych zamówień) — do decyzji właściciela po próbie.
+
+## 12. Otwarte do weryfikacji na środowiskach
+
+- SF-12 / SF-2: przed włączeniem webhooków próba na kopii testowej sklepu — podpis na prawdziwym
+  payloadzie, ping (czy jest podpisany), kosz, przywrócenie i trwałe usunięcie, kolejność dostaw,
+  różnica zegarów sklepu i serwera, ponawianie po `503`, obecność meta NIP w REST.
 
 - D-08 pkt 2 (harmonogram odporny na restart i usypianie): dowód z hostingu wymaga zarejestrowanego
   zadania, więc zbiera się go przy pierwszym wdrożeniu SF-13 lub SF-16 — przebiegi w `GET /api/jobs`

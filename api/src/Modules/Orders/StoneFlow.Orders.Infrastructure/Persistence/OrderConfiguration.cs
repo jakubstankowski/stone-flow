@@ -20,6 +20,10 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
     public const string ValueConstraint = "CK_Orders_Value";
 
+    public const string ShopFieldsConstraint = "CK_Orders_ShopFields";
+
+    public const string ShopRefundedAmountConstraint = "CK_Orders_ShopRefundedAmount";
+
     private const int CodeMaxLength = 16;
 
     public void Configure(EntityTypeBuilder<Order> builder)
@@ -30,6 +34,10 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
                 SourceConstraint,
                 "([Source] = N'Manual' AND [ExternalId] IS NULL) OR ([Source] <> N'Manual' AND [ExternalId] IS NOT NULL)");
             table.HasCheckConstraint(ValueConstraint, "[Value] >= 0");
+            table.HasCheckConstraint(
+                ShopFieldsConstraint,
+                "[Source] <> N'Manual' OR ([ShopModifiedAtUtc] IS NULL AND [ShopDeletedAtUtc] IS NULL AND [ShopRefundedAmount] = 0)");
+            table.HasCheckConstraint(ShopRefundedAmountConstraint, "[ShopRefundedAmount] >= 0");
         });
 
         builder.HasKey(order => order.Id);
@@ -42,6 +50,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.Value).HasPrecision(18, 2);
         builder.Property(order => order.FulfillmentStatus).HasConversion<string>().HasMaxLength(CodeMaxLength);
         builder.Property(order => order.ShopStatus).HasMaxLength(Order.ShopStatusMaxLength);
+        builder.Property(order => order.ShopModifiedAtUtc).HasColumnType("datetime2");
+        builder.Property(order => order.ShopDeletedAtUtc).HasColumnType("datetime2");
+        builder.Property(order => order.ShopRefundedAmount).HasPrecision(18, 2);
 
         builder.ComplexProperty(order => order.Customer, customer =>
         {
@@ -81,6 +92,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
         builder.Ignore(order => order.IsCancelled);
         builder.Ignore(order => order.ShopOwnedFields);
+        builder.Ignore(order => order.IsTerminalInShop);
 
         builder.HasIndex(order => order.Number).IsUnique();
         builder.HasIndex(order => new { order.Source, order.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");
