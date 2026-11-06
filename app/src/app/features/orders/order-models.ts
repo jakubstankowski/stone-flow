@@ -156,6 +156,8 @@ export interface OrderListItem {
   readonly fulfillmentStatus: FulfillmentStatus;
   readonly paid: string;
   readonly paymentState: PaymentState | null;
+  /** Surowy kod statusu WooCommerce (np. `processing`); `null` dla zamówień ręcznych (SF-12). */
+  readonly shopStatus: string | null;
 }
 
 export interface OrderListPage {
@@ -164,6 +166,12 @@ export interface OrderListPage {
   readonly pageSize: number;
   readonly total: number;
 }
+
+/**
+ * Ostrzeżenia o rozbieżności ERP i sklepu wyliczane w backendzie (SF-12). Tylko informacja:
+ * ERP niczego nie wysyła do sklepu.
+ */
+export type ShopWarning = 'activeInShop' | 'deletedInShop' | 'cancelledInShop' | 'refundedInShop';
 
 export interface OrderDetails {
   readonly id: string;
@@ -188,6 +196,13 @@ export interface OrderDetails {
   readonly refunds: readonly RefundEntry[];
   readonly salesCorrections: readonly SalesCorrectionEntry[];
   readonly salesReductions: SalesReductions;
+  /** Data modyfikacji w sklepie z ostatnio zastosowanej dostawy (ISO UTC). */
+  readonly shopModifiedAtUtc: string | null;
+  /** Oznaczenie usunięcia zamówienia w sklepie (ISO UTC). */
+  readonly shopDeletedAtUtc: string | null;
+  /** Suma zwrotów w sklepie; tylko informacja, nie tworzy wypływu. */
+  readonly shopRefundedAmount: string;
+  readonly shopWarnings: readonly ShopWarning[];
 }
 
 export interface OrderCreated {
@@ -214,6 +229,8 @@ export interface OrderListQuery {
   readonly statuses: readonly FulfillmentStatus[];
   readonly paymentStates: readonly PaymentStateFilter[];
   readonly search: string | null;
+  /** `true` pokazuje zamówienia ze sklepu o statusie pending, failed i checkout-draft (SF-12). */
+  readonly includeHiddenShopStatuses: boolean;
 }
 
 /** Kody Problem Details, na których rozgałęzia się interfejs. */

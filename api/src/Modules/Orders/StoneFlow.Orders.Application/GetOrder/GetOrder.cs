@@ -68,6 +68,19 @@ public sealed record OrderDetailsDto(
 
     /// <summary>Pola tylko do odczytu w edycji (puste dla zamówienia ręcznego).</summary>
     public IReadOnlyList<ShopOwnedField> ShopOwnedFields => Order.OwnedByShop(Source);
+
+    /// <summary>Data modyfikacji w sklepie z ostatniej zastosowanej dostawy (SF-12).</summary>
+    public DateTime? ShopModifiedAtUtc { get; init; }
+
+    /// <summary>Usunięcie w sklepie (SF-12).</summary>
+    public DateTime? ShopDeletedAtUtc { get; init; }
+
+    /// <summary>Suma zwrotów w sklepie — informacja (SF-12).</summary>
+    public decimal ShopRefundedAmount { get; init; }
+
+    /// <summary>Ostrzeżenia ze sklepu (reguły w <see cref="ShopStatuses.WarningsFor"/>).</summary>
+    public IReadOnlyList<ShopWarning> ShopWarnings =>
+        ShopStatuses.WarningsFor(Source, FulfillmentStatus, ShopStatus, ShopDeletedAtUtc, ShopRefundedAmount);
 }
 
 public sealed record GetOrderQuery(Guid Id) : IQuery<OrderDetailsDto?>;

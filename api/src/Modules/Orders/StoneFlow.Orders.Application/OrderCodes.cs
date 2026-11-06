@@ -96,6 +96,9 @@ public static class OrderCodes
     /// <summary>Nazwa pola w audycie: camelCase nazwy pola (<c>customerName</c>).</summary>
     public static string Of(OrderField field) => CamelCase(field.ToString());
 
+    /// <summary>Kod ostrzeżenia ze sklepu (<c>activeInShop</c>, <c>deletedInShop</c>).</summary>
+    public static string Of(ShopWarning warning) => CamelCase(warning.ToString());
+
     /// <summary>Nazwa pola wpisu w audycie (<c>amount</c>, <c>receivedBy</c>).</summary>
     public static string Of(EntryField field) => CamelCase(field.ToString());
 

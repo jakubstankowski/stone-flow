@@ -18,6 +18,8 @@ public sealed class OrdersDbContext(DbContextOptions<OrdersDbContext> options) :
 
     internal DbSet<OrderNumberCounter> OrderNumberCounters => Set<OrderNumberCounter>();
 
+    internal DbSet<ShopDeletion> ShopDeletions => Set<ShopDeletion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);

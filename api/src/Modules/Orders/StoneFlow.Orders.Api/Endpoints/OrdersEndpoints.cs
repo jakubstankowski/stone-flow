@@ -51,10 +51,11 @@ internal static class OrdersEndpoints
         [FromQuery] string? source = null,
         [FromQuery] string[]? status = null,
         [FromQuery] string? search = null,
-        [FromQuery] string[]? paymentState = null)
+        [FromQuery] string[]? paymentState = null,
+        [FromQuery] string? includeHiddenShopStatuses = null)
     {
         var result = await dispatcher.QueryAsync(
-            new ListOrdersQuery(page, pageSize, sort, direction, dateFrom, dateTo, channel, source, status, search, paymentState),
+            new ListOrdersQuery(page, pageSize, sort, direction, dateFrom, dateTo, channel, source, status, search, paymentState, includeHiddenShopStatuses),
             cancellationToken);
 
         return result.Page is { } list

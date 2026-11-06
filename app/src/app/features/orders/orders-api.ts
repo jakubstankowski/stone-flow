@@ -152,5 +152,8 @@ function listParams(query: OrderListQuery): HttpParams {
   for (const state of query.paymentStates) {
     params = params.append('paymentState', state);
   }
+  if (query.includeHiddenShopStatuses) {
+    params = params.set('includeHiddenShopStatuses', 'true');
+  }
   return params;
 }

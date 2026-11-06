@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Integrations\StoneFlow.Integrations.Application\StoneFlow.Integrations.Application.csproj" />
+  </ItemGroup>
+
+</Project>

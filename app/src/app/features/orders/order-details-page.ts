@@ -18,15 +18,46 @@ import {
   OrderDetails,
   OrderInput,
   SOURCE_LABELS,
+  ShopWarning,
   STATUS_LABELS,
   STATUS_TONES,
 } from './order-models';
 import { ChangeOrderOutcome, OrdersService } from './orders.service';
+import { shopStatusLabel } from './shop-status';
 
 export const CONFLICT_MESSAGE = 'Zamówienie zostało zmienione w międzyczasie.';
 const STATE_CHANGED_MESSAGE = 'Stan zamówienia zmienił się w międzyczasie.';
 
 type ViewStatus = 'loading' | 'notFound' | 'error' | 'loaded';
+
+/** Kolejność ostrzeżeń ze sklepu na ekranie (spec „Szczegóły zamówienia”). */
+const SHOP_WARNING_ORDER: readonly ShopWarning[] = [
+  'deletedInShop',
+  'activeInShop',
+  'cancelledInShop',
+  'refundedInShop',
+];
+
+interface ShopWarningView {
+  readonly code: ShopWarning;
+  readonly text: string;
+}
+
+/** Tekst ostrzeżenia ze sklepu; kwoty i daty tylko przez `shared/format`. */
+export function shopWarningText(code: ShopWarning, order: OrderDetails): string {
+  switch (code) {
+    case 'deletedInShop':
+      return order.shopDeletedAtUtc
+        ? `Zamówienie usunięte w sklepie (${formatDateTime(order.shopDeletedAtUtc)}).`
+        : 'Zamówienie usunięte w sklepie.';
+    case 'activeInShop':
+      return 'Zamówienie aktywne w sklepie — ERP nie zmienia niczego w sklepie.';
+    case 'cancelledInShop':
+      return 'Zamówienie anulowane w sklepie.';
+    case 'refundedInShop':
+      return `Zwrot w sklepie: ${formatPln(order.shopRefundedAmount)} — informacja, nie tworzy wypływu.`;
+  }
+}
 
 interface Alert {
   readonly text: string;
@@ -79,6 +110,18 @@ export class OrderDetailsPage {
   protected readonly entryActive = signal(false);
 
   protected readonly cancelled = computed(() => this.order()?.fulfillmentStatus === 'cancelled');
+  /** Ostrzeżenia ze sklepu w stałej kolejności, niezależnie od kolejności z API. */
+  protected readonly shopWarnings = computed<readonly ShopWarningView[]>(() => {
+    const order = this.order();
+    if (!order) {
+      return [];
+    }
+    return SHOP_WARNING_ORDER.filter((code) => order.shopWarnings.includes(code)).map((code) => ({
+      code,
+      text: shopWarningText(code, order),
+    }));
+  });
+  protected readonly shopStatusLabel = shopStatusLabel;
   protected readonly statusLabels = STATUS_LABELS;
   protected readonly statusTones = STATUS_TONES;
   protected readonly sourceLabels = SOURCE_LABELS;

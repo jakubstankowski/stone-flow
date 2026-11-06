@@ -21,6 +21,7 @@ public sealed class EndpointSecurityTests
         "POST /api/auth/login",
         "POST /api/auth/password-reset/confirm",
         "POST /api/auth/password-reset/request",
+        "POST /webhooks/woocommerce/orders",
     ];
 
     [Fact]

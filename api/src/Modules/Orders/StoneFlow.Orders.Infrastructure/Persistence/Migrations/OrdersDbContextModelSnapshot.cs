@@ -64,6 +64,16 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("OrderDate")
                         .HasColumnType("date");
 
+                    b.Property<DateTime?>("ShopDeletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ShopModifiedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("ShopRefundedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("ShopStatus")
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
@@ -190,6 +200,10 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Orders", "orders", t =>
                         {
+                            t.HasCheckConstraint("CK_Orders_ShopFields", "[Source] <> N'Manual' OR ([ShopModifiedAtUtc] IS NULL AND [ShopDeletedAtUtc] IS NULL AND [ShopRefundedAmount] = 0)");
+
+                            t.HasCheckConstraint("CK_Orders_ShopRefundedAmount", "[ShopRefundedAmount] >= 0");
+
                             t.HasCheckConstraint("CK_Orders_Source_ExternalId", "([Source] = N'Manual' AND [ExternalId] IS NULL) OR ([Source] <> N'Manual' AND [ExternalId] IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Orders_Value", "[Value] >= 0");
@@ -388,6 +402,20 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                     b.HasKey("Year");
 
                     b.ToTable("OrderNumberCounters", "orders");
+                });
+
+            modelBuilder.Entity("StoneFlow.Orders.Infrastructure.Persistence.ShopDeletion", b =>
+                {
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ExternalId");
+
+                    b.ToTable("ShopDeletions", "orders");
                 });
 
             modelBuilder.Entity("StoneFlow.Orders.Domain.Payments.Payment", b =>

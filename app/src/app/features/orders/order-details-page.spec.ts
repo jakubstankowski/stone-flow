@@ -113,8 +113,62 @@ describe('OrderDetailsPage', () => {
       orderDetails({ source: 'wooCommerce', externalId: '77', shopStatus: 'processing' }),
     );
     expect(element().textContent).toContain('Status w sklepie');
-    expect(element().textContent).toContain('processing');
+    expect(element().textContent).toContain('W realizacji');
+    expect(element().textContent).not.toContain('processing');
     expect(element().textContent).toContain('Źródło: Sklep');
+  });
+
+  it('shows no shop warnings when the API reports none', async () => {
+    const { element } = await open(
+      orderDetails({ source: 'wooCommerce', externalId: '77', shopStatus: 'processing' }),
+    );
+    expect(element().querySelector('[aria-label="Ostrzeżenia ze sklepu"]')).toBeNull();
+    expect(element().querySelector('[data-shop-warning]')).toBeNull();
+    expect(element().textContent).not.toContain('w sklepie:');
+  });
+
+  it('shows the shop warnings in a fixed order as a status region', async () => {
+    const { element } = await open(
+      orderDetails({
+        source: 'wooCommerce',
+        externalId: '77',
+        shopStatus: 'trash',
+        fulfillmentStatus: 'cancelled',
+        shopDeletedAtUtc: '2026-11-02T08:15:00Z',
+        shopRefundedAmount: '150.50',
+        shopWarnings: ['refundedInShop', 'cancelledInShop', 'activeInShop', 'deletedInShop'],
+      }),
+    );
+    const region = element().querySelector('[aria-label="Ostrzeżenia ze sklepu"]');
+    expect(region?.getAttribute('role')).toBe('status');
+    const warnings = Array.from(element().querySelectorAll('[data-shop-warning]'));
+    expect(warnings.map((warning) => warning.getAttribute('data-shop-warning'))).toEqual([
+      'deletedInShop',
+      'activeInShop',
+      'cancelledInShop',
+      'refundedInShop',
+    ]);
+    expect(warnings.every((warning) => region?.contains(warning))).toBe(true);
+    expect(warnings.map((warning) => warning.textContent?.trim())).toEqual([
+      'Zamówienie usunięte w sklepie (02.11.2026, 09:15).',
+      'Zamówienie aktywne w sklepie — ERP nie zmienia niczego w sklepie.',
+      'Zamówienie anulowane w sklepie.',
+      `Zwrot w sklepie: ${formatPln('150.50')} — informacja, nie tworzy wypływu.`,
+    ]);
+    expect(element().textContent).toContain('W koszu');
+  });
+
+  it.each([
+    ['deletedInShop', 'Zamówienie usunięte w sklepie.'],
+    ['activeInShop', 'Zamówienie aktywne w sklepie — ERP nie zmienia niczego w sklepie.'],
+    ['cancelledInShop', 'Zamówienie anulowane w sklepie.'],
+    ['refundedInShop', `Zwrot w sklepie: ${formatPln('0.00')} — informacja, nie tworzy wypływu.`],
+  ] as const)('shows only the %s warning when it is the only one', async (code, text) => {
+    const { element } = await open(
+      orderDetails({ source: 'wooCommerce', externalId: '77', shopWarnings: [code] }),
+    );
+    const warnings = Array.from(element().querySelectorAll('[data-shop-warning]'));
+    expect(warnings.map((warning) => warning.textContent?.trim())).toEqual([text]);
   });
 
   it('shows a missing order', async () => {

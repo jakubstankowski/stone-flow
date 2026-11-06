@@ -20,7 +20,8 @@ public sealed record OrderListItemDto(
     decimal Value,
     FulfillmentStatus FulfillmentStatus,
     decimal PaymentsTotal,
-    decimal RefundsTotal)
+    decimal RefundsTotal,
+    string? ShopStatus = null)
 {
     public PaymentSummary Payment =>
         PaymentSummary.Compute(Value, FulfillmentStatus == FulfillmentStatus.Cancelled, PaymentsTotal, RefundsTotal);
@@ -54,7 +55,8 @@ public sealed record OrderListCriteria(
     IReadOnlyList<FulfillmentStatus> Statuses,
     string? Search,
     IReadOnlyList<PaymentState> PaymentStates,
-    bool WithoutPaymentState);
+    bool WithoutPaymentState,
+    bool IncludeHiddenShopStatuses = false);
 
 /// <summary>Parametry listy z zapytania HTTP (tekst); walidacja w handlerze.</summary>
 public sealed record ListOrdersQuery(
@@ -68,7 +70,8 @@ public sealed record ListOrdersQuery(
     string? Source = null,
     IReadOnlyList<string>? Status = null,
     string? Search = null,
-    IReadOnlyList<string>? PaymentState = null) : IQuery<ListOrdersResult>;
+    IReadOnlyList<string>? PaymentState = null,
+    string? IncludeHiddenShopStatuses = null) : IQuery<ListOrdersResult>;
 
 /// <summary>Strona listy albo błędy parametrów (400).</summary>
 public sealed record ListOrdersResult(OrderListPageDto? Page, FieldErrors? Errors = null);
@@ -216,9 +219,23 @@ public sealed class ListOrdersHandler(IOrderReader reader) : IQueryHandler<ListO
             errors.Add("search", $"Wyszukiwany tekst może mieć najwyżej {SearchMaxLength} znaków.");
         }
 
+        // Zamówienia ze sklepu w statusach pending, failed i szkic są domyślnie ukryte (SF-12).
+        var includeHidden = false;
+        switch (OrderInput.Text(query.IncludeHiddenShopStatuses))
+        {
+            case null or "false":
+                break;
+            case "true":
+                includeHidden = true;
+                break;
+            default:
+                errors.Add("includeHiddenShopStatuses", "Dozwolone wartości: true, false.");
+                break;
+        }
+
         return errors.IsEmpty
             ? new OrderListCriteria(
-                page, pageSize, sort, descending, dateFrom, dateTo, channel, source, [.. statuses.Distinct()], search, [.. paymentStates.Distinct()], withoutPaymentState)
+                page, pageSize, sort, descending, dateFrom, dateTo, channel, source, [.. statuses.Distinct()], search, [.. paymentStates.Distinct()], withoutPaymentState, includeHidden)
             : null;
     }
 

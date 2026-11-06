@@ -25,7 +25,13 @@ import {
   STATUS_LABELS,
   STATUS_TONES,
 } from './order-models';
-import { DATE_RANGE_MESSAGE, OrdersService, SEARCH_MAX_LENGTH } from './orders.service';
+import {
+  DATE_RANGE_MESSAGE,
+  HIDDEN_SHOP_STATUSES_LABEL,
+  OrdersService,
+  SEARCH_MAX_LENGTH,
+} from './orders.service';
+import { shopStatusLabel } from './shop-status';
 
 const COLUMNS: readonly DataTableColumn<OrderListItem>[] = [
   { key: 'number', header: 'Numer', sortable: true },
@@ -78,6 +84,8 @@ export class OrdersListPage {
   protected readonly paymentStateTones = PAYMENT_STATE_TONES;
   protected readonly searchMaxLength = SEARCH_MAX_LENGTH;
   protected readonly dateRangeMessage = DATE_RANGE_MESSAGE;
+  protected readonly hiddenShopStatusesLabel = HIDDEN_SHOP_STATUSES_LABEL;
+  protected readonly shopStatusLabel = shopStatusLabel;
 
   constructor() {
     void this.orders.load();
@@ -127,6 +135,11 @@ export class OrdersListPage {
         )
       : current;
     void this.orders.updateFilters({ paymentStates: next });
+  }
+
+  protected onHiddenShopStatuses(event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+    void this.orders.updateFilters({ includeHiddenShopStatuses: checked });
   }
 
   protected isPaymentStateChecked(state: PaymentStateFilter): boolean {

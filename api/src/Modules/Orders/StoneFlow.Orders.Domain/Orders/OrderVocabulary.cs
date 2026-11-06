@@ -80,4 +80,13 @@ public enum OrderField
     HasReview,
     Notes,
     Comment,
+
+    /// <summary>Status ze sklepu (SF-12).</summary>
+    ShopStatus,
+
+    /// <summary>Usunięcie w sklepie (tak/nie).</summary>
+    ShopDeleted,
+
+    /// <summary>Kwota zwrotów w sklepie (informacja).</summary>
+    ShopRefundedAmount,
 }
