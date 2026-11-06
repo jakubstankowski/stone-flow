@@ -9,3 +9,5 @@ c9f09a540d32350dfeaff096002df422faf3d4f1:api/tests/StoneFlow.Access.Tests/Applic
 # Fikcyjny sekret webhooka w testach SF-12 (reguła generic-api-key).
 4fde4b1a89d8c018bebdfb072ca96b0a623ff3d1:api/tests/StoneFlow.Api.IntegrationTests/Orders/WooCommerceWebhookTests.cs:generic-api-key:16
 4fde4b1a89d8c018bebdfb072ca96b0a623ff3d1:api/tests/StoneFlow.Integrations.Tests/WooCommerce/WooCommercePayloadTests.cs:generic-api-key:10
+# Fikcyjny sekret webhooka w testach SF-13 (reguła generic-api-key).
+93d5c17f7ef277d45b6aaea5efaa6e77a4921c6e:api/tests/StoneFlow.Api.IntegrationTests/Integrations/WooCommerceBackfillTests.cs:generic-api-key:26
