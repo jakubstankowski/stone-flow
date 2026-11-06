@@ -314,7 +314,7 @@ the `app` prefix (`app-data-table`), enforced by ESLint.
 | `features/{area}/` | One feature area per main section, loaded with `loadComponent`/`loadChildren` |
 | `layout/` | Application shell, main navigation (`nav-items.ts` is the single list of sections), page title strategy |
 | `shared/ui/` | Reusable UI elements: `app-button`, `app-field`, `app-confirm-dialog`, `app-data-table`, `app-status-badge`, `app-loading-state`, `app-empty-state`, `app-error-state` |
-| `shared/format/` | Polish formatting functions and pipes (`plnAmount`, `plDate`, `plMonth`, `plDateTime`) |
+| `shared/format/` | Polish formatting functions and pipes (`plnAmount`, `plDate`, `plMonth`, `plDateTime`; `formatTime`, `formatReadTime` without pipes) |
 
 Routes use Polish slugs without diacritics (`/pulpit`, `/zamowienia`, `/wydatki`, `/operacje`,
 `/historia-zmian`, `/integracja`), with `title` and `data.section` equal to the section label.
@@ -368,6 +368,12 @@ Decided in SF-6. The frontend presents results; it does not calculate finances.
   and `novalidate`; validation runs in the UI and again in the API.
 - Forms show validation, save state and protection against double submission. Lists handle
   loading, empty and error states.
+- Background requests (decided in SF-14, e.g. the integration status refresh): „Żądania w tle (np.
+  odświeżanie stanu integracji) wysyła się tylko z widocznej karty i tylko w chwili celowej
+  aktywności użytkownika (`keydown`, `pointerdown`, powrót na widoczną kartę), która nastąpiła po
+  poprzednim odczycie, bo każde żądanie przedłuża sesję (DOST-01). Ruch kursora i kółko nie są
+  aktywnością. Brak świeżego odczytu pokazuje się jako stan ostrożny, nie jako stan kompletny.”
+  Client time limits use the RxJS `timeout` operator in the area client, before `firstValueFrom`.
 
 | Path in `app/src/app/` | Holds |
 |---|---|

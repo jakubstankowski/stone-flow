@@ -4,6 +4,7 @@
   [disabled]="disabled()"
   [attr.aria-disabled]="busy() || null"
   [attr.aria-busy]="busy() || null"
+  [attr.aria-describedby]="describedBy()"
   (click)="onClick($event)"
 >
   @if (busy()) {
