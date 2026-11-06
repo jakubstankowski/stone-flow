@@ -54,12 +54,12 @@ echo "== 1. Pusta baza"
 sql master "CREATE DATABASE [${db_ok}];" >/dev/null
 ConnectionStrings__StoneFlow="$(connection_for "$db_ok")" deploy/scripts/migrate.sh \
   || fail "Migracje na pustej bazie nie powiodły się."
-[[ "$(history_tables "$db_ok")" == "5" ]] || fail "Oczekiwano 5 tabel historii migracji."
+[[ "$(history_tables "$db_ok")" == "6" ]] || fail "Oczekiwano 6 tabel historii migracji."
 
 echo "== 2. Ponowne uruchomienie"
 ConnectionStrings__StoneFlow="$(connection_for "$db_ok")" deploy/scripts/migrate.sh \
   || fail "Ponowne uruchomienie migracji nie powiodło się."
-[[ "$(history_tables "$db_ok")" == "5" ]] || fail "Ponowne uruchomienie zmieniło liczbę tabel historii."
+[[ "$(history_tables "$db_ok")" == "6" ]] || fail "Ponowne uruchomienie zmieniło liczbę tabel historii."
 
 echo "== 3. Błąd w środku sekwencji"
 sql master "CREATE DATABASE [${db_fail}];" >/dev/null
@@ -69,7 +69,7 @@ if ConnectionStrings__StoneFlow="$(connection_for "$db_fail")" deploy/scripts/mi
 fi
 [[ "$(sql "$db_fail" "SELECT COUNT(*) FROM sys.tables t JOIN sys.schemas s ON s.schema_id = t.schema_id WHERE s.name = 'access' AND t.name = '__EFMigrationsHistory';")" == "1" ]] \
   || fail "access powinien być zmigrowany przed błędem."
-[[ "$(sql "$db_fail" "SELECT COUNT(*) FROM sys.schemas WHERE name IN ('expenses', 'reporting', 'integrations');")" == "0" ]] \
+[[ "$(sql "$db_fail" "SELECT COUNT(*) FROM sys.schemas WHERE name IN ('expenses', 'reporting', 'integrations', 'scheduling');")" == "0" ]] \
   || fail "Konteksty po orders nie powinny zostać uruchomione."
 
 echo "== 4. Nieosiągalny serwer"

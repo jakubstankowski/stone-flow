@@ -14,6 +14,7 @@ using StoneFlow.Orders.Infrastructure.Persistence;
 using StoneFlow.Reporting.Infrastructure;
 using StoneFlow.Reporting.Infrastructure.Persistence;
 using StoneFlow.Shared.Infrastructure;
+using StoneFlow.Shared.Infrastructure.Scheduling;
 
 namespace StoneFlow.Architecture.Tests;
 
@@ -42,6 +43,23 @@ public sealed class DbContextSchemaTests
     [MemberData(nameof(Modules.All), MemberType = typeof(Modules))]
     public void Schema_is_module_name_in_lower_case(string module) =>
         Assert.Equal(module.ToLowerInvariant(), Module(module).Schema);
+
+    /// <summary>Harmonogram zadań (SF-11) jest częścią wspólną, nie modułem: własny schemat <c>scheduling</c>.</summary>
+    [Fact]
+    public void Scheduling_context_uses_only_its_schema()
+    {
+        using var provider = BuildProvider(_ => { });
+        using var scope = provider.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<SchedulingDbContext>();
+
+        var model = context.GetService<IDesignTimeModel>().Model;
+        Assert.Equal(SchedulingDbContext.Schema, model.GetDefaultSchema());
+        Assert.All(model.GetEntityTypes(), entity => Assert.Equal(SchedulingDbContext.Schema, entity.GetSchema()));
+
+        var relational = RelationalOptionsExtension.Extract(context.GetService<IDbContextOptions>());
+        Assert.Equal(SchedulingDbContext.Schema, relational.MigrationsHistoryTableSchema);
+        Assert.Equal(typeof(SchedulingDbContext).Assembly.GetName().Name, relational.MigrationsAssembly);
+    }
 
     private static ServiceProvider BuildProvider(Action<IServiceCollection> register)
     {

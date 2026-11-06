@@ -177,7 +177,33 @@ Konfiguracja ręczna w Better Stack Uptime:
 - Alert e-mailem na adres właściciela.
 - `/health` jest anonimowy i bez szczegółów; `503` oznacza brak połączenia z bazą.
 
-## 10. Otwarte do weryfikacji na środowiskach
+## 10. Harmonogram zadań (SF-11)
+
+Zadania automatyczne (uzupełnianie WooCommerce, wydatki cykliczne) uruchamia harmonogram w API.
+Stan, ostatni sukces i dzierżawa są w schemacie `scheduling` w bazie; API sprawdza należne zadania
+przy starcie i co 5 minut. Uśpiony proces budzi każde żądanie HTTP, dlatego:
+
+| Budzik | Adres | Interwał |
+|---|---|---|
+| Zadanie w panelu hostingu („Scheduled Tasks”, plan Premium) | `GET https://<adres-api>/health` | 15 min |
+| Monitor Better Stack (sekcja 9) | `GET https://<adres-api>/health` | 3 min |
+
+- Wywołanie nie niesie uprawnień ani sekretu — tylko budzi i podtrzymuje proces. Nie ustawiaj
+  w panelu adresów z tokenem ani hasłem (adres trafia do logów IIS).
+- Stan zadań: `GET /api/jobs` po zalogowaniu — ostatni przebieg, błąd, ostatni sukces, liczba
+  kolejnych błędów i najbliższa próba. Po błędzie API ponawia po 15 min, potem co 1 h.
+- Konfiguracja opcjonalna w `appsettings.Production.json`: `Scheduling:TimerInterval`
+  (domyślnie `00:05:00`, od 1 do 15 min). `Scheduling:Enabled` służy tylko testom — nie wyłączaj go
+  na produkcji.
+
+## 11. Otwarte do weryfikacji na środowiskach
+
+- D-08 pkt 2 (harmonogram odporny na restart i usypianie): dowód z hostingu wymaga zarejestrowanego
+  zadania, więc zbiera się go przy pierwszym wdrożeniu SF-13 lub SF-16 — przebiegi w `GET /api/jobs`
+  po recyklingu puli i po nocy bez ruchu. Do sprawdzenia: limit bezczynności puli (oczekiwany
+  > 15 min) i to, że przebieg do 30 min kończy się bez uśpienia. „Bezpieczne uwierzytelnienie
+  wywołań” z D-08 nie dotyczy tego projektu, bo wywołanie budzące nie niesie uprawnień — do
+  odnotowania przez właściciela przy zamykaniu D-08.
 
 - Automatyczny przebieg obu publikacji i kontrole po publikacji.
 - Odświeżenie podstrony SPA na Vercel i przepisanie `/api/*` z zachowaniem ciasteczek sesji

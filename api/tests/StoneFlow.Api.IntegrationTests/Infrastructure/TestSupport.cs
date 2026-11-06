@@ -11,6 +11,7 @@ using StoneFlow.Expenses.Infrastructure.Persistence;
 using StoneFlow.Integrations.Infrastructure.Persistence;
 using StoneFlow.Orders.Infrastructure.Persistence;
 using StoneFlow.Reporting.Infrastructure.Persistence;
+using StoneFlow.Shared.Infrastructure.Scheduling;
 
 namespace StoneFlow.Api.IntegrationTests.Infrastructure;
 
@@ -86,6 +87,7 @@ internal static class TestDatabase
             scope.ServiceProvider.GetRequiredService<ExpensesDbContext>(),
             scope.ServiceProvider.GetRequiredService<ReportingDbContext>(),
             scope.ServiceProvider.GetRequiredService<IntegrationsDbContext>(),
+            scope.ServiceProvider.GetRequiredService<SchedulingDbContext>(),
         ];
 
         foreach (var context in contexts)

@@ -9,4 +9,5 @@ STONEFLOW_CONTEXTS=(
   "api/src/Modules/Expenses/StoneFlow.Expenses.Infrastructure|ExpensesDbContext"
   "api/src/Modules/Reporting/StoneFlow.Reporting.Infrastructure|ReportingDbContext"
   "api/src/Modules/Integrations/StoneFlow.Integrations.Infrastructure|IntegrationsDbContext"
+  "api/src/Shared/StoneFlow.Shared.Infrastructure|SchedulingDbContext"
 )
