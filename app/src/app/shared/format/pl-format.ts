@@ -41,6 +41,21 @@ const dateTimeFormat = new Intl.DateTimeFormat('pl-PL', {
   timeZone: WARSAW,
 });
 
+const timeFormat = new Intl.DateTimeFormat('pl-PL', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: WARSAW,
+});
+
+/** Klucz dnia kalendarzowego w Europe/Warsaw (`yyyy-MM-dd`). */
+const warsawDayFormat = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  timeZone: WARSAW,
+});
+
 export type AmountInput = number | string | null | undefined;
 
 /**
@@ -89,12 +104,36 @@ export function formatMonth(value: string | null | undefined): string {
  * Znacznik bez strefy (np. `DateTimeKind.Unspecified` z .NET) jest traktowany jako UTC.
  */
 export function formatDateTime(value: string | null | undefined): string {
-  if (!value || !/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+  const date = parseTimestamp(value);
+  return date ? dateTimeFormat.format(date) : NO_DATA;
+}
+
+/** Znacznik techniczny UTC (ISO 8601) → `14:05` w strefie Europe/Warsaw. */
+export function formatTime(value: string | null | undefined): string {
+  const date = parseTimestamp(value);
+  return date ? timeFormat.format(date) : NO_DATA;
+}
+
+/**
+ * Czas odczytu względem chwili `nowMs`: sama godzina (`14:05`), gdy to ten sam dzień w
+ * Europe/Warsaw, a w przeciwnym razie data z godziną (`28.10.2026, 14:05`).
+ */
+export function formatReadTime(value: string | null | undefined, nowMs: number): string {
+  const date = parseTimestamp(value);
+  if (!date) {
     return NO_DATA;
+  }
+  const sameDay = warsawDayFormat.format(date) === warsawDayFormat.format(new Date(nowMs));
+  return sameDay ? timeFormat.format(date) : dateTimeFormat.format(date);
+}
+
+function parseTimestamp(value: string | null | undefined): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    return null;
   }
   const hasZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
   const date = new Date(hasZone ? value : `${value}Z`);
-  return Number.isNaN(date.getTime()) ? NO_DATA : dateTimeFormat.format(date);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function parseIsoDate(value: string | null | undefined): Date | null {

@@ -6,6 +6,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTestHttp, signIn, signOut } from '../../testing/auth-testing';
 import { routes } from '../app.routes';
 import { PageTitleStrategy } from './page-title-strategy';
+import { discardIntegrationRequests } from '../../testing/integration-testing';
 
 describe('PageTitleStrategy', () => {
   beforeEach(() => {
@@ -18,7 +19,10 @@ describe('PageTitleStrategy', () => {
     });
   });
 
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    discardIntegrationRequests();
+    TestBed.inject(HttpTestingController).verify();
+  });
 
   it('sets the document title to "{section} · Stone Flow"', async () => {
     await signIn();

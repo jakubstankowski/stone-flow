@@ -1,0 +1,8 @@
+<a
+  class="flex min-h-11 items-center gap-1 rounded-field px-2 hover:bg-base-200"
+  routerLink="/integracja"
+  [attr.aria-label]="accessibleName()"
+>
+  <app-integration-state-badge [presentation]="status.presentation()" />
+</a>
+<p class="sr-only" role="status" aria-live="polite">{{ status.announcement() }}</p>
