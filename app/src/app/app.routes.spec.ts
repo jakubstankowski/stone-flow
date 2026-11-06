@@ -15,13 +15,15 @@ import { IntegrationPage } from './features/integration/integration-page';
 import { OperationsPage } from './features/operations/operations-page';
 import { OrdersListPage } from './features/orders/orders-list-page';
 import { NAV_ITEMS } from './layout/nav-items';
+import { discardIntegrationRequests } from '../testing/integration-testing';
 
-const SECTIONS: [string, string, Type<unknown>][] = [
-  ['/pulpit', 'Pulpit', DashboardPage],
-  ['/wydatki', 'Wydatki', ExpensesPage],
-  ['/operacje', 'Operacje', OperationsPage],
-  ['/historia-zmian', 'Historia zmian', ChangeHistoryPage],
-  ['/integracja', 'Integracja', IntegrationPage],
+/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”). */
+const SECTIONS: [string, string, Type<unknown>, boolean][] = [
+  ['/pulpit', 'Pulpit', DashboardPage, true],
+  ['/wydatki', 'Wydatki', ExpensesPage, true],
+  ['/operacje', 'Operacje', OperationsPage, true],
+  ['/historia-zmian', 'Historia zmian', ChangeHistoryPage, true],
+  ['/integracja', 'Integracja', IntegrationPage, false],
 ];
 
 const AUTH_SCREENS: [string, string, Type<unknown>][] = [
@@ -35,7 +37,10 @@ describe('app routes', () => {
     TestBed.configureTestingModule({ providers: [provideRouter(routes), provideTestHttp()] });
   });
 
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    discardIntegrationRequests();
+    TestBed.inject(HttpTestingController).verify();
+  });
 
   it('defines a lazily loaded route for every navigation item', () => {
     for (const item of NAV_ITEMS) {
@@ -47,7 +52,7 @@ describe('app routes', () => {
     }
   });
 
-  it.each(SECTIONS)('loads %s with the page heading %s', async (url, label, page) => {
+  it.each(SECTIONS)('loads %s with the page heading %s', async (url, label, page, placeholder) => {
     await signIn();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl(url);
@@ -56,9 +61,11 @@ describe('app routes', () => {
       harness.routeDebugElement?.query((node) => node.componentInstance instanceof page),
     ).not.toBeNull();
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(label);
-    expect(harness.routeNativeElement?.textContent).toContain(
-      'Ten widok powstanie w kolejnych etapach.',
-    );
+    if (placeholder) {
+      expect(harness.routeNativeElement?.textContent).toContain(
+        'Ten widok powstanie w kolejnych etapach.',
+      );
+    }
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
   });
 

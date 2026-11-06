@@ -12,7 +12,8 @@ const TONE_CLASSES: Record<StatusTone, string> = {
 
 /**
  * Etykieta statusu: tekst jest zawsze widoczny, ton jest tylko wzmocnieniem
- * (design guide, sekcje 2 i 6). Nie definiuje słownika statusów biznesowych.
+ * (design guide, sekcje 2 i 6). Nie definiuje słownika statusów biznesowych. Projekcja
+ * (np. ikona z `aria-hidden`) trafia przed etykietę.
  */
 @Component({
   selector: 'app-status-badge',
@@ -20,6 +21,7 @@ const TONE_CLASSES: Record<StatusTone, string> = {
     @if (marker()) {
       <span class="size-2 rounded-full bg-current" aria-hidden="true"></span>
     }
+    <ng-content />
     {{ label() }}
   </span>`,
 })

@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { nextRequest, provideTestHttp } from '../testing/auth-testing';
 import { App } from './app';
 import { routes } from './app.routes';
+import { discardIntegrationRequests } from '../testing/integration-testing';
 
 describe('App', () => {
   beforeEach(async () => {
@@ -13,7 +14,10 @@ describe('App', () => {
     }).compileComponents();
   });
 
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    discardIntegrationRequests();
+    TestBed.inject(HttpTestingController).verify();
+  });
 
   it('shows the session check instead of the shell until the API answers', async () => {
     const fixture = TestBed.createComponent(App);
