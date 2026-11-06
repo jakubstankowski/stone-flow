@@ -1,7 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
+using StoneFlow.Shared.Application.Scheduling;
 
 namespace StoneFlow.Api.IntegrationTests.Scheduling;
 
@@ -25,7 +27,7 @@ public sealed class JobsEndpointTests(SqlServerFixture sqlServer)
     [Fact]
     public async Task Without_registered_jobs_returns_empty_list_without_database()
     {
-        await using var factory = new StoneFlowApiFactory();
+        await using var factory = new StoneFlowApiFactory { ConfigureTestServices = services => services.RemoveAll<JobDefinition>() };
         using var client = factory.CreateClient();
 
         using var response = await GetAsOwnerAsync(client);

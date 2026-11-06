@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
 using StoneFlow.Api.IntegrationTests.Infrastructure;
 using StoneFlow.Shared.Application.Scheduling;
@@ -65,6 +66,8 @@ internal sealed class SchedulerHost : IAsyncDisposable
             Time = time,
             ConfigureTestServices = services =>
             {
+                // Tylko zadanie testowe: zadania modułów (np. uzupełnianie WooCommerce) nie mieszają się z historią.
+                services.RemoveAll<JobDefinition>();
                 services.AddSingleton(control);
                 services.AddScheduledJob<TestJob>(new JobDefinition(TestJob.Key, JobSchedule.DailyAt(new TimeOnly(23, 0)), maxDuration));
             },

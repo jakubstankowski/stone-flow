@@ -10,7 +10,15 @@ namespace StoneFlow.Integrations.Application.WooCommerce;
 /// <param name="Snapshot">Zamówienie z dostawy albo <c>null</c>, gdy treść jest nieczytelna.</param>
 /// <param name="Problem">Powód nieczytelności (bez danych klienta) do logu.</param>
 /// <param name="Currency">Waluta z treści (diagnostyka; sklep sprzedaje tylko w PLN).</param>
-public sealed record PayloadReadResult(ShopOrderSnapshot? Snapshot, string? Problem, string? Currency = null);
+/// <param name="ExternalId">ID zamówienia, gdy dało się je odczytać — także dla treści nieczytelnej
+/// (klucz historii błędów, SF-13).</param>
+/// <param name="ModifiedAtUtc">Data modyfikacji z treści, gdy czytelna — także dla treści nieczytelnej.</param>
+public sealed record PayloadReadResult(
+    ShopOrderSnapshot? Snapshot,
+    string? Problem,
+    string? Currency = null,
+    string? ExternalId = null,
+    DateTime? ModifiedAtUtc = null);
 
 /// <summary>
 /// Mapowanie zamówienia WooCommerce REST v3 (treść webhooka) na <see cref="ShopOrderSnapshot"/>
@@ -45,7 +53,7 @@ public static partial class WooCommerceOrderPayload
 
             if (topic == ShopOrderTopic.Deleted)
             {
-                return new PayloadReadResult(ShopOrderSnapshot.Deletion(id), null);
+                return new PayloadReadResult(ShopOrderSnapshot.Deletion(id), null, ExternalId: id);
             }
 
             var status = Text(root, "status");
@@ -54,22 +62,22 @@ public static partial class WooCommerceOrderPayload
             var total = ReadAmount(root, "total");
             if (status is null || created is null || modified is null || total is null)
             {
-                return Unreadable($"brak wymaganych pól zamówienia {id}");
+                return Unreadable($"brak wymaganych pól zamówienia {id}", id, modified);
             }
 
             if (total is < 0 or > MaxAmount)
             {
-                return Unreadable($"wartość zamówienia {id} poza zakresem");
+                return Unreadable($"wartość zamówienia {id} poza zakresem", id, modified);
             }
 
             if (ReadRefunds(root) is not { } refunded || refunded > MaxAmount)
             {
-                return Unreadable($"nieczytelne zwroty zamówienia {id}");
+                return Unreadable($"nieczytelne zwroty zamówienia {id}", id, modified);
             }
 
             var orderDate = DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(created.Value, WarsawTimeZone.Zone));
             var snapshot = new ShopOrderSnapshot(id, topic, modified, orderDate, status, total, refunded, ReadCustomer(root));
-            return new PayloadReadResult(snapshot, null, Text(root, "currency"));
+            return new PayloadReadResult(snapshot, null, Text(root, "currency"), id, modified);
         }
     }
 
@@ -90,7 +98,8 @@ public static partial class WooCommerceOrderPayload
         return compact.Length == 0 ? null : compact;
     }
 
-    private static PayloadReadResult Unreadable(string problem) => new(null, problem);
+    private static PayloadReadResult Unreadable(string problem, string? externalId = null, DateTime? modifiedAtUtc = null) =>
+        new(null, problem, ExternalId: externalId, ModifiedAtUtc: modifiedAtUtc);
 
     private static string? ReadId(JsonElement root)
     {

@@ -13,8 +13,28 @@ public sealed class WooCommerceOptions
 
     public const int MinSecretLength = 16;
 
+    public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromSeconds(30);
+
+    public static readonly TimeSpan MaxRequestTimeout = TimeSpan.FromMinutes(5);
+
     /// <summary>Sekret webhooków; brak oznacza wyłączoną integrację.</summary>
     public string? WebhookSecret { get; set; }
+
+    /// <summary>Adres sklepu (<c>https</c>) dla REST v3 (SF-13); brak trójki REST wyłącza uzupełnianie i „Ponów”.</summary>
+    public string? BaseUrl { get; set; }
+
+    /// <summary>Klucz REST (uprawnienie „Read”); tylko w nagłówku <c>Authorization</c>.</summary>
+    public string? ConsumerKey { get; set; }
+
+    /// <summary>Sekret klucza REST; tylko w nagłówku <c>Authorization</c>.</summary>
+    public string? ConsumerSecret { get; set; }
+
+    /// <summary>Limit czasu jednego żądania REST.</summary>
+    public TimeSpan RequestTimeout { get; set; } = DefaultRequestTimeout;
+
+    /// <summary>Czy podano pełną trójkę REST.</summary>
+    public bool RestConfigured =>
+        !string.IsNullOrWhiteSpace(BaseUrl) && !string.IsNullOrWhiteSpace(ConsumerKey) && !string.IsNullOrWhiteSpace(ConsumerSecret);
 }
 
 public sealed class WooCommerceOptionsValidator : IValidateOptions<WooCommerceOptions>
@@ -22,16 +42,41 @@ public sealed class WooCommerceOptionsValidator : IValidateOptions<WooCommerceOp
     public ValidateOptionsResult Validate(string? name, WooCommerceOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        return string.IsNullOrWhiteSpace(options.WebhookSecret) || options.WebhookSecret.Length >= WooCommerceOptions.MinSecretLength
-            ? ValidateOptionsResult.Success
-            : ValidateOptionsResult.Fail(
-                $"'{WooCommerceOptions.SectionName}:WebhookSecret' musi mieć co najmniej {WooCommerceOptions.MinSecretLength} znaków.");
+        var failures = new List<string>();
+        if (!string.IsNullOrWhiteSpace(options.WebhookSecret) && options.WebhookSecret.Length < WooCommerceOptions.MinSecretLength)
+        {
+            failures.Add($"'{WooCommerceOptions.SectionName}:WebhookSecret' musi mieć co najmniej {WooCommerceOptions.MinSecretLength} znaków.");
+        }
+
+        var given = new[] { options.BaseUrl, options.ConsumerKey, options.ConsumerSecret }.Count(v => !string.IsNullOrWhiteSpace(v));
+        if (given is > 0 and < 3)
+        {
+            failures.Add($"'{WooCommerceOptions.SectionName}': podaj razem BaseUrl, ConsumerKey i ConsumerSecret albo żadnego z nich.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.BaseUrl)
+            && !(Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var url) && url.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(url.Query)))
+        {
+            failures.Add($"'{WooCommerceOptions.SectionName}:BaseUrl' musi być adresem https bez parametrów.");
+        }
+
+        if (options.RequestTimeout <= TimeSpan.Zero || options.RequestTimeout > WooCommerceOptions.MaxRequestTimeout)
+        {
+            failures.Add($"'{WooCommerceOptions.SectionName}:RequestTimeout' musi mieścić się w zakresie (0, {WooCommerceOptions.MaxRequestTimeout}].");
+        }
+
+        return failures.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(failures);
     }
 }
 
 internal sealed class WooCommerceWebhookSettings(IOptions<WooCommerceOptions> options) : IWooCommerceWebhookSettings
 {
     public string? Secret => string.IsNullOrWhiteSpace(options.Value.WebhookSecret) ? null : options.Value.WebhookSecret;
+}
+
+internal sealed class WooCommerceRestSettings(IOptions<WooCommerceOptions> options) : IWooCommerceRestSettings
+{
+    public bool IsConfigured => options.Value.RestConfigured;
 }
 
 /// <summary>Każda próba w nowym zakresie DI; jedno ponowienie po naruszeniu unikalności.</summary>
@@ -65,9 +110,6 @@ internal sealed partial class WooCommerceWebhookEvents(ILogger<WooCommerceWebhoo
 
     public void UnknownStatus(string externalId, string status) => LogUnknownStatus(externalId, status);
 
-    public void Failed(Exception exception, string topic, string? deliveryId, string externalId) =>
-        LogFailed(exception, topic, deliveryId, externalId);
-
     [LoggerMessage(EventId = 7200, Level = LogLevel.Warning, Message = "Webhook WooCommerce: odrzucony podpis, dostawa {DeliveryId}.")]
     private partial void LogSignatureRejected(string? deliveryId);
 
@@ -86,6 +128,5 @@ internal sealed partial class WooCommerceWebhookEvents(ILogger<WooCommerceWebhoo
     [LoggerMessage(EventId = 7205, Level = LogLevel.Information, Message = "Webhook WooCommerce: niestandardowy status {Status} zamówienia {ExternalId}.")]
     private partial void LogUnknownStatus(string externalId, string status);
 
-    [LoggerMessage(EventId = 7206, Level = LogLevel.Error, Message = "Webhook WooCommerce: błąd zapisu {Topic} zamówienia {ExternalId} (dostawa {DeliveryId}).")]
-    private partial void LogFailed(Exception exception, string topic, string? deliveryId, string externalId);
+    // EventId 7206 (błąd zapisu w webhooku) wycofany w SF-13: błąd loguje raz OrderOutcome (7305).
 }

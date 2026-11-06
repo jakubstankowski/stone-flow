@@ -153,10 +153,13 @@ per module assembly (`AddHandlersFromAssembly` in the module's `DependencyInject
     (does the record exist and may this account act on it): in the handler — being logged in
     does not replace it;
   - transaction: one `SaveChanges` per use case is already atomic. In financial modules
-    (Orders, Expenses, Reporting, Integrations) every state-changing use case runs in
+    (Orders, Expenses, Reporting) every state-changing use case runs in
     `IUnitOfWork.ExecuteInTransactionAsync(work, commitWhen, …)` (SF-7), which also covers the
     audit entry; `commitWhen` returns `false` for a failure result so partial writes roll back.
-    Access keeps its own `IAccessUnitOfWork`.
+    Access keeps its own `IAccessUnitOfWork`. Integrations (SF-13) changes orders only through
+    `IShopOrderSync` (which uses `IUnitOfWork` in Orders); its own tables (`IntegrationsDbContext`)
+    have their own connection and use transactions of that context, not `IUnitOfWork` (see "Data
+    access").
 - Handlers do not call other handlers through the dispatcher. When use cases share behaviour,
   extract a module-local operation (a domain method or an Application helper used by both) and
   state who owns validation, the transaction, retries and side effects. No global service layer.
@@ -265,7 +268,9 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
   job or sync creates a new DI scope per unit of work; after a rolled-back unit of work the scope
   does no further writes. `SchedulingDbContext` is the exception: it has its own connection (not
   `ModuleConnection`) and uses transactions of its own context for the job lease, so scheduler
-  writes never join a job's unit of work.
+  writes never join a job's unit of work. `IntegrationsDbContext` (SF-13: sync cursor, runs, order
+  error history) follows the same pattern, so a rolled-back order write never rolls back its error
+  record; Integrations calls Orders only through `IShopOrderSync`/`IShopOrderLookup`.
 - Migrations run before the new code is published (SF-4), so every migration must work with the
   previous API version (expand/contract: add first, remove in a later deployment). Never edit an
   applied migration; fix forward. A new module with a database is appended to
