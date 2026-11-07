@@ -10,7 +10,7 @@ import { PasswordResetRequestPage } from './features/auth/password-reset-request
 import { SetPasswordPage } from './features/auth/set-password-page';
 import { ChangeHistoryPage } from './features/change-history/change-history-page';
 import { DashboardPage } from './features/dashboard/dashboard-page';
-import { ExpensesPage } from './features/expenses/expenses-page';
+import { ExpensesListPage } from './features/expenses/expenses-list-page';
 import { IntegrationPage } from './features/integration/integration-page';
 import { OperationsPage } from './features/operations/operations-page';
 import { OrdersListPage } from './features/orders/orders-list-page';
@@ -18,7 +18,6 @@ import { NAV_ITEMS } from './layout/nav-items';
 
 const SECTIONS: [string, string, Type<unknown>][] = [
   ['/pulpit', 'Pulpit', DashboardPage],
-  ['/wydatki', 'Wydatki', ExpensesPage],
   ['/operacje', 'Operacje', OperationsPage],
   ['/historia-zmian', 'Historia zmian', ChangeHistoryPage],
   ['/integracja', 'Integracja', IntegrationPage],
@@ -81,6 +80,34 @@ describe('app routes', () => {
 
     expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(heading);
+  });
+
+  it.each([
+    ['/wydatki', 'Wydatki'],
+    ['/wydatki/nowy', 'Dodaj wydatek'],
+  ])('loads the expenses section at %s with the heading %s', async (url, heading) => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl(url);
+    if (url === '/wydatki') {
+      (await nextRequest((request) => request.url === '/api/expenses')).flush({
+        items: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+      });
+    }
+    await navigation;
+
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(heading);
+    if (url === '/wydatki') {
+      expect(
+        harness.routeDebugElement?.query(
+          (node) => node.componentInstance instanceof ExpensesListPage,
+        ),
+      ).not.toBeNull();
+    }
   });
 
   it('lists orders with the list page', async () => {

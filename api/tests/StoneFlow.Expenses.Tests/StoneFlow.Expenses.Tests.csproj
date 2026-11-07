@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Domain\StoneFlow.Expenses.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Expenses\StoneFlow.Expenses.Application\StoneFlow.Expenses.Application.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,172 @@
+<section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-bold">Wydatki</h1>
+    @if (!expenses.registryEmpty()) {
+      <app-button variant="primary" (pressed)="add()">Dodaj wydatek</app-button>
+    }
+  </div>
+
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+
+  @if (expenses.registryEmpty()) {
+    <app-empty-state
+      heading="Brak wydatków"
+      description="Dodaj pierwszy wydatek, aby pojawił się na liście."
+    >
+      <app-button variant="primary" (pressed)="add()">Dodaj wydatek</app-button>
+    </app-empty-state>
+  } @else {
+    <app-data-table
+      caption="Wydatki"
+      emptyTitle="Brak wydatków"
+      [filteredEmptyTitle]="filteredEmptyTitle()"
+      [columns]="columns"
+      [rows]="expenses.items()"
+      [rowKey]="rowKey"
+      [total]="expenses.total()"
+      [page]="expenses.page()"
+      [pageSize]="expenses.pageSize"
+      [sort]="expenses.sort()"
+      [filters]="expenses.activeFilters()"
+      [filterable]="true"
+      [loading]="expenses.loading()"
+      [error]="expenses.error()"
+      (pageChange)="onPage($event)"
+      (sortChange)="onSort($event)"
+      (filterRemove)="expenses.removeFilter($event)"
+      (filtersClear)="expenses.clearFilters()"
+      (retry)="expenses.load()"
+    >
+      <form
+        tableFilters
+        novalidate
+        aria-label="Filtry wydatków"
+        class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2 xl:grid-cols-4"
+        (submit)="onSearch($event)"
+      >
+        <app-field
+          label="Szukaj"
+          fieldId="wydatki-szukaj"
+          hint="Opis, kontrahent lub dokument. Zatwierdź klawiszem Enter."
+        >
+          <input
+            #control
+            class="input w-full"
+            type="search"
+            autocomplete="off"
+            [attr.maxlength]="searchMaxLength"
+            [value]="expenses.filters().search"
+            (change)="onSearchChange($event)"
+          />
+        </app-field>
+        <app-field label="Stan" fieldId="wydatki-stan">
+          <select #control class="select w-full" (change)="onState($event)">
+            <option value="" [selected]="expenses.filters().state === ''">Wszystkie</option>
+            @for (state of stateFilters; track state) {
+              <option [value]="state" [selected]="expenses.filters().state === state">
+                {{ stateFilterLabels[state] }}
+              </option>
+            }
+          </select>
+        </app-field>
+        <app-field label="Kwota" fieldId="wydatki-znak">
+          <select #control class="select w-full" (change)="onSign($event)">
+            <option value="" [selected]="expenses.filters().sign === ''">Wszystkie</option>
+            @for (sign of signFilters; track sign) {
+              <option [value]="sign" [selected]="expenses.filters().sign === sign">
+                {{ signFilterLabels[sign] }}
+              </option>
+            }
+          </select>
+        </app-field>
+        <div class="hidden xl:block"></div>
+        <app-field
+          label="Data kosztu od"
+          fieldId="wydatki-koszt-od"
+          [error]="expenses.costDateRangeInvalid() ? dateRangeMessage : null"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="expenses.filters().costDateFrom"
+            (change)="onDate('costDateFrom', $event)"
+          />
+        </app-field>
+        <app-field label="Data kosztu do" fieldId="wydatki-koszt-do">
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="expenses.filters().costDateTo"
+            (change)="onDate('costDateTo', $event)"
+          />
+        </app-field>
+        <app-field
+          label="Data zapłaty od"
+          fieldId="wydatki-zaplata-od"
+          [error]="expenses.paidOnRangeInvalid() ? dateRangeMessage : null"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="expenses.filters().paidOnFrom"
+            (change)="onDate('paidOnFrom', $event)"
+          />
+        </app-field>
+        <app-field label="Data zapłaty do" fieldId="wydatki-zaplata-do">
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="expenses.filters().paidOnTo"
+            (change)="onDate('paidOnTo', $event)"
+          />
+        </app-field>
+        <fieldset class="flex flex-col gap-1 md:col-span-2 xl:col-span-4">
+          <legend class="text-base font-medium">Kategoria</legend>
+          <div class="flex flex-wrap gap-x-6">
+            @for (category of categories; track category) {
+              <label class="flex min-h-11 items-center gap-2">
+                <input
+                  class="checkbox"
+                  type="checkbox"
+                  [checked]="isCategoryChecked(category)"
+                  (change)="onCategory(category, $event)"
+                />
+                {{ categoryLabels[category] }}
+              </label>
+            }
+          </div>
+        </fieldset>
+      </form>
+
+      <ng-template appTableCell="description" [appTableCellOf]="expenses.items()" let-row>
+        <a class="link font-medium text-(--sf-accent-text)" [routerLink]="['/wydatki', row.id]">{{
+          row.description
+        }}</a>
+        @if (isNegative(row.grossAmount)) {
+          <span class="mt-1 block text-sm text-(--sf-muted)">{{ negativeLabel }}</span>
+        }
+      </ng-template>
+      <ng-template appTableCell="state" [appTableCellOf]="expenses.items()" let-row>
+        <span class="flex flex-wrap gap-1">
+          <app-status-badge
+            [label]="statusLabels[row.paymentStatus]"
+            [tone]="statusTones[row.paymentStatus]"
+          />
+          @if (row.overdue) {
+            <app-status-badge [label]="overdueLabel" tone="warning" [marker]="true" />
+          }
+        </span>
+      </ng-template>
+    </app-data-table>
+  }
+</section>

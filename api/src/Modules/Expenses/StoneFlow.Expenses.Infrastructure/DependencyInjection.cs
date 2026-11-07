@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using StoneFlow.Expenses.Application;
+using StoneFlow.Expenses.Application.Abstractions;
 using StoneFlow.Expenses.Infrastructure.Persistence;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
@@ -11,6 +13,10 @@ public static class DependencyInjection
     {
         services.AddDbContext<ExpensesDbContext>((serviceProvider, options) =>
             options.UseModuleSqlServer<ExpensesDbContext>(serviceProvider, ExpensesDbContext.Schema));
+
+        services.AddScoped<IExpenseStore, ExpenseStore>();
+        services.AddScoped<IExpenseReader, ExpenseReader>();
+        services.AddScoped<ExpenseChangeRunner>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 

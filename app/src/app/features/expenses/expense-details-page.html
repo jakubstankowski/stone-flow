@@ -1,0 +1,217 @@
+<section class="flex flex-col gap-6">
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+  <div role="alert">
+    @if (alert(); as current) {
+      <div
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+      >
+        <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+        @if (current.reload) {
+          <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+            Wczytaj ponownie
+          </app-button>
+        }
+      </div>
+    }
+  </div>
+
+  @switch (status()) {
+    @case ('loading') {
+      <h1 class="text-3xl font-bold">Wydatek</h1>
+      <app-loading-state [rows]="6" label="Wczytywanie wydatku…" />
+    }
+    @case ('notFound') {
+      <h1 class="text-3xl font-bold">Wydatek</h1>
+      <app-empty-state heading="Nie znaleziono wydatku" description="Mógł zostać usunięty.">
+        <app-button (pressed)="goToList()">Wróć do listy</app-button>
+      </app-empty-state>
+    }
+    @case ('error') {
+      <h1 class="text-3xl font-bold">Wydatek</h1>
+      <app-error-state message="Nie udało się wczytać wydatku." (retry)="retry()" />
+    }
+    @case ('loaded') {
+      @if (expense(); as expense) {
+        <div class="flex flex-col gap-3">
+          <h1 class="text-3xl font-bold">{{ expense.description }}</h1>
+          <div class="flex flex-wrap gap-2">
+            <app-status-badge
+              [label]="statusLabels[expense.paymentStatus]"
+              [tone]="statusTones[expense.paymentStatus]"
+            />
+            @if (expense.overdue) {
+              <app-status-badge [label]="overdueLabel" tone="warning" [marker]="true" />
+            }
+            @if (negative()) {
+              <app-status-badge [label]="negativeLabel" tone="info" />
+            }
+          </div>
+        </div>
+
+        @switch (mode()) {
+          @case ('edit') {
+            @if (formInitial(); as initial) {
+              <app-expense-form
+                submitLabel="Zapisz zmiany"
+                [initial]="initial"
+                [action]="save"
+                [confirmClearPaid]="confirmClearPaid"
+              >
+                <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+              </app-expense-form>
+            }
+          }
+          @case ('pay') {
+            <app-expense-paid-form
+              [grossAmount]="expense.grossAmount"
+              [paymentMethod]="expense.paymentMethod"
+              [action]="pay"
+            >
+              <app-button formActions (pressed)="closeForm()">Anuluj</app-button>
+            </app-expense-paid-form>
+          }
+          @default {
+            <div class="flex flex-wrap gap-3">
+              <app-button variant="primary" (pressed)="startEdit()">Edytuj</app-button>
+              @if (paid()) {
+                <app-button
+                  [busy]="actionBusy() === 'unmark'"
+                  busyLabel="Zapisywanie…"
+                  (pressed)="unmark()"
+                >
+                  Cofnij oznaczenie zapłaty
+                </app-button>
+              } @else {
+                <app-button (pressed)="startPay()">Oznacz jako opłacony</app-button>
+              }
+              <app-button
+                variant="danger"
+                [busy]="actionBusy() === 'delete'"
+                busyLabel="Usuwanie…"
+                (pressed)="remove()"
+              >
+                Usuń
+              </app-button>
+              <app-button (pressed)="goToList()">Wróć do listy</app-button>
+            </div>
+          }
+        }
+
+        @if (mode() !== 'edit') {
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="wydatek-kwoty"
+            >
+              <h2 id="wydatek-kwoty" class="text-xl font-semibold">Kwoty</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kwota brutto</dt>
+                  <dd class="tabular-nums">{{ formatPln(expense.grossAmount) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kwota netto</dt>
+                  <dd class="tabular-nums">{{ formatPln(expense.netAmount) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kategoria</dt>
+                  <dd>{{ categoryLabels[expense.category] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kontrahent</dt>
+                  <dd>{{ expense.counterparty ?? noData }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="wydatek-daty"
+            >
+              <h2 id="wydatek-daty" class="text-xl font-semibold">Daty</h2>
+              <dl class="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Data kosztu</dt>
+                  <dd>{{ formatDate(expense.costDate) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Termin płatności</dt>
+                  <dd>{{ formatDate(expense.dueDate) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Data zapłaty</dt>
+                  <dd>{{ formatDate(expense.paidOn) }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="wydatek-platnosc"
+            >
+              <h2 id="wydatek-platnosc" class="text-xl font-semibold">Płatność i dokument</h2>
+              <dl class="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Metoda płatności</dt>
+                  <dd>
+                    {{ expense.paymentMethod ? methodLabels[expense.paymentMethod] : noData }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Płatnik</dt>
+                  <dd>{{ expense.payer ?? noData }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Referencja dokumentu</dt>
+                  <dd>{{ expense.documentReference ?? noData }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="wydatek-komentarz-naglowek"
+            >
+              <h2 id="wydatek-komentarz-naglowek" class="text-xl font-semibold">Komentarz</h2>
+              <p class="whitespace-pre-line">{{ expense.comment ?? noData }}</p>
+              <p class="text-sm text-(--sf-muted)">
+                Dodano {{ formatDateTime(expense.createdAtUtc) }}, ostatnia zmiana
+                {{ formatDateTime(expense.updatedAtUtc) }}.
+              </p>
+            </section>
+          </div>
+        }
+
+        <app-confirm-dialog
+          #unmarkDialog
+          heading="Cofnąć oznaczenie zapłaty?"
+          confirmLabel="Cofnij oznaczenie"
+          tone="primary"
+        >
+          <p>
+            Wydatek „{{ expense.description }}” wróci do stanu Planowany i przestanie liczyć się do
+            wypływów z {{ formatDate(expense.paidOn) }}. Zmiana zostanie zapisana w historii zmian.
+          </p>
+        </app-confirm-dialog>
+        <app-confirm-dialog
+          #deleteDialog
+          heading="Usunąć wydatek?"
+          confirmLabel="Usuń"
+          tone="danger"
+        >
+          <p>
+            Wydatek „{{ expense.description }}” z {{ formatDate(expense.costDate) }} na
+            {{ formatPln(expense.grossAmount) }} zostanie usunięty z ewidencji i raportów. Ślad
+            usunięcia zostanie w historii zmian.
+          </p>
+        </app-confirm-dialog>
+      }
+    }
+  }
+</section>

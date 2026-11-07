@@ -32,7 +32,7 @@ import {
   toRefundInput,
 } from './entry-form-model';
 import { EntryField, focusById, outcomeErrors, shownError, summaryOf } from './entry-form-support';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import {
   REFUND_KINDS,
   REFUND_KIND_DESCRIPTIONS,

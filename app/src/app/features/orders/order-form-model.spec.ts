@@ -1,4 +1,5 @@
 import { orderDetails } from '../../../testing/orders-testing';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import {
   ORDER_MESSAGES,
   amountError,
@@ -6,7 +7,6 @@ import {
   isValidPostalCode,
   isValidTaxId,
   orderFormFrom,
-  todayInWarsaw,
   toOrderInput,
 } from './order-form-model';
 
