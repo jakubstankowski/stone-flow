@@ -33,7 +33,7 @@ import {
   toPaymentInput,
 } from './entry-form-model';
 import { EntryField, focusById, outcomeErrors, shownError, summaryOf } from './entry-form-support';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, PaymentInput } from './order-models';
 
 export type PaymentFormAction = (input: PaymentInput) => Promise<EntryFormOutcome>;

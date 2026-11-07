@@ -25,7 +25,7 @@ import {
   toSalesCorrectionInput,
 } from './entry-form-model';
 import { EntryField, focusById, outcomeErrors, shownError, summaryOf } from './entry-form-support';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import { SalesCorrectionInput } from './order-models';
 
 export type SalesCorrectionFormAction = (input: SalesCorrectionInput) => Promise<EntryFormOutcome>;

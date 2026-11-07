@@ -7,7 +7,7 @@ import {
   emptyRefundForm,
   refundFormFrom,
 } from './entry-form-model';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import { RefundInput } from './order-models';
 import { RefundForm } from './refund-form';
 

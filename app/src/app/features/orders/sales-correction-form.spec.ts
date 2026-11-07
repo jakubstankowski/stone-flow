@@ -7,7 +7,7 @@ import {
   emptySalesCorrectionForm,
   salesCorrectionFormFrom,
 } from './entry-form-model';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import { SalesCorrectionInput } from './order-models';
 import { SalesCorrectionForm } from './sales-correction-form';
 
