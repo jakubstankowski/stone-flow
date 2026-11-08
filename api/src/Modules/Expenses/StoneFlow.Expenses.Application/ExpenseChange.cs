@@ -32,7 +32,7 @@ public sealed record ExpenseChangeResult(ExpenseChangeOutcome Outcome, byte[]? V
 /// Wspólny przebieg zmiany wydatku dla poprawy i akcji zapłaty, w jednej jednostce pracy:
 /// wczytanie (404), wersja (409 — zawsze przed regułą domeny), operacja domeny (409 przy
 /// naruszeniu reguły zapłaty), brak zmian (sukces bez zapisu i audytu), zapis z oczekiwaną wersją
-/// (409 przy konflikcie w bazie) i audyt <c>Updated</c>. Zatwierdzany jest tylko wynik
+/// (409 przy konflikcie w bazie) i audyt <c>Updated</c> (z rodzicem — definicją — dla wystąpienia cyklicznego). Zatwierdzany jest tylko wynik
 /// <see cref="ExpenseChangeOutcome.Saved"/>. Walidację wejścia robi handler przed wywołaniem.
 /// </summary>
 public sealed class ExpenseChangeRunner(IUnitOfWork unitOfWork, IAuditLog auditLog, IExpenseStore store, TimeProvider timeProvider)
@@ -91,7 +91,7 @@ public sealed class ExpenseChangeRunner(IUnitOfWork unitOfWork, IAuditLog auditL
             return new ExpenseChangeResult(ExpenseChangeOutcome.Conflict);
         }
 
-        await auditLog.RecordAsync(ExpenseAudit.Updated(stored.Expense, result.Changes, AuditAuthor.Account(accountId)), cancellationToken);
+        await auditLog.RecordAsync(ExpenseAudit.Updated(stored.Expense, result.Changes, AuditAuthor.Account(accountId), ExpenseAudit.ParentOf(stored.Expense)), cancellationToken);
         return new ExpenseChangeResult(ExpenseChangeOutcome.Saved, saved.Version);
     }
 }

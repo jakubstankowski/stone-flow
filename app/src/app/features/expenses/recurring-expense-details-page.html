@@ -1,0 +1,241 @@
+<section class="flex flex-col gap-6">
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+  <div role="alert">
+    @if (alert(); as current) {
+      <div
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+      >
+        <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+        @if (current.action === 'reload') {
+          <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+            Wczytaj ponownie
+          </app-button>
+        } @else if (current.action === 'retry') {
+          <app-button [busy]="reloading()" busyLabel="Zapisywanie…" (pressed)="retryLast()">
+            Spróbuj ponownie
+          </app-button>
+        }
+      </div>
+    }
+  </div>
+
+  @switch (status()) {
+    @case ('loading') {
+      <h1 class="text-3xl font-bold">Wydatek cykliczny</h1>
+      <app-loading-state [rows]="6" label="Wczytywanie wydatku cyklicznego…" />
+    }
+    @case ('notFound') {
+      <h1 class="text-3xl font-bold">Wydatek cykliczny</h1>
+      <app-empty-state
+        heading="Nie znaleziono wydatku cyklicznego"
+        description="Mógł zostać usunięty."
+      >
+        <app-button (pressed)="goToList()">Wróć do listy</app-button>
+      </app-empty-state>
+    }
+    @case ('error') {
+      <h1 class="text-3xl font-bold">Wydatek cykliczny</h1>
+      <app-error-state message="Nie udało się wczytać wydatku cyklicznego." (retry)="retry()" />
+    }
+    @case ('loaded') {
+      @if (definition(); as definition) {
+        <div class="flex flex-col gap-3">
+          <h1 class="text-3xl font-bold">{{ definition.description }}</h1>
+          <div class="flex flex-wrap gap-2">
+            <app-status-badge
+              [label]="statusLabels[definition.status]"
+              [tone]="statusTones[definition.status]"
+            />
+          </div>
+        </div>
+
+        @if (definition.pausedOn) {
+          <p
+            class="rounded-box border border-(--sf-warning) bg-base-100 p-4 font-medium"
+            data-testid="wstrzymany"
+          >
+            Wstrzymany od {{ formatDate(definition.pausedOn) }}. Okresy z terminem w czasie
+            wstrzymania pozostaną puste.
+          </p>
+        }
+
+        @if (editing()) {
+          @if (formInitial(); as initial) {
+            <app-expense-form
+              submitLabel="Zapisz zmiany"
+              [initial]="initial"
+              [recurring]="formOptions()"
+            >
+              <app-button formActions (pressed)="closeForm()">Zamknij bez zapisu</app-button>
+            </app-expense-form>
+          }
+        } @else {
+          <div class="flex flex-wrap gap-3">
+            <app-button variant="primary" (pressed)="startEdit()">Edytuj</app-button>
+            @if (canResume()) {
+              <app-button
+                [busy]="actionBusy() === 'resume'"
+                busyLabel="Zapisywanie…"
+                (pressed)="resume()"
+              >
+                Wznów
+              </app-button>
+            } @else if (canPause()) {
+              <app-button
+                [busy]="actionBusy() === 'pause'"
+                busyLabel="Zapisywanie…"
+                (pressed)="pause()"
+              >
+                Wstrzymaj
+              </app-button>
+            }
+            <app-button
+              variant="danger"
+              [busy]="actionBusy() === 'delete'"
+              busyLabel="Usuwanie…"
+              (pressed)="remove()"
+            >
+              Usuń
+            </app-button>
+            <app-button (pressed)="goToList()">Wróć do listy</app-button>
+          </div>
+
+          <div class="grid gap-6 lg:grid-cols-2">
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="cykliczny-kwoty"
+            >
+              <h2 id="cykliczny-kwoty" class="text-xl font-semibold">Kwoty</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kwota brutto</dt>
+                  <dd class="tabular-nums">{{ formatPln(definition.grossAmount) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kwota netto</dt>
+                  <dd class="tabular-nums">{{ formatPln(definition.netAmount) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kategoria</dt>
+                  <dd>{{ categoryLabels[definition.category] }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Kontrahent</dt>
+                  <dd>{{ definition.counterparty ?? noData }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="cykliczny-harmonogram"
+            >
+              <h2 id="cykliczny-harmonogram" class="text-xl font-semibold">Harmonogram</h2>
+              <dl class="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Dzień miesiąca</dt>
+                  <dd>{{ dayOfMonthText(definition.dayOfMonth) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Początek</dt>
+                  <dd>{{ formatDate(definition.startsOn) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Koniec</dt>
+                  <dd>{{ definition.endsOn ? formatDate(definition.endsOn) : 'Bez końca' }}</dd>
+                </div>
+                <div class="sm:col-span-3">
+                  <dt class="text-sm text-(--sf-muted)">Najbliższy termin</dt>
+                  <dd data-testid="najblizszy-termin">{{ nextDue() }}</dd>
+                </div>
+                <div class="sm:col-span-3">
+                  <dt class="text-sm text-(--sf-muted)">Utworzone wystąpienia</dt>
+                  <dd class="flex flex-wrap items-center gap-x-3">
+                    <span>Utworzone wystąpienia: {{ definition.occurrenceCount }}</span>
+                    <a
+                      class="link inline-flex min-h-11 items-center text-(--sf-accent-text)"
+                      routerLink="/wydatki"
+                      [queryParams]="{ wydatekCykliczny: definition.id }"
+                      >Pokaż wystąpienia</a
+                    >
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="cykliczny-platnosc"
+            >
+              <h2 id="cykliczny-platnosc" class="text-xl font-semibold">Płatność</h2>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Metoda płatności</dt>
+                  <dd>
+                    {{ definition.paymentMethod ? methodLabels[definition.paymentMethod] : noData }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Płatnik</dt>
+                  <dd>{{ definition.payer ?? noData }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section
+              class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+              aria-labelledby="cykliczny-komentarz"
+            >
+              <h2 id="cykliczny-komentarz" class="text-xl font-semibold">Komentarz</h2>
+              <p class="whitespace-pre-line">{{ definition.comment ?? noData }}</p>
+              <p class="text-sm text-(--sf-muted)">
+                Dodano {{ formatDateTime(definition.createdAtUtc) }}, ostatnia zmiana
+                {{ formatDateTime(definition.updatedAtUtc) }}.
+              </p>
+            </section>
+          </div>
+        }
+
+        <app-confirm-dialog
+          #pauseDialog
+          heading="Wstrzymać wydatek cykliczny?"
+          confirmLabel="Wstrzymaj"
+          tone="primary"
+        >
+          <p>
+            Do czasu wznowienia nie powstaną nowe wystąpienia. Okresy z terminem w czasie
+            wstrzymania pozostaną puste — wznowienie ich nie uzupełni.
+          </p>
+        </app-confirm-dialog>
+        <app-confirm-dialog
+          #resumeDialog
+          heading="Wznowić wydatek cykliczny?"
+          confirmLabel="Wznów"
+          tone="primary"
+        >
+          @for (line of resumeLines(); track $index) {
+            <p>{{ line }}</p>
+          }
+        </app-confirm-dialog>
+        <app-confirm-dialog
+          #deleteDialog
+          heading="Usunąć wydatek cykliczny?"
+          confirmLabel="Usuń"
+          tone="danger"
+        >
+          <p>
+            Wydatek cykliczny „{{ definition.description }}” zostanie usunięty i nie utworzy
+            kolejnych wystąpień. Utworzone wystąpienia ({{ definition.occurrenceCount }}) pozostaną
+            zwykłymi wydatkami w ewidencji i raportach. Ślad usunięcia zostanie w historii zmian.
+          </p>
+        </app-confirm-dialog>
+      }
+    }
+  }
+</section>

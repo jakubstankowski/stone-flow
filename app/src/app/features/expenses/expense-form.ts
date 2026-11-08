@@ -17,6 +17,7 @@ import {
   FormField,
   TreeValidationResult,
   ValidationError,
+  disabled,
   form,
   submit,
   validate,
@@ -38,6 +39,22 @@ import {
   paidOnError,
   toExpenseInput,
 } from './expense-form-model';
+import {
+  ExpenseEditorModel,
+  RECURRING_HINTS,
+  RecurringFormOptions,
+  dayOfMonthError,
+  emptySchedule,
+  endsOnError,
+  previewQueryOf,
+  recurringErrorMessage,
+  recurringGrossError,
+  recurringNetError,
+  startsOnError,
+  toRecurringExpenseInput,
+} from './recurring-expense-form-model';
+import { RecurringPreviewQuery } from './recurring-expense-models';
+import { RecurringExpensePreviewPanel } from './recurring-expense-preview';
 import {
   CATEGORIES,
   CATEGORY_LABELS,
@@ -62,6 +79,8 @@ interface RegisteredField {
   readonly key: string;
   readonly id: string;
   readonly field: () => FieldTree<string>;
+  /** Pole tylko jednego trybu (jednorazowy albo definicja). */
+  readonly only?: 'expense' | 'definition';
 }
 
 function message(text: string | null): ValidationError | null {
@@ -77,16 +96,23 @@ function maxLength(value: string, limit: number, text: string): string | null {
  * i dokument”, „Komentarz”). Ujemna kwota brutto pokazuje opis „Korekta / zwrot od dostawcy”.
  * Wyczyszczenie daty zapłaty opłaconego wydatku wymaga potwierdzenia (`confirmClearPaid`) — tylko
  * w UI; API przyjmuje `paidOn = null` bez flagi.
+ *
+ * Z `recurring` formularz ma tryb definicji (SF-16): „Powtarzaj co miesiąc” (dodanie) albo stały
+ * tryb (edycja). Tryb definicji ukrywa „Daty” i „Referencję dokumentu”, pokazuje „Harmonogram”
+ * z podglądem i zapisuje przez `recurring.action`. Odznaczenie opcji przywraca wpisane daty.
  */
 @Component({
   selector: 'app-expense-form',
-  imports: [Button, Field, FormField],
+  imports: [Button, Field, FormField, RecurringExpensePreviewPanel],
   templateUrl: './expense-form.html',
 })
 export class ExpenseForm {
   readonly initial = input.required<ExpenseFormModel>();
   readonly submitLabel = input('Zapisz');
-  readonly action = input.required<ExpenseFormAction>();
+  /** Zapis wydatku jednorazowego; bez niego formularz działa tylko w trybie definicji. */
+  readonly action = input<ExpenseFormAction | null>(null);
+  /** Tryb definicji wydatku cyklicznego; `null` — zwykły wydatek. */
+  readonly recurring = input<RecurringFormOptions | null>(null);
   /** Potwierdzenie usunięcia daty zapłaty; `null` pomija pytanie (np. nowy wydatek). */
   readonly confirmClearPaid = input<(() => Promise<boolean>) | null>(null);
 
@@ -101,8 +127,19 @@ export class ExpenseForm {
   private readonly injector = inject(Injector);
   private readonly summaryElement = viewChild<ElementRef<HTMLElement>>('summaryBox');
 
-  private readonly model = linkedSignal(() => structuredClone(this.initial()));
+  protected readonly hints = RECURRING_HINTS;
+
+  private readonly model = linkedSignal<ExpenseEditorModel>(() => {
+    const options = this.recurring();
+    return {
+      ...structuredClone(this.initial()),
+      ...(options ? { ...options.schedule } : emptySchedule()),
+      recurring: options ? options.kind === 'edit' || options.checked : false,
+    };
+  });
   protected readonly form = form(this.model, (path) => {
+    // Wstrzymana definicja: dzień zablokowany, ale wysyłany z modelu (NC6).
+    disabled(path.dayOfMonth, () => this.recurring()?.paused ?? false);
     validate(path.description, ({ value }) =>
       message(
         value().trim() === ''
@@ -118,28 +155,51 @@ export class ExpenseForm {
         maxLength(value(), EXPENSE_LIMITS.counterparty, EXPENSE_MESSAGES.counterpartyTooLong),
       ),
     );
-    validate(path.costDate, ({ value }) =>
+    validate(path.costDate, ({ value, valueOf }) =>
       message(
-        value() === ''
-          ? EXPENSE_MESSAGES.costDateRequired
-          : isValidDate(value())
-            ? null
-            : EXPENSE_MESSAGES.dateInvalid,
+        valueOf(path.recurring)
+          ? null
+          : value() === ''
+            ? EXPENSE_MESSAGES.costDateRequired
+            : isValidDate(value())
+              ? null
+              : EXPENSE_MESSAGES.dateInvalid,
       ),
     );
-    validate(path.dueDate, ({ value }) => message(optionalDateError(value())));
-    validate(path.paidOn, ({ value }) => message(paidOnError(value(), this.today)));
-    validate(path.grossAmount, ({ value }) => message(grossAmountError(value())));
-    validate(path.netAmount, ({ value, valueOf }) =>
-      message(netAmountError(value(), valueOf(path.grossAmount))),
+    validate(path.dueDate, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? null : optionalDateError(value())),
     );
-    validate(path.documentReference, ({ value }) =>
+    validate(path.paidOn, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? null : paidOnError(value(), this.today)),
+    );
+    validate(path.grossAmount, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? recurringGrossError(value()) : grossAmountError(value())),
+    );
+    validate(path.netAmount, ({ value, valueOf }) =>
       message(
-        maxLength(
-          value(),
-          EXPENSE_LIMITS.documentReference,
-          EXPENSE_MESSAGES.documentReferenceTooLong,
-        ),
+        valueOf(path.recurring)
+          ? recurringNetError(value())
+          : netAmountError(value(), valueOf(path.grossAmount)),
+      ),
+    );
+    validate(path.dayOfMonth, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? dayOfMonthError(value()) : null),
+    );
+    validate(path.startsOn, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? startsOnError(value()) : null),
+    );
+    validate(path.endsOn, ({ value, valueOf }) =>
+      message(valueOf(path.recurring) ? endsOnError(value(), valueOf(path.startsOn)) : null),
+    );
+    validate(path.documentReference, ({ value, valueOf }) =>
+      message(
+        valueOf(path.recurring)
+          ? null
+          : maxLength(
+              value(),
+              EXPENSE_LIMITS.documentReference,
+              EXPENSE_MESSAGES.documentReferenceTooLong,
+            ),
       ),
     );
     validate(path.payer, ({ value }) =>
@@ -160,22 +220,74 @@ export class ExpenseForm {
     { key: 'counterparty', id: 'wydatek-kontrahent', field: () => this.form.counterparty },
     { key: 'grossAmount', id: 'wydatek-brutto', field: () => this.form.grossAmount },
     { key: 'netAmount', id: 'wydatek-netto', field: () => this.form.netAmount },
-    { key: 'costDate', id: 'wydatek-data-kosztu', field: () => this.form.costDate },
-    { key: 'dueDate', id: 'wydatek-termin', field: () => this.form.dueDate },
-    { key: 'paidOn', id: 'wydatek-data-zaplaty', field: () => this.form.paidOn },
+    {
+      key: 'costDate',
+      id: 'wydatek-data-kosztu',
+      field: () => this.form.costDate,
+      only: 'expense',
+    },
+    { key: 'dueDate', id: 'wydatek-termin', field: () => this.form.dueDate, only: 'expense' },
+    {
+      key: 'paidOn',
+      id: 'wydatek-data-zaplaty',
+      field: () => this.form.paidOn,
+      only: 'expense',
+    },
+    {
+      key: 'dayOfMonth',
+      id: 'wydatek-dzien',
+      field: () => this.form.dayOfMonth,
+      only: 'definition',
+    },
+    {
+      key: 'startsOn',
+      id: 'wydatek-poczatek',
+      field: () => this.form.startsOn,
+      only: 'definition',
+    },
+    { key: 'endsOn', id: 'wydatek-koniec', field: () => this.form.endsOn, only: 'definition' },
     {
       key: 'paymentMethod',
       id: 'wydatek-metoda',
       field: () => this.form.paymentMethod as FieldTree<string>,
     },
     { key: 'payer', id: 'wydatek-platnik', field: () => this.form.payer },
-    { key: 'documentReference', id: 'wydatek-dokument', field: () => this.form.documentReference },
+    {
+      key: 'documentReference',
+      id: 'wydatek-dokument',
+      field: () => this.form.documentReference,
+      only: 'expense',
+    },
     { key: 'comment', id: 'wydatek-komentarz', field: () => this.form.comment },
   ];
 
   protected readonly busy = computed(() => this.form().submitting());
+  /** Tryb definicji: zaznaczone „Powtarzaj co miesiąc” albo edycja definicji. */
+  protected readonly definitionMode = computed(() => this.model().recurring);
+  protected readonly showRecurringToggle = computed(() => this.recurring()?.kind === 'create');
+  protected readonly editingDefinition = computed(() => this.recurring()?.kind === 'edit');
+  protected readonly pausedDefinition = computed(() => this.recurring()?.paused ?? false);
+  protected readonly dayHint = computed(() => {
+    if (this.pausedDefinition()) {
+      return `${RECURRING_HINTS.dayPaused} ${RECURRING_HINTS.day}`;
+    }
+    return this.editingDefinition()
+      ? `${RECURRING_HINTS.day} ${RECURRING_HINTS.dayEdit}`
+      : RECURRING_HINTS.day;
+  });
+  /** Zapytanie podglądu (tylko przy poprawnym formacie harmonogramu). */
+  protected readonly previewQuery = computed<RecurringPreviewQuery | null>(
+    () => {
+      const model = this.model();
+      return model.recurring ? previewQueryOf(model, this.recurring()?.definitionId ?? null) : null;
+    },
+    { equal: (a, b) => JSON.stringify(a) === JSON.stringify(b) },
+  );
   /** Brutto wpisane jako ujemne (tekstowo): pokazuje opis korekty / zwrotu. */
   protected readonly negative = computed(() => {
+    if (this.model().recurring) {
+      return false;
+    }
     const amount = parseSignedPlnAmount(this.model().grossAmount);
     return amount !== null && isNegativeAmount(amount);
   });
@@ -187,7 +299,11 @@ export class ExpenseForm {
       return [];
     }
     const items: SummaryItem[] = [];
+    const mode = this.model().recurring ? 'definition' : 'expense';
     for (const entry of this.registry) {
+      if (entry.only && entry.only !== mode) {
+        continue;
+      }
       const text = this.errorOf(entry.field());
       if (text) {
         items.push({ id: entry.id, message: text });
@@ -203,6 +319,7 @@ export class ExpenseForm {
     // Nowy stan początkowy (np. „Wczytaj ponownie”) czyści dotknięcia i podsumowanie.
     effect(() => {
       this.initial();
+      this.recurring();
       untracked(() => {
         this.form().reset();
         this.attempted.set(false);
@@ -227,6 +344,17 @@ export class ExpenseForm {
 
   protected async onSubmit(event: Event): Promise<void> {
     event.preventDefault();
+    await this.resubmit();
+  }
+
+  /** Czy formularz właśnie zapisuje (blokuje ponowienia z zewnątrz, np. „Spróbuj ponownie”). */
+  readonly saving = computed(() => this.busy());
+
+  /**
+   * Zapis bieżących danych formularza tą samą ścieżką co „Zapisz” (walidacja, `busy`, błędy przy
+   * polach). Używa go „Spróbuj ponownie” po `503`, żeby nie wysłać starszej wersji danych.
+   */
+  async resubmit(): Promise<void> {
     if (this.busy()) {
       return;
     }
@@ -242,25 +370,42 @@ export class ExpenseForm {
   }
 
   private async save(): Promise<TreeValidationResult> {
-    const clearsPaid = this.initial().paidOn !== '' && this.model().paidOn === '';
-    const confirm = this.confirmClearPaid();
-    if (clearsPaid && confirm && !(await confirm())) {
-      return null;
+    const model = this.model();
+    const recurring = this.recurring();
+    const definition = model.recurring && recurring !== null;
+    let outcome: ExpenseFormOutcome;
+    if (model.recurring && recurring) {
+      outcome = await recurring.action(toRecurringExpenseInput(model));
+    } else {
+      const action = this.action();
+      if (!action) {
+        return null;
+      }
+      const clearsPaid = this.initial().paidOn !== '' && model.paidOn === '';
+      const confirm = this.confirmClearPaid();
+      if (clearsPaid && confirm && !(await confirm())) {
+        return null;
+      }
+      outcome = await action(toExpenseInput(model));
     }
-    const outcome = await this.action()(toExpenseInput(this.model()));
     if (!outcome) {
       return null;
     }
     const { error } = outcome;
     if (error.kind !== 'validation') {
-      this.general.set([expenseErrorMessage(error)]);
+      this.general.set([definition ? recurringErrorMessage(error) : expenseErrorMessage(error)]);
       return null;
     }
+    const mode = definition ? 'definition' : 'expense';
     const fieldErrors: ValidationError.WithFieldTree[] = [];
     const unmatched: string[] = [];
     for (const [key, messages] of Object.entries(error.fieldErrors)) {
       const normalized = key.replace(/^\$\./, '');
-      const entry = this.registry.find((candidate) => candidate.key.toLowerCase() === normalized);
+      const entry = this.registry.find(
+        (candidate) =>
+          candidate.key.toLowerCase() === normalized &&
+          (!candidate.only || candidate.only === mode),
+      );
       for (const text of messages) {
         if (entry) {
           fieldErrors.push({ kind: 'server', message: text, fieldTree: entry.field() });
@@ -270,7 +415,9 @@ export class ExpenseForm {
       }
     }
     if (fieldErrors.length === 0 && unmatched.length === 0) {
-      unmatched.push(error.detail ?? EXPENSE_MESSAGES.saveFailed);
+      unmatched.push(
+        error.detail ?? (definition ? recurringErrorMessage(error) : EXPENSE_MESSAGES.saveFailed),
+      );
     }
     this.general.set(unmatched);
     return fieldErrors;

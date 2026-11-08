@@ -45,7 +45,7 @@ public sealed class DeleteExpenseHandler(IUnitOfWork unitOfWork, IAuditLog audit
             return new ExpenseChangeResult(ExpenseChangeOutcome.Conflict);
         }
 
-        await auditLog.RecordAsync(ExpenseAudit.Deleted(stored.Expense, AuditAuthor.Account(command.AccountId)), cancellationToken);
+        await auditLog.RecordAsync(ExpenseAudit.Deleted(stored.Expense, AuditAuthor.Account(command.AccountId), ExpenseAudit.ParentOf(stored.Expense)), cancellationToken);
 
         var deleted = await store.DeleteAsync(stored.Expense, version, cancellationToken);
         return deleted.Status == StoreSaveStatus.Saved

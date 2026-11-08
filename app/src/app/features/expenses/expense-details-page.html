@@ -54,6 +54,26 @@
           </div>
         </div>
 
+        @if (expense.recurring; as recurring) {
+          <div
+            class="flex flex-col items-start gap-1 rounded-box border border-(--sf-info) bg-base-100 p-4"
+            data-testid="wystapienie-cykliczne"
+          >
+            <p class="font-medium">
+              Wystąpienie wydatku cyklicznego za {{ formatMonth(recurring.period) }}
+            </p>
+            @if (recurring.definitionExists) {
+              <a
+                class="link inline-flex min-h-11 items-center text-(--sf-accent-text)"
+                [routerLink]="['/wydatki', 'cykliczne', recurring.definitionId]"
+                >Przejdź do wydatku cyklicznego</a
+              >
+            } @else {
+              <p>Wydatek cykliczny został usunięty.</p>
+            }
+          </div>
+        }
+
         @switch (mode()) {
           @case ('edit') {
             @if (formInitial(); as initial) {
@@ -210,6 +230,12 @@
             {{ formatPln(expense.grossAmount) }} zostanie usunięty z ewidencji i raportów. Ślad
             usunięcia zostanie w historii zmian.
           </p>
+          @if (expense.recurring) {
+            <p class="mt-2">
+              To wystąpienie wydatku cyklicznego nie zostanie utworzone ponownie. W razie pomyłki
+              dodaj wydatek ręcznie.
+            </p>
+          }
         </app-confirm-dialog>
       }
     }

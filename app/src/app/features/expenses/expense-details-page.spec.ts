@@ -200,4 +200,49 @@ describe('ExpenseDetailsPage', () => {
     const occurrences = (element().textContent ?? '').split('Nie znaleziono wydatku').length - 1;
     expect(occurrences).toBe(1);
   });
+
+  it('shows the occurrence period with a link and the extra sentence in the delete dialog', async () => {
+    const { element, settle } = await open(
+      expenseDetails({
+        recurring: { definitionId: 'c1', period: '2026-10', definitionExists: true },
+      }),
+    );
+    const info = element().querySelector('[data-testid="wystapienie-cykliczne"]');
+
+    expect(info?.textContent).toContain('Wystąpienie wydatku cyklicznego za październik 2026');
+    const link = Array.from(element().querySelectorAll('a')).find(
+      (a) => a.textContent?.trim() === 'Przejdź do wydatku cyklicznego',
+    );
+    expect(link?.getAttribute('href')).toBe('/wydatki/cykliczne/c1');
+
+    const dialog = () => dialogWith(element(), 'Usunąć wydatek');
+    buttonByText(element(), 'Usuń').click();
+    await settle(() => expect(dialog().open).toBe(true));
+    expect(dialog().textContent).toContain(
+      'To wystąpienie wydatku cyklicznego nie zostanie utworzone ponownie. W razie pomyłki dodaj wydatek ręcznie.',
+    );
+    buttonByText(dialog(), 'Anuluj').click();
+  });
+
+  it('says when the definition of an occurrence was deleted', async () => {
+    const { element } = await open(
+      expenseDetails({
+        recurring: { definitionId: 'c1', period: '2026-10', definitionExists: false },
+      }),
+    );
+
+    expect(element().textContent).toContain('Wydatek cykliczny został usunięty.');
+    expect(element().textContent).not.toContain('Przejdź do wydatku cyklicznego');
+  });
+
+  it('shows no occurrence information for a one-off expense', async () => {
+    const { element, settle } = await open();
+
+    expect(element().querySelector('[data-testid="wystapienie-cykliczne"]')).toBeNull();
+    const dialog = () => dialogWith(element(), 'Usunąć wydatek');
+    buttonByText(element(), 'Usuń').click();
+    await settle(() => expect(dialog().open).toBe(true));
+    expect(dialog().textContent).not.toContain('wystąpienie wydatku cyklicznego');
+    buttonByText(dialog(), 'Anuluj').click();
+  });
 });

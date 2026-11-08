@@ -6,6 +6,8 @@
     }
   </div>
 
+  <app-expenses-subnav />
+
   <div role="status" aria-live="polite">
     @if (notice(); as text) {
       <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
@@ -13,6 +15,8 @@
       </p>
     }
   </div>
+
+  <app-recurring-job-notice />
 
   @if (expenses.registryEmpty()) {
     <app-empty-state
@@ -152,6 +156,9 @@
         <a class="link font-medium text-(--sf-accent-text)" [routerLink]="['/wydatki', row.id]">{{
           row.description
         }}</a>
+        @if (row.recurringDefinitionId) {
+          <span class="mt-1 block text-sm text-(--sf-muted)">{{ recurringMark }}</span>
+        }
         @if (isNegative(row.grossAmount)) {
           <span class="mt-1 block text-sm text-(--sf-muted)">{{ negativeLabel }}</span>
         }

@@ -20,6 +20,7 @@ import {
   STATE_FILTER_LABELS,
 } from './expense-models';
 import { ExpensesApi } from './expenses-api';
+import { RecurringExpensesApi } from './recurring-expenses-api';
 
 export const EXPENSES_PAGE_SIZE = 25;
 export const SEARCH_MAX_LENGTH = 100;
@@ -33,6 +34,8 @@ export interface ExpenseFilters {
   readonly categories: readonly ExpenseCategory[];
   readonly state: ExpenseStateFilter | '';
   readonly sign: ExpenseSignFilter | '';
+  /** Wystąpienia jednej definicji (`/wydatki?wydatekCykliczny={id}`, SF-16). */
+  readonly recurringDefinitionId: string;
 }
 
 export const EMPTY_FILTERS: ExpenseFilters = {
@@ -44,7 +47,18 @@ export const EMPTY_FILTERS: ExpenseFilters = {
   categories: [],
   state: '',
   sign: '',
+  recurringDefinitionId: '',
 };
+
+/** Etykieta aktywnego filtra definicji: opis z API, a po usunięciu definicji „(usunięty)”. */
+export function recurringFilterLabel(description: string | null | undefined): string {
+  if (description === undefined) {
+    return 'Wydatek cykliczny';
+  }
+  return description === null
+    ? 'Wydatek cykliczny (usunięty)'
+    : `Wydatek cykliczny: ${description}`;
+}
 
 const DEFAULT_SORT: SortState = { key: 'costDate', direction: 'desc' };
 const SORT_KEYS: readonly ExpenseSort[] = ['costDate', 'dueDate', 'paidOn', 'grossAmount'];
@@ -78,6 +92,9 @@ export type ChangeExpenseOutcome =
 @Injectable({ providedIn: 'root' })
 export class ExpensesService {
   private readonly api = inject(ExpensesApi);
+  private readonly recurringApi = inject(RecurringExpensesApi);
+  /** Opis definicji z filtra: `undefined` — jeszcze nieznany, `null` — definicja usunięta. */
+  private readonly recurringDescription = signal<string | null | undefined>(undefined);
 
   private readonly pageState = signal(1);
   private readonly sortState = signal<SortState>(DEFAULT_SORT);
@@ -143,6 +160,12 @@ export class ExpensesService {
     }
     if (filters.sign) {
       active.push({ id: 'sign', label: `Kwota: ${SIGN_FILTER_LABELS[filters.sign]}` });
+    }
+    if (filters.recurringDefinitionId) {
+      active.push({
+        id: 'recurringDefinitionId',
+        label: recurringFilterLabel(this.recurringDescription()),
+      });
     }
     return active;
   });
@@ -232,6 +255,30 @@ export class ExpensesService {
 
   clearFilters(): Promise<void> {
     return this.updateFilters(EMPTY_FILTERS);
+  }
+
+  /**
+   * Filtr wystąpień jednej definicji (z parametru `wydatekCykliczny`): pozostałe filtry są
+   * czyszczone, a opis do etykiety filtra pochodzi z `GET /api/recurring-expenses/{id}`.
+   */
+  async filterByRecurring(definitionId: string): Promise<void> {
+    this.recurringDescription.set(undefined);
+    const list = this.updateFilters({ ...EMPTY_FILTERS, recurringDefinitionId: definitionId });
+    await Promise.all([list, this.loadRecurringDescription(definitionId)]);
+  }
+
+  private async loadRecurringDescription(definitionId: string): Promise<void> {
+    try {
+      const definition = await this.recurringApi.get(definitionId);
+      if (this.filtersState().recurringDefinitionId === definitionId) {
+        this.recurringDescription.set(definition.description);
+      }
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (isNotFound(apiError) && this.filtersState().recurringDefinitionId === definitionId) {
+        this.recurringDescription.set(null);
+      }
+    }
   }
 
   async loadExpense(id: string): Promise<LoadExpenseOutcome> {
@@ -330,6 +377,7 @@ export class ExpensesService {
       state: filters.state || null,
       sign: filters.sign || null,
       search: search ? search.slice(0, SEARCH_MAX_LENGTH) : null,
+      recurringDefinitionId: filters.recurringDefinitionId || null,
     };
   }
 }

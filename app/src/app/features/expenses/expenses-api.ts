@@ -88,6 +88,7 @@ function listParams(query: ExpenseListQuery): HttpParams {
     ['state', query.state],
     ['sign', query.sign],
     ['search', query.search],
+    ['recurringDefinitionId', query.recurringDefinitionId],
   ];
   for (const [name, value] of optional) {
     if (value) {

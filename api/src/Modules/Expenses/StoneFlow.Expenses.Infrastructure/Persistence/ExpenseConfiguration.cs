@@ -7,7 +7,8 @@ namespace StoneFlow.Expenses.Infrastructure.Persistence;
 /// <summary>
 /// Tabela <c>expenses.Expenses</c>: kwoty <c>decimal(18,2)</c>, reguły kwot powtórzone w <c>CHECK</c>
 /// (brutto ≠ 0; netto 0 albo tego samego znaku, |netto| ≤ |brutto|), unikalny klucz idempotencji
-/// (filtrowany — wydatki z SF-16 nie mają klucza), indeksy pod filtry dat i <c>rowversion</c>.
+/// (filtrowany — wydatki z SF-16 nie mają klucza), powiązanie wystąpienia z definicją (obie kolumny
+/// albo żadna), indeksy pod filtry dat i <c>rowversion</c>.
 /// </summary>
 internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 {
@@ -20,6 +21,7 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
     public const string NetAmountConstraint = "CK_Expenses_NetAmount";
     public const string CreationRequestConstraint = "CK_Expenses_CreationRequest";
     public const string CreationRequestIndex = "UX_Expenses_CreationRequestId";
+    public const string RecurringConstraint = "CK_Expenses_Recurring";
 
     private const int CategoryMaxLength = 32;
     private const int MethodMaxLength = 16;
@@ -35,6 +37,9 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             table.HasCheckConstraint(
                 CreationRequestConstraint,
                 "([CreationRequestId] IS NULL AND [CreationRequestHash] IS NULL) OR ([CreationRequestId] IS NOT NULL AND [CreationRequestHash] IS NOT NULL)");
+            table.HasCheckConstraint(
+                RecurringConstraint,
+                "([RecurringDefinitionId] IS NULL AND [RecurringPeriod] IS NULL) OR ([RecurringDefinitionId] IS NOT NULL AND [RecurringPeriod] IS NOT NULL)");
         });
 
         builder.HasKey(expense => expense.Id);
@@ -52,6 +57,7 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.Property(expense => expense.Payer).HasMaxLength(Expense.PayerMaxLength);
         builder.Property(expense => expense.Comment).HasMaxLength(Expense.CommentMaxLength);
         builder.Property(expense => expense.CreationRequestHash).HasColumnType("binary(32)");
+        builder.Property(expense => expense.RecurringPeriod).HasColumnType("date");
         builder.Property(expense => expense.CreatedAtUtc).HasColumnType("datetime2");
         builder.Property(expense => expense.UpdatedAtUtc).HasColumnType("datetime2");
         builder.Property<byte[]>(VersionProperty).IsRowVersion().IsRequired();
@@ -64,5 +70,10 @@ internal sealed class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.HasIndex(expense => new { expense.PaidOn, expense.Id })
             .HasFilter("[PaidOn] IS NOT NULL")
             .HasDatabaseName("IX_Expenses_PaidOn");
+
+        // Wystąpienia jednej definicji (filtr listy, liczba wystąpień); bez klucza obcego — definicję można usunąć.
+        builder.HasIndex(expense => new { expense.RecurringDefinitionId, expense.CostDate, expense.Id })
+            .HasFilter("[RecurringDefinitionId] IS NOT NULL")
+            .HasDatabaseName("IX_Expenses_RecurringDefinitionId");
     }
 }
