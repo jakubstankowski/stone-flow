@@ -17,6 +17,9 @@ import { StatusBadge, StatusTone } from './status-badge';
     </app-empty-state>
     <app-error-state (retry)="retried = retried + 1" />
     <app-status-badge label="Opłacone" [tone]="tone()" [marker]="true" />
+    <app-status-badge class="z-ikona" label="Aktualne" tone="success"
+      ><svg data-testid="ikona" aria-hidden="true"></svg
+    ></app-status-badge>
   `,
 })
 class Host {
@@ -63,7 +66,8 @@ describe('system states and status badge', () => {
 
   it('always shows the status text, with tone only as reinforcement', async () => {
     const { fixture, host, element } = await setup();
-    const badge = () => element.querySelector('app-status-badge > span') as HTMLElement;
+    const badge = () =>
+      element.querySelector('app-status-badge:not(.z-ikona) > span') as HTMLElement;
 
     expect(badge().textContent?.trim()).toBe('Opłacone');
     expect(badge().className).toContain('text-(--sf-success)');
@@ -73,5 +77,13 @@ describe('system states and status badge', () => {
     await fixture.whenStable();
     expect(badge().textContent?.trim()).toBe('Opłacone');
     expect(badge().className).toContain('text-(--sf-error)');
+  });
+
+  it('projects an icon before the visible label', async () => {
+    const { element } = await setup();
+    const badge = element.querySelector('app-status-badge.z-ikona > span') as HTMLElement;
+
+    expect(badge.textContent?.trim()).toBe('Aktualne');
+    expect(badge.firstElementChild?.getAttribute('data-testid')).toBe('ikona');
   });
 });

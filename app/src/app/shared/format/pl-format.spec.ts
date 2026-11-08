@@ -4,6 +4,8 @@ import {
   formatDateTime,
   formatMonth,
   formatPln,
+  formatReadTime,
+  formatTime,
   parsePlnAmount,
   parseSignedPlnAmount,
   todayInWarsaw,
@@ -79,6 +81,38 @@ describe('formatDateTime', () => {
       expect(formatDateTime(value)).toBe(NO_DATA);
     },
   );
+});
+
+describe('formatTime', () => {
+  it('presents only the Europe/Warsaw time', () => {
+    expect(formatTime('2026-11-06T13:05:00Z')).toBe('14:05');
+    expect(formatTime('2026-07-01T21:30:00Z')).toBe('23:30');
+  });
+
+  it.each([null, '', '2026-11-06', 'nie data'])('shows missing data for %s', (value) => {
+    expect(formatTime(value)).toBe(NO_DATA);
+  });
+});
+
+describe('formatReadTime', () => {
+  const now = Date.parse('2026-11-06T20:00:00Z');
+
+  it('shows only the time for a read from the same Warsaw day', () => {
+    expect(formatReadTime('2026-11-06T13:05:00Z', now)).toBe('14:05');
+  });
+
+  it('shows the date for a read from another Warsaw day', () => {
+    expect(formatReadTime('2026-11-05T13:05:00Z', now)).toBe('05.11.2026, 14:05');
+  });
+
+  it('uses the Warsaw day, not the UTC day', () => {
+    // 23:30 UTC 5 listopada to już 6 listopada w Warszawie.
+    expect(formatReadTime('2026-11-05T23:30:00Z', now)).toBe('00:30');
+  });
+
+  it('shows missing data for an unreadable value', () => {
+    expect(formatReadTime(null, now)).toBe(NO_DATA);
+  });
 });
 
 describe('formatting edge cases from code review', () => {

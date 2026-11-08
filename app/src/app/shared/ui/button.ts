@@ -23,6 +23,8 @@ export class Button {
   readonly busy = input(false);
   readonly busyLabel = input('Zapisywanie…');
   readonly disabled = input(false);
+  /** Id elementu z opisem (np. powodem wyłączenia) dla `aria-describedby` natywnego przycisku. */
+  readonly describedBy = input<string | null>(null);
 
   readonly pressed = output<void>();
 

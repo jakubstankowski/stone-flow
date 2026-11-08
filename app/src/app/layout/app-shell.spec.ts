@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTestHttp, signIn } from '../../testing/auth-testing';
 import { sectionRoutes } from '../app.routes';
 import { AppShell } from './app-shell';
+import { discardIntegrationRequests } from '../../testing/integration-testing';
 
 describe('AppShell', () => {
   beforeEach(async () => {
@@ -15,7 +16,10 @@ describe('AppShell', () => {
     await signIn('owner@example.com');
   });
 
-  afterEach(() => TestBed.inject(HttpTestingController).verify());
+  afterEach(() => {
+    discardIntegrationRequests();
+    TestBed.inject(HttpTestingController).verify();
+  });
 
   async function render(url: string) {
     await RouterTestingHarness.create(url);
@@ -78,5 +82,18 @@ describe('AppShell', () => {
     expect(focusable[0]).toBe('Stone Flow');
     expect(focusable[1]).toBe('Menu');
     expect(focusable.at(-1)).toBe('Wyloguj');
+  });
+
+  it('shows the integration state in the header, before the user menu', async () => {
+    const { element } = await render('/pulpit');
+    const header = element.querySelector('header') as HTMLElement;
+    const indicator = header.querySelector('app-integration-indicator') as HTMLElement;
+
+    expect(indicator.querySelector('a')?.getAttribute('href')).toBe('/integracja');
+    expect(indicator.textContent).toContain('Sprawdzanie stanu…');
+    expect(
+      indicator.compareDocumentPosition(header.querySelector('app-user-menu') as HTMLElement) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

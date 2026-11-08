@@ -86,6 +86,33 @@ describe('Button', () => {
   });
 });
 
+@Component({
+  imports: [Button],
+  template: `<p id="powod">Powód</p>
+    <app-button [describedBy]="describedBy()" [disabled]="true">Synchronizuj</app-button>`,
+})
+class DescribedHost {
+  readonly describedBy = signal<string | null>('powod');
+}
+
+describe('Button description', () => {
+  it('links the native button to the description element', async () => {
+    const fixture = TestBed.createComponent(DescribedHost);
+    await fixture.whenStable();
+    const button = (fixture.nativeElement as HTMLElement).querySelector('button') as HTMLElement;
+    expect(button.getAttribute('aria-describedby')).toBe('powod');
+
+    fixture.componentInstance.describedBy.set(null);
+    await fixture.whenStable();
+    expect(button.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('adds no description by default', async () => {
+    const { button } = await setup();
+    expect(button.hasAttribute('aria-describedby')).toBe(false);
+  });
+});
+
 describe('Button busy state recovery', () => {
   it('emits again once it is no longer busy', async () => {
     const { fixture, host, button } = await setup();

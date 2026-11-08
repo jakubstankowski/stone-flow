@@ -8,14 +8,15 @@ import {
   RouterOutlet,
 } from '@angular/router';
 import { filter, map } from 'rxjs';
+import { IntegrationIndicator } from './integration-indicator';
 import { MainNav } from './main-nav';
 import { PRODUCT_NAME } from './nav-items';
 import { UserMenu } from './user-menu';
 
-/** Powłoka aplikacji: pominięcie nawigacji, nagłówek, nawigacja, menu użytkownika i treść. */
+/** Powłoka aplikacji: pominięcie nawigacji, nagłówek, nawigacja, stan integracji, menu użytkownika i treść. */
 @Component({
   selector: 'app-shell',
-  imports: [MainNav, RouterLink, RouterOutlet, UserMenu],
+  imports: [IntegrationIndicator, MainNav, RouterLink, RouterOutlet, UserMenu],
   templateUrl: './app-shell.html',
   host: { class: 'flex min-h-screen flex-col' },
 })
