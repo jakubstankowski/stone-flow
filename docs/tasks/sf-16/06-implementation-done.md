@@ -127,7 +127,7 @@ Warunki: zalogowany właściciel, pusta baza, dzisiaj = 08.11.2026 (przy innej d
 | 16 | Formularz cykliczny: brutto `0`, potem `-50` | Błąd „Kwota wydatku cyklicznego musi być większa od 0 zł.” |
 | 17 | Formularz cykliczny: koniec przed początkiem | Błąd przy polu „Koniec”, zapis zablokowany. |
 | 18 | Definicja z p. 3 → **Usuń** → potwierdź | Komunikat „Wydatek cykliczny został usunięty.”, definicji nie ma na **Wydatki cykliczne**; jej wystąpienia **zostają** na liście wydatków. |
-| 19 | **Historia zmian** | Wpisy utworzenia definicji, edycji, wstrzymania, wznowienia, usunięcia (autor: konto) oraz utworzenia wystąpień z autorem **Zadanie automatyczne**. |
+| 19 | — (widok **Historia zmian** powstaje w SF-18; dziś zaślepka) | Wpisy audytu (definicja: autor konto; wystąpienia: **Zadanie automatyczne**) sprawdzisz w UI dopiero po SF-18. |
 | 20 | **Wydatki cykliczne** → filtry stanu | „Aktywny” / „Wstrzymany” filtrują listę; pusta lista pokazuje „Brak wydatków cyklicznych”. |
 | 21 | Widok telefonu (F12 → tryb urządzenia, ~390 px): p. 3–5 i 12 | Formularz i szczegóły czytelne, bez przewijania w poziomie. |
 
