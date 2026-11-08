@@ -85,6 +85,22 @@ describe('ExpenseCreatePage', () => {
     await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/wydatki/w7'));
   });
 
+  it('fills net from gross (÷ 1,23) until the user types their own net amount', async () => {
+    const { element, settle } = await open();
+    const gross = () => element().querySelector('#wydatek-brutto') as HTMLInputElement;
+    const net = () => element().querySelector('#wydatek-netto') as HTMLInputElement;
+
+    typeInto(gross(), '1233');
+    await settle(() => expect(net().value).toBe('1002,44'));
+    typeInto(gross(), '123');
+    await settle(() => expect(net().value).toBe('100,00'));
+
+    typeInto(net(), '113,89');
+    typeInto(gross(), '246');
+    await settle(() => expect(gross().value).toBe('246'));
+    expect(net().value).toBe('113,89');
+  });
+
   it('shows the existing expense after 409 idempotency_key_reused and starts over with a new key', async () => {
     const { element, settle } = await open();
 

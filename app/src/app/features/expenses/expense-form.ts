@@ -35,6 +35,7 @@ import {
   grossAmountError,
   isValidDate,
   netAmountError,
+  netFromGross,
   optionalDateError,
   paidOnError,
   toExpenseInput,
@@ -326,7 +327,22 @@ export class ExpenseForm {
         this.general.set([]);
       });
     });
+    // Netto wyliczane z brutto (÷ 1,23), dopóki użytkownik nie wpisał własnego netto.
+    effect(() => {
+      const suggestion = this.netSuggestion();
+      untracked(() => {
+        const net = this.model().netAmount;
+        const previous = this.lastNetSuggestion;
+        this.lastNetSuggestion = suggestion;
+        if (suggestion !== null && (net.trim() === '' || net === previous)) {
+          this.form.netAmount().value.set(suggestion);
+        }
+      });
+    });
   }
+
+  private readonly netSuggestion = computed(() => netFromGross(this.model().grossAmount));
+  private lastNetSuggestion: string | null = null;
 
   /** Błąd pola do wyświetlenia: po dotknięciu pola albo próbie zapisu. */
   protected errorOf<T>(field: FieldTree<T>): string | null {
