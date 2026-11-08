@@ -1,5 +1,5 @@
 import { NETWORK_ERROR_MESSAGE, ApiError } from '../../core/http/api-error';
-import { parsePlnAmount } from '../../shared/format/pl-format';
+import { parsePlnAmount, todayInWarsaw } from '../../shared/format/pl-format';
 import {
   CustomerKind,
   FulfillmentStatus,
@@ -81,16 +81,6 @@ const POSTAL_CODE = /^\d{2}-\d{3}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NIP_WEIGHTS = [6, 5, 7, 2, 3, 4, 5, 6, 7];
-
-/** Dzisiejsza data w strefie Europe/Warsaw jako `yyyy-MM-dd`. */
-export function todayInWarsaw(now = new Date()): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Warsaw',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-}
 
 export function emptyOrderForm(orderDate = todayInWarsaw()): OrderFormModel {
   return {

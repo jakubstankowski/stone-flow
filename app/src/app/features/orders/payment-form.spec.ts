@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ApiError } from '../../core/http/api-error';
 import { EntryFormOutcome, PaymentFormModel, emptyPaymentForm } from './entry-form-model';
-import { todayInWarsaw } from './order-form-model';
+import { todayInWarsaw } from '../../shared/format/pl-format';
 import { PaymentInput } from './order-models';
 import { PaymentForm } from './payment-form';
 

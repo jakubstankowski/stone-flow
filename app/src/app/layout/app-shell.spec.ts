@@ -58,11 +58,12 @@ describe('AppShell', () => {
   });
 
   it('shows the product name linking to the dashboard and the current section', async () => {
-    const { fixture, element } = await render('/wydatki');
+    // Sekcja bez zapytań do API (lista wydatków od SF-15 pobiera dane).
+    const { fixture, element } = await render('/historia-zmian');
     const header = element.querySelector('header') as HTMLElement;
 
     expect(header.querySelector('a[href="/pulpit"]')?.textContent?.trim()).toBe('Stone Flow');
-    expect(header.textContent).toContain('Wydatki');
+    expect(header.textContent).toContain('Historia zmian');
 
     await TestBed.inject(Router).navigateByUrl('/operacje');
     await fixture.whenStable();

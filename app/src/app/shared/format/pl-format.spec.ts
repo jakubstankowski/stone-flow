@@ -7,6 +7,8 @@ import {
   formatReadTime,
   formatTime,
   parsePlnAmount,
+  parseSignedPlnAmount,
+  todayInWarsaw,
 } from './pl-format';
 
 const nbsp = ' ';
@@ -162,5 +164,30 @@ describe('parsePlnAmount', () => {
     '12,5e3',
   ])('rejects %s', (text) => {
     expect(parsePlnAmount(text)).toBeNull();
+  });
+});
+
+describe('parseSignedPlnAmount', () => {
+  it.each([
+    ['-1 234,50', '-1234.50'],
+    ['−1234,5', '-1234.50'],
+    ['- 99', '-99.00'],
+    ['1234.50', '1234.50'],
+    ['-0', '0.00'],
+    ['-0,00', '0.00'],
+    ['0', '0.00'],
+  ])('reads %s as %s', (text, expected) => {
+    expect(parseSignedPlnAmount(text)).toBe(expected);
+  });
+
+  it.each(['', '-', '--5', '-1,234', 'abc', null, undefined])('rejects %s', (text) => {
+    expect(parseSignedPlnAmount(text)).toBeNull();
+  });
+});
+
+describe('todayInWarsaw', () => {
+  it('uses the calendar day in Europe/Warsaw', () => {
+    expect(todayInWarsaw(new Date('2026-11-05T23:30:00Z'))).toBe('2026-11-06');
+    expect(todayInWarsaw(new Date('2026-11-05T22:59:00Z'))).toBe('2026-11-05');
   });
 });

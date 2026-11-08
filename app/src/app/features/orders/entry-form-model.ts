@@ -1,6 +1,6 @@
 import { ApiError, NETWORK_ERROR_MESSAGE } from '../../core/http/api-error';
-import { parsePlnAmount } from '../../shared/format/pl-format';
-import { ORDER_MESSAGES, isValidDate, textOrNull, todayInWarsaw } from './order-form-model';
+import { parsePlnAmount, todayInWarsaw } from '../../shared/format/pl-format';
+import { ORDER_MESSAGES, isValidDate, textOrNull } from './order-form-model';
 import {
   PaymentEntry,
   PaymentInput,

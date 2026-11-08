@@ -1,0 +1,33 @@
+<section class="flex flex-col gap-6">
+  <h1 class="text-3xl font-bold">Dodaj wydatek</h1>
+
+  <div aria-live="polite">
+    @if (keyReused(); as expenseId) {
+      <div
+        #reusedMessage
+        tabindex="-1"
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+      >
+        <p class="font-medium">
+          Ten formularz zapisał już
+          <a class="link text-(--sf-accent-text)" [routerLink]="['/wydatki', expenseId]">wydatek</a
+          >.
+        </p>
+        <app-button (pressed)="startNext()">Dodaj kolejny wydatek</app-button>
+      </div>
+    } @else if (keyReused() === '') {
+      <div
+        #reusedMessage
+        tabindex="-1"
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+      >
+        <p class="font-medium">Ten formularz zapisał już wydatek.</p>
+        <app-button (pressed)="startNext()">Dodaj kolejny wydatek</app-button>
+      </div>
+    }
+  </div>
+
+  <app-expense-form [initial]="initial()" [action]="save" submitLabel="Zapisz">
+    <app-button formActions (pressed)="goToList()">Wróć do listy</app-button>
+  </app-expense-form>
+</section>

@@ -1,0 +1,40 @@
+<form
+  novalidate
+  class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+  aria-labelledby="zaplata-naglowek"
+  (submit)="onSubmit($event)"
+>
+  <h2 id="zaplata-naglowek" class="text-xl font-semibold">Oznacz jako opłacony</h2>
+  <p>{{ effectText() }}</p>
+  <div class="grid gap-4 md:grid-cols-2">
+    <app-field
+      label="Data zapłaty"
+      fieldId="zaplata-data"
+      hint="Nie później niż dzisiaj."
+      [required]="true"
+      [error]="errorOf(form.paidOn)"
+    >
+      <input
+        #control
+        class="input w-full"
+        type="date"
+        [attr.max]="today"
+        [formField]="form.paidOn"
+      />
+    </app-field>
+    <app-field label="Metoda płatności" fieldId="zaplata-metoda">
+      <select #control class="select w-full" [formField]="form.paymentMethod">
+        <option value="">Nie podano</option>
+        @for (method of methods; track method) {
+          <option [value]="method">{{ methodLabels[method] }}</option>
+        }
+      </select>
+    </app-field>
+  </div>
+  <div class="flex flex-wrap gap-3">
+    <app-button variant="primary" type="submit" [busy]="busy()" busyLabel="Zapisywanie…">
+      Oznacz jako opłacony
+    </app-button>
+    <ng-content select="[formActions]" />
+  </div>
+</form>

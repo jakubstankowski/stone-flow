@@ -168,3 +168,29 @@ export function parsePlnAmount(text: string | null | undefined): string | null {
   const fraction = (match[2] ?? '').padEnd(2, '0');
   return `${integer}.${fraction}`;
 }
+
+/**
+ * Kwota ze znakiem wpisana po polsku (`-1 234,50`, `−1234,5`, `1234.50`) → kanoniczny ciąg
+ * dziesiętny dla API (`"-1234.50"`), wyłącznie operacjami na tekście. Minus może być znakiem
+ * `-` albo `−` (U+2212). `-0` daje `"0.00"`. Zwraca `null` dla pustego pola, tekstu i więcej niż
+ * dwóch miejsc po przecinku.
+ */
+export function parseSignedPlnAmount(text: string | null | undefined): string | null {
+  const trimmed = (text ?? '').trim();
+  const negative = /^[-−]/.test(trimmed);
+  const amount = parsePlnAmount(negative ? trimmed.slice(1).trimStart() : trimmed);
+  if (amount === null) {
+    return null;
+  }
+  return negative && !/^0\.00$/.test(amount) ? `-${amount}` : amount;
+}
+
+/** Dzisiejsza data w strefie Europe/Warsaw jako `yyyy-MM-dd`. */
+export function todayInWarsaw(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: WARSAW,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
