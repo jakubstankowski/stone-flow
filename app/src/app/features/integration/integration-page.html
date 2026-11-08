@@ -1,4 +1,213 @@
 <section class="flex flex-col gap-6">
   <h1 class="text-3xl font-bold">Integracja</h1>
-  <app-empty-state heading="Ten widok powstanie w kolejnych etapach." />
+
+  <section
+    aria-labelledby="integracja-stan"
+    class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-6"
+  >
+    <h2 id="integracja-stan" class="text-xl font-semibold">Stan synchronizacji</h2>
+
+    @switch (status.view().phase) {
+      @case ('loading') {
+        <app-loading-state [rows]="3" label="Wczytywanie stanu integracji…" />
+      }
+      @case ('unknown') {
+        <app-error-state
+          message="Nie udało się wczytać stanu integracji."
+          (retry)="retryStatus()"
+        />
+      }
+    }
+
+    @if (known(); as current) {
+      <div class="flex flex-col gap-2">
+        <app-integration-state-badge [presentation]="status.presentation()" />
+        @if (current.aged) {
+          <p class="text-sm font-medium">{{ agedHint }}</p>
+        }
+        @for (line of explanations(); track $index) {
+          <p>{{ line }}</p>
+        }
+      </div>
+
+      <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-[auto_1fr]">
+        <dt class="font-semibold">Ostatnia pełna kontrola</dt>
+        <dd>
+          {{ current.status.lastSuccessAtUtc | plDateTime }}
+          @if (current.status.lastSuccessAtUtc === null) {
+            <span class="text-(--sf-muted)">Pełna kontrola jeszcze się nie odbyła.</span>
+          }
+        </dd>
+      </dl>
+
+      <div class="flex flex-col gap-2">
+        <h3 class="text-lg font-semibold">Ostatni przebieg</h3>
+        @if (current.status.lastRun; as run) {
+          <dl class="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+            <dt class="font-semibold">Status</dt>
+            <dd>{{ labelOf(runStatusLabels, run.status) }}</dd>
+            <dt class="font-semibold">Źródło</dt>
+            <dd>{{ labelOf(runSourceLabels, run.source) }}</dd>
+            <dt class="font-semibold">Początek</dt>
+            <dd>{{ run.startedAtUtc | plDateTime }}</dd>
+            <dt class="font-semibold">Koniec</dt>
+            <dd>{{ run.finishedAtUtc | plDateTime }}</dd>
+            <dt class="font-semibold">Przetworzone zamówienia</dt>
+            <dd>{{ run.ordersProcessed }}</dd>
+            <dt class="font-semibold">Błędy zamówień</dt>
+            <dd>{{ run.errors }}</dd>
+            @if (run.message) {
+              <dt class="font-semibold">Komunikat</dt>
+              <dd>{{ run.message }}</dd>
+            }
+          </dl>
+        } @else {
+          <p class="text-sm text-(--sf-muted)">Uzupełnianie jeszcze się nie odbyło.</p>
+        }
+      </div>
+    }
+
+    <div class="flex flex-col items-start gap-2">
+      <app-button
+        variant="primary"
+        [busy]="syncBusy()"
+        busyLabel="Uruchamianie…"
+        [disabled]="syncDisabledReason() !== null"
+        [describedBy]="syncDisabledReason() !== null ? syncReasonId : null"
+        (pressed)="sync()"
+      >
+        Synchronizuj teraz
+      </app-button>
+      @if (syncDisabledReason(); as reason) {
+        <p [id]="syncReasonId" class="text-sm text-(--sf-muted)">{{ reason }}</p>
+      }
+      <!-- Stałe regiony: zmienia się tylko treść, więc czytniki ogłaszają wynik. -->
+      <p role="status" aria-live="polite" class="text-sm font-medium">
+        @if (syncResult(); as result) {
+          @if (!result.alert) {
+            {{ result.text }}
+          }
+        }
+      </p>
+      <p role="alert" class="text-sm font-medium text-(--sf-error)">
+        @if (syncResult(); as result) {
+          @if (result.alert) {
+            {{ result.text }}
+          }
+        }
+      </p>
+    </div>
+  </section>
+
+  <section aria-labelledby="integracja-bledy" class="flex flex-col gap-4">
+    <h2 id="integracja-bledy" class="text-xl font-semibold">Błędy zamówień</h2>
+    @if (retryHidden()) {
+      <p class="text-sm text-(--sf-muted)">{{ explanations()[0] }}</p>
+    }
+    <div #retryResult tabindex="-1" data-region="retry-result">
+      <p role="status" aria-live="polite" class="text-sm font-medium">
+        @if (errors.result(); as result) {
+          @if (!result.alert) {
+            {{ result.text }}
+          }
+        }
+      </p>
+      <p role="alert" class="text-sm font-medium text-(--sf-error)">
+        @if (errors.result(); as result) {
+          @if (result.alert) {
+            {{ result.text }}
+          }
+        }
+      </p>
+    </div>
+
+    <app-data-table
+      caption="Błędy zamówień"
+      emptyTitle="Brak otwartych błędów zamówień"
+      emptyDescription="Błędy zapisu zamówień ze sklepu pojawią się tutaj."
+      filteredEmptyTitle="Brak błędów dla wybranego filtra"
+      [columns]="columns"
+      [rows]="errors.items()"
+      [rowKey]="rowKey"
+      [total]="errors.total()"
+      [page]="errors.page()"
+      [pageSize]="pageSize"
+      [filters]="errors.activeFilters()"
+      [filterable]="true"
+      [loading]="errors.loading()"
+      [error]="errors.error()"
+      (pageChange)="errors.goTo($event)"
+      (filterRemove)="errors.clearFilter()"
+      (filtersClear)="errors.clearFilter()"
+      (retry)="errors.load()"
+    >
+      <div
+        tableFilters
+        class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-3"
+      >
+        <label class="flex flex-col gap-1" for="integracja-filtr-status">
+          <span class="font-medium">Status</span>
+          <select
+            id="integracja-filtr-status"
+            class="select w-full"
+            [value]="errors.filter()"
+            (change)="onFilter($event)"
+          >
+            @for (option of filterOptions; track option) {
+              <option [value]="option" [selected]="option === errors.filter()">
+                {{ filterLabels[option] }}
+              </option>
+            }
+          </select>
+        </label>
+      </div>
+
+      <ng-template appTableCell="order" [appTableCellOf]="errors.items()" let-row>
+        <div class="flex flex-col">
+          @if (row.orderId) {
+            <a class="link text-(--sf-accent-text)" [routerLink]="['/zamowienia', row.orderId]">{{
+              row.orderNumber ? 'Zamówienie ' + row.orderNumber : 'Zamówienie w ERP'
+            }}</a>
+          }
+          <span class="text-(--sf-muted)">ID w sklepie: {{ row.externalId }}</span>
+        </div>
+      </ng-template>
+
+      <ng-template appTableCell="message" [appTableCellOf]="errors.items()" let-row>
+        <div class="flex flex-col">
+          <span>{{ row.message }}</span>
+          <span class="text-xs text-(--sf-muted)">Kontekst: {{ row.context }}</span>
+        </div>
+      </ng-template>
+
+      <ng-template appTableCell="status" [appTableCellOf]="errors.items()" let-row>
+        <div class="flex flex-col items-start gap-1">
+          @if (row.status === 'open') {
+            <app-status-badge label="Otwarty" tone="warning" />
+          } @else if (row.status === 'closed') {
+            <app-status-badge label="Zamknięty" />
+            <span class="text-xs text-(--sf-muted)"
+              >{{ row.closedAtUtc | plDateTime
+              }}{{ row.closedBy ? ', ' + labelOf(closedByLabels, row.closedBy) : '' }}</span
+            >
+          } @else {
+            <app-status-badge [label]="row.status" />
+          }
+        </div>
+      </ng-template>
+
+      <ng-template appTableCell="action" [appTableCellOf]="errors.items()" let-row>
+        @if (row.status === 'open' && !retryHidden()) {
+          <app-button
+            [busy]="errors.isBusy(row.id)"
+            [busyLabel]="'Ponawianie zamówienia ' + row.externalId + '…'"
+            [disabled]="retryDisabled()"
+            (pressed)="retry(row)"
+          >
+            Ponów<span class="sr-only"> zamówienie {{ row.externalId }}</span>
+          </app-button>
+        }
+      </ng-template>
+    </app-data-table>
+  </section>
 </section>
