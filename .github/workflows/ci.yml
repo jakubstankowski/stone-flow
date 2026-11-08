@@ -1,6 +1,6 @@
-﻿name: CI
+name: CI
 
-# Na PR uruchamiany bezpoĹ›rednio; na main wywoĹ‚uje go deploy.yml (jeden przebieg CI na commit,
+# Na PR uruchamiany bezpośrednio; na main wywołuje go deploy.yml (jeden przebieg CI na commit,
 # publikacja dopiero po zielonym CI).
 on:
   pull_request:
@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
 
-# Nowszy commit w PR anuluje poprzedni przebieg; na main (wywoĹ‚anie z deploy.yml) nigdy.
+# Nowszy commit w PR anuluje poprzedni przebieg; na main (wywołanie z deploy.yml) nigdy.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -25,8 +25,8 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # Testy integracyjne tworzÄ… osobnÄ… bazÄ™ na test (ok. 10 s kaĹĽdy); od SF-10 przebieg trwa ponad
-    # 20 minut. Przyspieszenie (wspĂłlna baza na klasÄ™ testĂłw) to osobne zadanie.
+    # Testy integracyjne tworzą osobną bazę na test (ok. 10 s każdy); od SF-10 przebieg trwa ponad
+    # 20 minut. Przyspieszenie (wspólna baza na klasę testów) to osobne zadanie.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,7 +44,7 @@ jobs:
           dotnet --list-runtimes | grep -q "^Microsoft.AspNetCore.App ${DOTNET_RUNTIME_VERSION} " \
             || { echo "::error::Brak Microsoft.AspNetCore.App ${DOTNET_RUNTIME_VERSION}"; exit 1; }
 
-      - name: NarzÄ™dzia
+      - name: Narzędzia
         run: dotnet tool restore
 
       - name: Restore (lockfile)
@@ -59,7 +59,7 @@ jobs:
       - name: Testy
         run: dotnet test --solution stone-flow.slnx -c Release --no-build --results-directory TestResults --report-xunit-trx
 
-      - name: Wyniki testĂłw
+      - name: Wyniki testów
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -94,7 +94,7 @@ jobs:
       - uses: ./.github/actions/setup-gitleaks
         id: gitleaks
 
-      - name: Brak sekretĂłw w pakiecie frontendu
+      - name: Brak sekretów w pakiecie frontendu
         run: '"${{ steps.gitleaks.outputs.path }}" dir dist --config ../.gitleaks.toml --redact --verbose --exit-code 1'
 
   secrets:
@@ -109,7 +109,7 @@ jobs:
       - uses: ./.github/actions/setup-gitleaks
         id: gitleaks
 
-      - name: Skan caĹ‚ej historii
+      - name: Skan całej historii
         run: '"${{ steps.gitleaks.outputs.path }}" git . --config .gitleaks.toml --redact --verbose --exit-code 1'
 
   deploy-dry-run:
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      # Jednorazowe hasĹ‚o kontenera testowego (nie jest sekretem Ĺ›rodowiska).
+      # Jednorazowe hasło kontenera testowego (nie jest sekretem środowiska).
       SA_PASSWORD: Ci-${{ github.run_id }}-${{ github.run_attempt }}-Aa
     services:
       mssql:
@@ -134,7 +134,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: NarzÄ™dzia
+      - name: Narzędzia
         run: dotnet tool restore
 
       - name: Restore (lockfile)
@@ -156,9 +156,9 @@ jobs:
             fi
             sleep 5
           done
-          echo "::error::SQL Server nie wystartowaĹ‚."; exit 1
+          echo "::error::SQL Server nie wystartował."; exit 1
 
-      - name: PrĂłba migracji (kolejnoĹ›Ä‡, ponowienie, bĹ‚Ä…d w Ĺ›rodku, brak serwera)
+      - name: Próba migracji (kolejność, ponowienie, błąd w środku, brak serwera)
         env:
           MSSQL_CONTAINER: ${{ job.services.mssql.id }}
         run: |
