@@ -5,8 +5,8 @@ using StoneFlow.Expenses.Api.Endpoints;
 namespace StoneFlow.Expenses.Api;
 
 /// <summary>
-/// Rejestracja modułu w hoście: endpointy <c>/api/expenses</c> (wydatki i ich zapłata) i
-/// <c>/api/owner-withdrawals</c> (wypłaty właścicieli, SF-17).
+/// Rejestracja modułu w hoście: endpointy <c>/api/expenses</c> (wydatki i ich zapłata),
+/// <c>/api/recurring-expenses</c> (wydatki cykliczne) i <c>/api/owner-withdrawals</c> (wypłaty właścicieli).
 /// </summary>
 public static class ExpensesModule
 {
@@ -16,6 +16,7 @@ public static class ExpensesModule
     {
         ExpensesEndpoints.Map(endpoints);
         OwnerWithdrawalsEndpoints.Map(endpoints);
+        RecurringExpensesEndpoints.Map(endpoints);
         return endpoints;
     }
 }

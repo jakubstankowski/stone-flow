@@ -91,12 +91,16 @@ describe('app routes', () => {
   it.each([
     ['/wydatki', 'Wydatki'],
     ['/wydatki/nowy', 'Dodaj wydatek'],
+    ['/wydatki/cykliczne', 'Wydatki cykliczne'],
   ])('loads the expenses section at %s with the heading %s', async (url, heading) => {
     await signIn();
     const harness = await RouterTestingHarness.create();
     const navigation = harness.navigateByUrl(url);
-    if (url === '/wydatki') {
-      (await nextRequest((request) => request.url === '/api/expenses')).flush({
+    if (url === '/wydatki' || url === '/wydatki/cykliczne') {
+      // SF-16: ostrzeżenie o zadaniu czyta `/api/jobs` raz przy wejściu.
+      (await nextRequest('/api/jobs')).flush([]);
+      const list = url === '/wydatki' ? '/api/expenses' : '/api/recurring-expenses';
+      (await nextRequest((request) => request.url === list)).flush({
         items: [],
         page: 1,
         pageSize: 25,

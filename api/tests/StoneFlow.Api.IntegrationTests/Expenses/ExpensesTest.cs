@@ -200,6 +200,30 @@ internal sealed class ExpensesTest : IAsyncDisposable
         return rows;
     }
 
+    /// <summary>Przestawia zegar aplikacji (tylko do przodu) i loguje ponownie, bo sesja wygasa po godzinie bezczynności.</summary>
+    public async Task AdvanceToAsync(DateTimeOffset instant)
+    {
+        Time.SetUtcNow(instant);
+        using var login = await Client.LoginAsync();
+        Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
+    }
+
+    public async Task<IReadOnlyList<T>> RowsAsync<T>(string sql, Func<SqlDataReader, T> read)
+    {
+        await using var connection = await OpenAsync();
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+        var rows = new List<T>();
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            rows.Add(read(reader));
+        }
+
+        return rows;
+    }
+
+    public string ConnectionString => _connectionString;
+
     public async ValueTask DisposeAsync()
     {
         Client.Dispose();

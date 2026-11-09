@@ -1,8 +1,14 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { nextRequest, provideTestHttp, respondNetworkError } from '../../../testing/auth-testing';
-import { expenseListItem } from '../../../testing/expenses-testing';
+import { RouterTestingHarness } from '@angular/router/testing';
+import {
+  nextRequest,
+  provideTestHttp,
+  respondNetworkError,
+  respondProblem,
+} from '../../../testing/auth-testing';
+import { expenseListItem, recurringDetails } from '../../../testing/expenses-testing';
 import { NO_DATA, formatPln } from '../../shared/format/pl-format';
 import { ExpenseListItem } from './expense-models';
 import { ExpensesListPage } from './expenses-list-page';
@@ -23,6 +29,7 @@ describe('ExpensesListPage', () => {
 
   async function render(items: readonly ExpenseListItem[]) {
     const fixture = TestBed.createComponent(ExpensesListPage);
+    (await nextRequest('/api/jobs')).flush([]);
     (await nextRequest((r) => r.url === '/api/expenses')).flush({
       items,
       page: 1,
@@ -119,11 +126,92 @@ describe('ExpensesListPage', () => {
 
   it('shows the list error with a retry action', async () => {
     const fixture = TestBed.createComponent(ExpensesListPage);
+    (await nextRequest('/api/jobs')).flush([]);
     respondNetworkError(await nextRequest((r) => r.url === '/api/expenses'));
     await vi.waitFor(async () => {
       await fixture.whenStable();
       expect(fixture.nativeElement.textContent).toContain('Nie udało się wczytać wydatków.');
     });
     expect(fixture.nativeElement.textContent).toContain('Spróbuj ponownie');
+  });
+
+  it('marks occurrences of a recurring expense with the text „Cykliczny”', async () => {
+    const element = await render([
+      expenseListItem({ id: 'w1', recurringDefinitionId: 'c1' }),
+      expenseListItem({ id: 'w2', recurringDefinitionId: null }),
+    ]);
+    const rows = Array.from(element.querySelectorAll('tbody tr'));
+
+    expect(rows[0].textContent).toContain('Cykliczny');
+    expect(rows[1].textContent).not.toContain('Cykliczny');
+    expect(element.textContent).toContain('Wydatki cykliczne');
+  });
+
+  describe('filter from the wydatekCykliczny parameter (SF-16)', () => {
+    async function openWith(url: string) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([{ path: 'wydatki', component: ExpensesListPage }]),
+          provideTestHttp(),
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      const harness = await RouterTestingHarness.create();
+      const navigation = harness.navigateByUrl(url);
+      const element = () => harness.routeNativeElement as HTMLElement;
+      const settle = async (check: () => void) =>
+        vi.waitFor(async () => {
+          await harness.fixture.whenStable();
+          check();
+        });
+      return { navigation, element, settle };
+    }
+
+    it('lists only occurrences of the definition and shows its description as a filter', async () => {
+      const { navigation, element, settle } = await openWith('/wydatki?wydatekCykliczny=c1');
+      await navigation;
+      (await nextRequest('/api/jobs')).flush([]);
+      const list = await nextRequest((r) => r.url === '/api/expenses');
+      expect(list.request.params.get('recurringDefinitionId')).toBe('c1');
+      list.flush({
+        items: [expenseListItem({ recurringDefinitionId: 'c1' })],
+        page: 1,
+        pageSize: 25,
+        total: 1,
+      });
+      (await nextRequest({ method: 'GET', url: '/api/recurring-expenses/c1' })).flush(
+        recurringDetails({ description: 'Abonament reklamowy' }),
+      );
+
+      await settle(() =>
+        expect(element().textContent).toContain('Wydatek cykliczny: Abonament reklamowy'),
+      );
+
+      const service = TestBed.inject(ExpensesService);
+      const removed = service.removeFilter('recurringDefinitionId');
+      const all = await nextRequest((r) => r.url === '/api/expenses');
+      expect(all.request.params.has('recurringDefinitionId')).toBe(false);
+      all.flush({ items: [], page: 1, pageSize: 25, total: 0 });
+      await removed;
+    });
+
+    it('labels a deleted definition as „(usunięty)”', async () => {
+      const { navigation, element, settle } = await openWith('/wydatki?wydatekCykliczny=c9');
+      await navigation;
+      (await nextRequest('/api/jobs')).flush([]);
+      (await nextRequest((r) => r.url === '/api/expenses')).flush({
+        items: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+      });
+      respondProblem(await nextRequest({ method: 'GET', url: '/api/recurring-expenses/c9' }), 404, {
+        code: 'recurring_expense_not_found',
+      });
+
+      await settle(() => expect(element().textContent).toContain('Wydatek cykliczny (usunięty)'));
+      expect(element().textContent).toContain('Wyczyść filtry');
+    });
   });
 });

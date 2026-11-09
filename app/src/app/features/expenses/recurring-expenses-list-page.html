@@ -1,0 +1,96 @@
+<section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-bold">Wydatki cykliczne</h1>
+    @if (!recurring.registryEmpty()) {
+      <app-button variant="primary" (pressed)="add()">Dodaj wydatek cykliczny</app-button>
+    }
+  </div>
+
+  <app-expenses-subnav />
+
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+
+  <app-recurring-job-notice />
+
+  @if (recurring.registryEmpty()) {
+    <app-empty-state
+      heading="Brak wydatków cyklicznych"
+      description="Dodaj wydatek cykliczny, aby powtarzał się co miesiąc."
+    >
+      <app-button variant="primary" (pressed)="add()">Dodaj wydatek cykliczny</app-button>
+    </app-empty-state>
+  } @else {
+    <app-data-table
+      caption="Wydatki cykliczne"
+      emptyTitle="Brak wydatków cyklicznych"
+      filteredEmptyTitle="Brak wydatków cyklicznych dla wybranych filtrów"
+      [columns]="columns"
+      [rows]="recurring.items()"
+      [rowKey]="rowKey"
+      [total]="recurring.total()"
+      [page]="recurring.page()"
+      [pageSize]="recurring.pageSize"
+      [sort]="recurring.sort()"
+      [filters]="recurring.activeFilters()"
+      [filterable]="true"
+      [loading]="recurring.loading()"
+      [error]="recurring.error()"
+      (pageChange)="onPage($event)"
+      (sortChange)="onSort($event)"
+      (filterRemove)="recurring.removeFilter($event)"
+      (filtersClear)="recurring.clearFilters()"
+      (retry)="recurring.load()"
+    >
+      <form
+        tableFilters
+        novalidate
+        aria-label="Filtry wydatków cyklicznych"
+        class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2"
+        (submit)="onSearch($event)"
+      >
+        <app-field
+          label="Szukaj"
+          fieldId="cykliczne-szukaj"
+          hint="Opis lub kontrahent. Zatwierdź klawiszem Enter."
+        >
+          <input
+            #control
+            class="input w-full"
+            type="search"
+            autocomplete="off"
+            [attr.maxlength]="searchMaxLength"
+            [value]="recurring.filters().search"
+            (change)="onSearchChange($event)"
+          />
+        </app-field>
+        <app-field label="Stan" fieldId="cykliczne-stan">
+          <select #control class="select w-full" (change)="onState($event)">
+            <option value="" [selected]="recurring.filters().state === ''">Wszystkie</option>
+            @for (state of states; track state) {
+              <option [value]="state" [selected]="recurring.filters().state === state">
+                {{ stateLabels[state] }}
+              </option>
+            }
+          </select>
+        </app-field>
+      </form>
+
+      <ng-template appTableCell="description" [appTableCellOf]="recurring.items()" let-row>
+        <a
+          class="link font-medium text-(--sf-accent-text)"
+          [routerLink]="['/wydatki', 'cykliczne', row.id]"
+          >{{ row.description }}</a
+        >
+      </ng-template>
+      <ng-template appTableCell="status" [appTableCellOf]="recurring.items()" let-row>
+        <app-status-badge [label]="statusLabels[row.status]" [tone]="statusTones[row.status]" />
+      </ng-template>
+    </app-data-table>
+  }
+</section>

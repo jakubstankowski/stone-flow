@@ -50,10 +50,12 @@ internal static class ExpensesEndpoints
         [FromQuery] string[]? category = null,
         [FromQuery] string? state = null,
         [FromQuery] string? sign = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] string? recurringDefinitionId = null)
     {
         var result = await dispatcher.QueryAsync(
-            new ListExpensesQuery(page, pageSize, sort, direction, costDateFrom, costDateTo, paidOnFrom, paidOnTo, category, state, sign, search),
+            new ListExpensesQuery(
+                page, pageSize, sort, direction, costDateFrom, costDateTo, paidOnFrom, paidOnTo, category, state, sign, search, recurringDefinitionId),
             cancellationToken);
 
         return result.Page is { } list
@@ -153,6 +155,6 @@ internal static class ExpensesEndpoints
         };
     }
 
-    private static ValidationProblem ValidationProblem(FieldErrors? errors) =>
+    internal static ValidationProblem ValidationProblem(FieldErrors? errors) =>
         TypedResults.ValidationProblem(errors?.ToDictionary() ?? new Dictionary<string, string[]>());
 }

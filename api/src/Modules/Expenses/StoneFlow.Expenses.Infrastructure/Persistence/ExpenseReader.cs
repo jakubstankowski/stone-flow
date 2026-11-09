@@ -13,7 +13,7 @@ namespace StoneFlow.Expenses.Infrastructure.Persistence;
 /// </summary>
 internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
 {
-    private const string LikeEscape = "\\";
+    internal const string LikeEscape = "\\";
 
     public async Task<ExpenseRowsPage> ListAsync(ExpenseListCriteria criteria, CancellationToken cancellationToken)
     {
@@ -31,7 +31,7 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
         var rows = await Sort(expenses, criteria)
             .Skip((int)skip)
             .Take(criteria.PageSize)
-            .Select(e => new ExpenseListRowDto(e.Id, e.Description, e.Category, e.Counterparty, e.CostDate, e.DueDate, e.PaidOn, e.GrossAmount))
+            .Select(e => new ExpenseListRowDto(e.Id, e.Description, e.Category, e.Counterparty, e.CostDate, e.DueDate, e.PaidOn, e.GrossAmount, e.RecurringDefinitionId))
             .ToListAsync(cancellationToken);
 
         return new ExpenseRowsPage(rows, total);
@@ -57,7 +57,13 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
                 e.Comment,
                 e.CreatedAtUtc,
                 e.UpdatedAtUtc,
-                EF.Property<byte[]>(e, ExpenseConfiguration.VersionProperty)))
+                EF.Property<byte[]>(e, ExpenseConfiguration.VersionProperty),
+                e.RecurringDefinitionId != null && e.RecurringPeriod != null
+                    ? new ExpenseRecurrenceDto(
+                        e.RecurringDefinitionId.Value,
+                        e.RecurringPeriod.Value,
+                        context.RecurringDefinitions.Any(d => d.Id == e.RecurringDefinitionId))
+                    : null))
             .SingleOrDefaultAsync(cancellationToken);
 
         return record is null
@@ -100,6 +106,11 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
         if (criteria.PaidOnTo is { } paidTo)
         {
             expenses = expenses.Where(e => e.PaidOn <= paidTo);
+        }
+
+        if (criteria.RecurringDefinitionId is { } definitionId)
+        {
+            expenses = expenses.Where(e => e.RecurringDefinitionId == definitionId);
         }
 
         if (criteria.Categories.Count > 0)
@@ -150,7 +161,7 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
         (_, true) => expenses.OrderByDescending(e => e.CostDate).ThenByDescending(e => e.Id),
     };
 
-    private static string EscapeLike(string text) =>
+    internal static string EscapeLike(string text) =>
         text.Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
             .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
             .Replace("_", LikeEscape + "_", StringComparison.Ordinal)

@@ -57,6 +57,8 @@ export interface ExpenseDetails {
   readonly comment: string | null;
   readonly paymentStatus: ExpensePaymentStatus;
   readonly overdue: boolean;
+  /** Wystąpienie wydatku cyklicznego (SF-16); `null` dla wydatku dodanego ręcznie. */
+  readonly recurring: ExpenseRecurrence | null;
   readonly createdAtUtc: string;
   readonly updatedAtUtc: string;
   readonly version: string;
@@ -73,6 +75,15 @@ export interface ExpenseListItem {
   readonly grossAmount: string;
   readonly paymentStatus: ExpensePaymentStatus;
   readonly overdue: boolean;
+  /** Definicja, z której powstało wystąpienie (SF-16); `null` dla wydatku dodanego ręcznie. */
+  readonly recurringDefinitionId: string | null;
+}
+
+/** Pochodzenie wystąpienia: definicja, okres `yyyy-MM` i to, czy definicja jeszcze istnieje. */
+export interface ExpenseRecurrence {
+  readonly definitionId: string;
+  readonly period: string;
+  readonly definitionExists: boolean;
 }
 
 export interface ExpenseListPage {
@@ -95,6 +106,8 @@ export interface ExpenseListQuery {
   readonly state: ExpenseStateFilter | null;
   readonly sign: ExpenseSignFilter | null;
   readonly search: string | null;
+  /** Tylko wystąpienia jednej definicji (SF-16). */
+  readonly recurringDefinitionId: string | null;
 }
 
 export interface ExpenseCreated {

@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NO_DATA, formatDate, formatPln } from '../../shared/format/pl-format';
 import { Button } from '../../shared/ui/button';
 import { DataTable, DataTableColumn, SortState } from '../../shared/ui/data-table';
@@ -26,6 +26,9 @@ import {
   isNegativeAmount,
 } from './expense-models';
 import { DATE_RANGE_MESSAGE, ExpensesService, SEARCH_MAX_LENGTH } from './expenses.service';
+import { ExpensesSubnav } from './expenses-subnav';
+import { RECURRING_MARK } from './recurring-expense-models';
+import { RecurringJobNotice } from './recurring-job-notice';
 
 const COLUMNS: readonly DataTableColumn<ExpenseListItem>[] = [
   {
@@ -62,10 +65,22 @@ const COLUMNS: readonly DataTableColumn<ExpenseListItem>[] = [
 /**
  * Ekran `/wydatki`: jedna strona z API, filtry przy tabeli (na telefonie w panelu „Filtry”),
  * sortowanie przez API. Pusta ewidencja (bez filtrów) pokazuje „Brak wydatków” z akcją.
+ * Parametr `wydatekCykliczny` (odczytany raz) ustawia filtr wystąpień jednej definicji; wiersz
+ * wystąpienia ma pod opisem tekst „Cykliczny” (SF-16).
  */
 @Component({
   selector: 'app-expenses-list-page',
-  imports: [Button, DataTable, EmptyState, Field, RouterLink, StatusBadge, TableCell],
+  imports: [
+    Button,
+    DataTable,
+    EmptyState,
+    ExpensesSubnav,
+    Field,
+    RecurringJobNotice,
+    RouterLink,
+    StatusBadge,
+    TableCell,
+  ],
   templateUrl: './expenses-list-page.html',
 })
 export class ExpensesListPage {
@@ -87,6 +102,7 @@ export class ExpensesListPage {
   protected readonly statusTones = PAYMENT_STATUS_TONES;
   protected readonly overdueLabel = OVERDUE_LABEL;
   protected readonly negativeLabel = NEGATIVE_AMOUNT_LABEL;
+  protected readonly recurringMark = RECURRING_MARK;
   protected readonly isNegative = isNegativeAmount;
   protected readonly searchMaxLength = SEARCH_MAX_LENGTH;
   protected readonly dateRangeMessage = DATE_RANGE_MESSAGE;
@@ -98,7 +114,12 @@ export class ExpensesListPage {
   );
 
   constructor() {
-    void this.expenses.load();
+    const definitionId = inject(ActivatedRoute).snapshot.queryParamMap.get('wydatekCykliczny');
+    if (definitionId) {
+      void this.expenses.filterByRecurring(definitionId);
+    } else {
+      void this.expenses.load();
+    }
   }
 
   protected add(): void {

@@ -29,7 +29,7 @@
 ## Open Items
 
 - **Human review required before merge** (ryzyko high).
-- Po merge z SF-16 odtworzyć `ExpensesDbContextModelSnapshot.cs` narzędziem EF zamiast ręcznego rozwiązywania konfliktu.
+- Merge `main` (SF-16): migracja `20261109064821_OwnerWithdrawals` wygenerowana ponownie przez `dotnet ef` na snapshocie z SF-16 (Up/Down bez zmian, Designer i snapshot z pełnym modelem); `has-pending-model-changes` bez zmian. `RecurringExpensesEndpoints` korzysta z `EndpointSupport`.
 - Brak testu integracyjnego: wydatek opłacony przed datą uruchomienia znika z listy. Pokrywa to test jednostkowy wspólnego filtra.
 
 ## Scenariusze testów ręcznych (UI)

@@ -1,6 +1,7 @@
 using StoneFlow.Expenses.Application;
 using StoneFlow.Expenses.Application.GetExpense;
 using StoneFlow.Expenses.Application.ListExpenses;
+using StoneFlow.Expenses.Application.Recurring;
 
 namespace StoneFlow.Expenses.Api.Endpoints;
 
@@ -43,7 +44,8 @@ public sealed record ExpenseListItemResponse(
     string? PaidOn,
     string GrossAmount,
     string PaymentStatus,
-    bool Overdue);
+    bool Overdue,
+    Guid? RecurringDefinitionId);
 
 public sealed record ExpenseListPageResponse(IReadOnlyList<ExpenseListItemResponse> Items, int Page, int PageSize, int Total);
 
@@ -65,7 +67,11 @@ public sealed record ExpenseDetailsResponse(
     bool Overdue,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    string Version);
+    string Version,
+    ExpenseRecurrenceResponse? Recurring);
+
+/// <summary>Wystąpienie wydatku cyklicznego: definicja, okres <c>yyyy-MM</c> i czy definicja nadal istnieje.</summary>
+public sealed record ExpenseRecurrenceResponse(Guid DefinitionId, string Period, bool DefinitionExists);
 
 internal static class ExpenseContracts
 {
@@ -109,7 +115,10 @@ internal static class ExpenseContracts
             details.Payment.Overdue,
             e.CreatedAtUtc,
             e.UpdatedAtUtc,
-            ExpenseVersion.Format(e.Version));
+            ExpenseVersion.Format(e.Version),
+            e.Recurring is { } recurring
+                ? new ExpenseRecurrenceResponse(recurring.DefinitionId, RecurringCodes.FormatPeriod(recurring.Period), recurring.DefinitionExists)
+                : null);
     }
 
     private static ExpenseListItemResponse ToResponse(ExpenseListItemDto item)
@@ -125,7 +134,8 @@ internal static class ExpenseContracts
             Date(row.PaidOn),
             ExpenseInput.FormatAmount(row.GrossAmount),
             ExpenseCodes.Of(item.Payment.Status),
-            item.Payment.Overdue);
+            item.Payment.Overdue,
+            row.RecurringDefinitionId);
     }
 
     private static string? Date(DateOnly? date) => date is { } value ? ExpenseInput.FormatDate(value) : null;

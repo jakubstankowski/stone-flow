@@ -1,8 +1,14 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { NO_DATA, formatDate, formatDateTime, formatPln } from '../../shared/format/pl-format';
+import {
+  NO_DATA,
+  formatDate,
+  formatDateTime,
+  formatMonth,
+  formatPln,
+} from '../../shared/format/pl-format';
 import { Button } from '../../shared/ui/button';
 import { ConfirmDialog } from '../../shared/ui/confirm-dialog';
 import { EmptyState } from '../../shared/ui/empty-state';
@@ -54,6 +60,7 @@ interface Alert {
     ExpenseForm,
     ExpensePaidForm,
     LoadingState,
+    RouterLink,
     StatusBadge,
   ],
   templateUrl: './expense-details-page.html',
@@ -88,6 +95,7 @@ export class ExpenseDetailsPage {
   protected readonly formatDate = formatDate;
   protected readonly formatDateTime = formatDateTime;
   protected readonly formatPln = formatPln;
+  protected readonly formatMonth = formatMonth;
 
   private readonly deleteDialog = viewChild<ConfirmDialog>('deleteDialog');
   private readonly unmarkDialog = viewChild<ConfirmDialog>('unmarkDialog');
