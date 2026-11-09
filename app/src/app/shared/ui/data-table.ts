@@ -41,7 +41,7 @@ export interface ActiveFilter {
  * Tabela prezentacyjna dla list modułów (design guide, sekcje 6 i 8). Nie pobiera,
  * nie sortuje i nie paginuje danych lokalnie — emituje zdarzenia do rodzica, który
  * pyta API. Filtry są projekcją z atrybutem `tableFilters`, a komórki inne niż tekst —
- * szablonami `appTableCell`.
+ * szablonami `appTableCell`. Opcja `mobileCards` zamienia wiersze w karty na telefonie.
  */
 @Component({
   selector: 'app-data-table',
@@ -65,6 +65,11 @@ export class DataTable<T> {
   readonly emptyTitle = input('Brak rekordów.');
   readonly emptyDescription = input<string | null>(null);
   readonly filteredEmptyTitle = input('Brak wyników dla wybranych filtrów.');
+  /**
+   * Poniżej `md` wiersze jako karty z widocznym nagłówkiem kolumny w każdej komórce (jeden DOM,
+   * nagłówki tabeli zostają dla czytników ekranu). Domyślnie wyłączone: zwykła tabela.
+   */
+  readonly mobileCards = input(false);
 
   readonly pageChange = output<number>();
   readonly sortChange = output<SortState>();

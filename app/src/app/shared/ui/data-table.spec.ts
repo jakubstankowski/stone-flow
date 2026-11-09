@@ -36,6 +36,7 @@ const COLUMNS: readonly DataTableColumn<Row>[] = [
     [filterable]="true"
     [loading]="loading()"
     [error]="error()"
+    [mobileCards]="mobileCards()"
     (pageChange)="events.push('page:' + $event)"
     (sortChange)="events.push('sort:' + $event.key + ':' + $event.direction)"
     (filterRemove)="events.push('remove:' + $event)"
@@ -58,6 +59,7 @@ class Host {
   readonly filters = signal<ActiveFilter[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
+  readonly mobileCards = signal(false);
   readonly events: string[] = [];
 }
 
@@ -196,5 +198,32 @@ describe('DataTable', () => {
     host.filters.set([{ id: 'kategoria', label: 'Kategoria: Paliwo' }]);
     await fixture.whenStable();
     expect(element.textContent).toContain('Brak wyników dla wybranych filtrów.');
+  });
+
+  it('keeps the plain table layout by default', async () => {
+    const { element } = await setup();
+
+    expect(element.querySelectorAll('[data-cell-header]')).toHaveLength(0);
+    expect(element.querySelector('thead')?.classList.contains('max-md:sr-only')).toBe(false);
+    expect(element.querySelector('tbody tr')?.className).toBe('border-b border-base-300');
+  });
+
+  it('turns rows into cards with a visible column header in every cell on phones', async () => {
+    const { fixture, host, element } = await setup();
+    host.mobileCards.set(true);
+    await fixture.whenStable();
+
+    expect(element.querySelector('thead')?.classList.contains('max-md:sr-only')).toBe(true);
+    const rows = element.querySelectorAll('tbody tr');
+    expect(rows).toHaveLength(2);
+    for (const row of Array.from(rows)) {
+      expect(row.classList.contains('max-md:block')).toBe(true);
+      const headers = Array.from(row.querySelectorAll('td [data-cell-header]'));
+      expect(headers.map((header) => header.textContent?.trim())).toEqual(['Opis', 'Kwota']);
+      for (const header of headers) {
+        expect(header.classList.contains('md:hidden')).toBe(true);
+      }
+    }
+    expect(rows[0].querySelector('td')?.textContent).toContain('Czynsz');
   });
 });

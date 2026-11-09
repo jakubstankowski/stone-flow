@@ -59,13 +59,13 @@
     tabindex="0"
     [attr.aria-label]="caption()"
   >
-    <table class="table">
+    <table class="table" [class]="mobileCards() ? 'max-md:block' : ''">
       <caption class="sr-only">
         {{
           caption()
         }}
       </caption>
-      <thead>
+      <thead [class]="mobileCards() ? 'max-md:sr-only' : ''">
         <tr class="bg-base-200">
           @for (column of columns(); track column.key; let first = $first) {
             <th
@@ -105,19 +105,34 @@
           }
         </tr>
       </thead>
-      <tbody>
+      <tbody [class]="mobileCards() ? 'max-md:flex max-md:flex-col max-md:gap-3 max-md:p-3' : ''">
         @for (row of rows(); track rowKey()(row)) {
-          <tr class="border-b border-base-300">
+          <tr
+            class="border-b border-base-300"
+            [class]="
+              mobileCards()
+                ? 'max-md:block max-md:rounded-box max-md:border max-md:border-(--sf-secondary) max-md:p-3'
+                : ''
+            "
+          >
             @for (column of columns(); track column.key; let first = $first) {
               <td
                 class="text-sm"
-                [class.sticky]="first"
-                [class.left-0]="first"
+                [class]="
+                  mobileCards() ? 'max-md:block max-md:px-0 max-md:py-1 max-md:text-left' : ''
+                "
+                [class.sticky]="first && !mobileCards()"
+                [class.left-0]="first && !mobileCards()"
                 [class.bg-base-100]="first"
                 [class.text-right]="column.align === 'end'"
                 [class.tabular-nums]="column.align === 'end'"
                 [class.whitespace-nowrap]="column.align === 'end'"
               >
+                @if (mobileCards()) {
+                  <span data-cell-header class="block text-xs text-(--sf-muted) md:hidden">{{
+                    column.header
+                  }}</span>
+                }
                 @if (templates().get(column.key); as cell) {
                   <ng-container *ngTemplateOutlet="cell; context: { $implicit: row }" />
                 } @else {

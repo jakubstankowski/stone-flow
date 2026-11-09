@@ -31,7 +31,7 @@ import {
   OrdersService,
   SEARCH_MAX_LENGTH,
 } from './orders.service';
-import { shopStatusLabel } from './shop-status';
+import { shopStatusLabel } from '../../shared/dictionaries/shop-status';
 
 const COLUMNS: readonly DataTableColumn<OrderListItem>[] = [
   { key: 'number', header: 'Numer', sortable: true },

@@ -1,23 +1,28 @@
+import { ExpenseCategory } from '../../shared/dictionaries/expense-categories';
+import { REFUND_KIND_LABELS, RefundKind } from '../../shared/dictionaries/order-dictionaries';
+import {
+  PAYMENT_METHOD_LABELS,
+  PaymentMethodCode,
+} from '../../shared/dictionaries/payment-methods';
+
+// Słowniki wspólne z innymi obszarami są w `shared/dictionaries`; tu eksport pod dotychczasowymi nazwami.
+export { EXPENSE_CATEGORY_LABELS as CATEGORY_LABELS } from '../../shared/dictionaries/expense-categories';
+export { REFUND_KIND_LABELS } from '../../shared/dictionaries/order-dictionaries';
+export { PAYMENT_METHOD_LABELS as METHOD_LABELS } from '../../shared/dictionaries/payment-methods';
+
 /** Rodzaj operacji pieniężnej (stały kod API `GET /api/operations`). */
 export type OperationKind = 'payment' | 'refund' | 'expense' | 'withdrawal';
 
 export type OperationDirection = 'inflow' | 'outflow';
 
-export type OperationRefundKind = 'salesReturn' | 'moneyReturn';
+export type OperationRefundKind = RefundKind;
 
-export type OperationMethod = 'transfer' | 'blik' | 'cash' | 'cashOnDelivery';
+export type OperationMethod = PaymentMethodCode;
 
 export type OperationSourceType = 'order' | 'expense' | 'withdrawal';
 
-/** Kategoria opłaconego wydatku (kod API, jak w `features/expenses`). */
-export type OperationCategory =
-  | 'materialPurchase'
-  | 'cutting'
-  | 'hdsTransport'
-  | 'marketing'
-  | 'otherOperations'
-  | 'vatTax'
-  | 'ppeTax';
+/** Kategoria opłaconego wydatku (kod API). */
+export type OperationCategory = ExpenseCategory;
 
 /**
  * Pozycja listy „Operacje”. `amount` to kwota zapisana jako ciąg dziesiętny (`"-50.00"`), bez
@@ -86,11 +91,6 @@ export const KIND_FILTER_LABELS: Readonly<Record<OperationKind, string>> = {
   withdrawal: 'Wypłata właściciela',
 };
 
-export const REFUND_KIND_LABELS: Readonly<Record<OperationRefundKind, string>> = {
-  salesReturn: 'Zwrot sprzedaży',
-  moneyReturn: 'Zwrot pieniędzy',
-};
-
 /** Etykieta kolumny „Rodzaj”: zwrot pokazuje swój rodzaj. */
 export function kindLabel(item: Pick<OperationItem, 'kind' | 'refundKind'>): string {
   if (item.kind === 'refund' && item.refundKind) {
@@ -104,29 +104,11 @@ export const DIRECTION_LABELS: Readonly<Record<OperationDirection, string>> = {
   outflow: 'Wypływ',
 };
 
-export const METHOD_LABELS: Readonly<Record<OperationMethod, string>> = {
-  transfer: 'Przelew',
-  blik: 'BLIK',
-  cash: 'Gotówka',
-  cashOnDelivery: 'Pobranie',
-};
-
 export const NO_METHOD = 'Nie podano';
 
 export function methodLabel(method: OperationMethod | null): string {
-  return method ? METHOD_LABELS[method] : NO_METHOD;
+  return method ? PAYMENT_METHOD_LABELS[method] : NO_METHOD;
 }
-
-/** Kopia słownika z `features/expenses` (bez importów między obszarami). */
-export const CATEGORY_LABELS: Readonly<Record<OperationCategory, string>> = {
-  materialPurchase: 'Zakup materiału u dostawców',
-  cutting: 'Cięcie',
-  hdsTransport: 'Transport HDS',
-  marketing: 'Marketing',
-  otherOperations: 'Pozostała działalność',
-  vatTax: 'Podatek VAT',
-  ppeTax: 'Podatek PPE',
-};
 
 /** Dopisek przy opłaconym wydatku z ujemną kwotą (jak na liście wydatków). */
 export const NEGATIVE_AMOUNT_LABEL = 'Korekta / zwrot od dostawcy';

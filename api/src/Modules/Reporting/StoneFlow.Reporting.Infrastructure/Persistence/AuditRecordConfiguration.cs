@@ -44,6 +44,7 @@ internal sealed class AuditRecordConfiguration : IEntityTypeConfiguration<AuditR
             .HasColumnType("nvarchar(max)");
 
         builder.HasIndex(record => record.OccurredAtUtc);
+        builder.HasIndex(record => record.ObjectBusinessDate);
         builder.HasIndex(record => new { record.ObjectType, record.ObjectId });
         builder.HasIndex(record => new { record.ParentObjectType, record.ParentObjectId });
     }
