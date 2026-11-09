@@ -174,7 +174,7 @@ Poniższy model jest propozycją logiczną; nie narzuca tabel ani kontraktów AP
 | Klient przy zamówieniu | Osoba lub firma, dane kontaktowe, adres, opcjonalny NIP; rozdzielone pola zamiast jednego bloku tekstu |
 | Dane operacyjne | Dostawca lub dostawcy, referencje ZO, numer faktury, flagi zdjęć i opinii, dodatkowe uwagi |
 | Wpłata | Powiązanie z zamówieniem, kwota, data rzeczywistej operacji, metoda, opcjonalne pole „Przyjął” przy gotówce; zamówienie może mieć wiele wpłat |
-| Wydatek | Opis, kategoria, kontrahent, data kosztu, opcjonalny termin, data zapłaty wyznaczająca stan „Opłacony”, kwota brutto (wymagana, różna od 0 zł, ujemna przy korekcie lub zwrocie od dostawcy) i netto (opcjonalna) przepisane z dokumentu, referencja dokumentu, metoda, płatnik, komentarz |
+| Wydatek | Opis, kategoria, kontrahent, data kosztu, opcjonalny termin, data zapłaty wyznaczająca stan „Opłacony”, kwota brutto (wymagana, różna od 0 zł, ujemna przy korekcie lub zwrocie od dostawcy) i netto (opcjonalna; formularz podpowiada brutto / 1,23) przepisane z dokumentu, referencja dokumentu, metoda, płatnik, komentarz |
 | Wypłata właściciela | Osoba, kwota, data, metoda; odrębna od wydatku |
 | Zwrot | Powiązanie z zamówieniem, rodzaj (zwrot sprzedaży albo zwrot pieniędzy), kwota, data, metoda, powód; odrębny od wpłaty |
 | Korekta sprzedaży | Powiązanie z zamówieniem, kwota, data, powód; bez metody, nie jest operacją pieniężną |
@@ -198,7 +198,7 @@ Poniższy model jest propozycją logiczną; nie narzuca tabel ani kontraktów AP
 
 Dostępne są dwa rozdzielone widoki: sprzedaż oraz przepływy pieniężne. Obliczenia wykonuje backend. Nie wolno liczyć pieniędzy typami zmiennoprzecinkowymi. UI stosuje polskie formatowanie i podaje walutę.
 
-Reguły kwot (decyzja użytkownika z 01.11.2026): kwoty są typu `decimal(18,2)`, zapisywane do grosza. Ewentualne zaokrąglenie odbywa się połową od zera (0,005 → 0,01). Sumy są sumami zapisanych kwot, bez ponownego zaokrąglania. MVP działa wyłącznie w PLN, bez kursów walut. Zamówienie ma tylko wartość brutto, bez netto i stawki VAT. Wydatek ma kwotę brutto i opcjonalną kwotę netto przepisane z dokumentu; system nie wylicza ich ze stawki i jej nie przechowuje. Raporty używają kwot brutto.
+Reguły kwot (decyzja użytkownika z 01.11.2026): kwoty są typu `decimal(18,2)`, zapisywane do grosza. Ewentualne zaokrąglenie odbywa się połową od zera (0,005 → 0,01). Sumy są sumami zapisanych kwot, bez ponownego zaokrąglania. MVP działa wyłącznie w PLN, bez kursów walut. Zamówienie ma tylko wartość brutto, bez netto i stawki VAT. Wydatek ma kwotę brutto i opcjonalną kwotę netto przepisane z dokumentu. Formularz wydatku podpowiada netto jako brutto / 1,23 (VAT 23%, zaokrąglenie do grosza połową od zera); użytkownik może je poprawić, np. przy innej stawce albo 0 zł, a netto wpisane ręcznie nie jest nadpisywane. Zapisywana jest tylko kwota netto widoczna w formularzu; system nie przechowuje stawki i nie przelicza netto zapisanych wydatków (decyzja użytkownika z 08.11.2026). Raporty używają kwot brutto.
 
 ### Definicje widoków
 
@@ -220,7 +220,7 @@ Zabezpieczenia wymagane przy projektowaniu obliczeń:
 3. Planowany wydatek i niezapłacone zamówienie nie zwiększają rzeczywistych przepływów.
 4. Kwota zwrotu jest odrębnym zdarzeniem, a nie utratą historii zamówienia (patrz „Anulowanie i zwrot”).
 5. Wartość zero, brak danych i niekompletne dane mają odmienne znaczenia.
-6. Nie przeliczać wszystkich kwot netto przez stałe dzielenie przez 1,23. Taki wzór występuje w DEMO, a system przepisuje kwoty z dokumentu i nie wylicza ich ze stawki.
+6. Nie przeliczać zapisanych kwot netto przez stałe dzielenie przez 1,23. Taki wzór występuje w DEMO; podpowiedź brutto / 1,23 w formularzu jest tylko wartością początkową pola, którą użytkownik zatwierdza albo poprawia (decyzja użytkownika z 08.11.2026).
 
 Zakres raportów w MVP: bieżący miesiąc, poprzedni miesiąc, rok i własny zakres; agregacja miesięczna oraz porównanie okresów. Kategorie i kanały powinny prowadzić do danych szczegółowych. Porównanie procentowe przy bazie równej zero pokazuje „brak podstawy porównania”.
 
