@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     # Testy integracyjne tworzą osobną bazę na test (ok. 10 s każdy); od SF-10 przebieg trwa ponad
     # 20 minut. Przyspieszenie (wspólna baza na klasę testów) to osobne zadanie.
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
