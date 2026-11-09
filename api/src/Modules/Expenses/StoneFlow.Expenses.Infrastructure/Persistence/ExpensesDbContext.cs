@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using StoneFlow.Expenses.Domain.Expenses;
+using StoneFlow.Expenses.Domain.Recurring;
 
 namespace StoneFlow.Expenses.Infrastructure.Persistence;
 
@@ -8,6 +9,12 @@ public sealed class ExpensesDbContext(DbContextOptions<ExpensesDbContext> option
     public const string Schema = "expenses";
 
     public DbSet<Expense> Expenses => Set<Expense>();
+
+    public DbSet<RecurringExpenseDefinition> RecurringDefinitions => Set<RecurringExpenseDefinition>();
+
+    public DbSet<RecurringExpensePeriod> RecurringPeriods => Set<RecurringExpensePeriod>();
+
+    public DbSet<RecurringDefinitionRequest> RecurringDefinitionRequests => Set<RecurringDefinitionRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

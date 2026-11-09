@@ -189,6 +189,24 @@ export function netAmountError(net: string, gross: string): string | null {
     : null;
 }
 
+/**
+ * Podpowiedź netto z brutto przy stawce VAT 23%: brutto / 1,23 zaokrąglone do grosza (połówki od
+ * zera). Liczone na groszach jako `BigInt`, bez liczb zmiennoprzecinkowych. Zwraca tekst w formie
+ * pola (`"1002,44"`) albo `null`, gdy brutto jest puste lub niepoprawne.
+ */
+export function netFromGross(gross: string): string | null {
+  const amount = parseSignedPlnAmount(gross);
+  if (amount === null) {
+    return null;
+  }
+  const negative = amount.startsWith('-');
+  const grosze = BigInt(amount.replace('-', '').replace('.', ''));
+  const net = (grosze * 200n + 123n) / 246n;
+  const whole = (net / 100n).toString();
+  const fraction = (net % 100n).toString().padStart(2, '0');
+  return `${negative && net !== 0n ? '-' : ''}${whole},${fraction}`;
+}
+
 /** Data opcjonalna: pusta albo poprawna. */
 export function optionalDateError(text: string): string | null {
   return text === '' || isValidDate(text) ? null : EXPENSE_MESSAGES.dateInvalid;

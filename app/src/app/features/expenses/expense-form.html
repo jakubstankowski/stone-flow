@@ -26,6 +26,66 @@
     </div>
   }
 
+  @if (showRecurringToggle()) {
+    <label class="flex min-h-11 items-center gap-3 self-start text-base font-medium">
+      <input
+        class="checkbox"
+        type="checkbox"
+        aria-controls="wydatek-harmonogram"
+        [attr.aria-expanded]="definitionMode()"
+        [formField]="form.recurring"
+      />
+      Powtarzaj co miesiąc
+    </label>
+  }
+
+  @if (recurring()) {
+    <fieldset
+      id="wydatek-harmonogram"
+      class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+      [hidden]="!definitionMode()"
+    >
+      <legend class="px-1 text-xl font-semibold">Harmonogram</legend>
+      @if (definitionMode()) {
+        <div class="grid gap-4 md:grid-cols-3">
+          <app-field
+            label="Dzień miesiąca"
+            fieldId="wydatek-dzien"
+            [hint]="dayHint()"
+            [required]="true"
+            [error]="errorOf(form.dayOfMonth)"
+          >
+            <input
+              #control
+              class="input w-full tabular-nums"
+              type="number"
+              inputmode="numeric"
+              step="1"
+              [formField]="form.dayOfMonth"
+            />
+          </app-field>
+          <app-field
+            label="Początek"
+            fieldId="wydatek-poczatek"
+            [required]="true"
+            [error]="errorOf(form.startsOn)"
+          >
+            <input #control class="input w-full" type="date" [formField]="form.startsOn" />
+          </app-field>
+          <app-field
+            label="Koniec"
+            fieldId="wydatek-koniec"
+            hint="Opcjonalnie; bez końca wydatek powtarza się co miesiąc."
+            [error]="errorOf(form.endsOn)"
+          >
+            <input #control class="input w-full" type="date" [formField]="form.endsOn" />
+          </app-field>
+        </div>
+        <app-recurring-expense-preview [query]="previewQuery()" />
+      }
+    </fieldset>
+  }
+
   <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
     <legend class="px-1 text-xl font-semibold">Wydatek</legend>
     <div class="grid gap-4 md:grid-cols-2">
@@ -79,7 +139,11 @@
       <app-field
         label="Kwota brutto (zł)"
         fieldId="wydatek-brutto"
-        hint="Np. 1 234,50. Kwota różna od 0 zł; ujemna oznacza korektę lub zwrot od dostawcy."
+        [hint]="
+          definitionMode()
+            ? hints.gross
+            : 'Np. 1 234,50. Kwota różna od 0 zł; ujemna oznacza korektę lub zwrot od dostawcy.'
+        "
         [required]="true"
         [error]="errorOf(form.grossAmount)"
       >
@@ -95,7 +159,7 @@
       <app-field
         label="Kwota netto (zł)"
         fieldId="wydatek-netto"
-        hint="Opcjonalnie, przepisana z dokumentu; 0 zł jest dozwolone."
+        hint="Wyliczana z brutto (÷ 1,23, VAT 23%). Możesz ją poprawić, np. dla innej stawki; 0 zł jest dozwolone."
         [error]="errorOf(form.netAmount)"
       >
         <input
@@ -117,45 +181,51 @@
     </div>
   </fieldset>
 
-  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
-    <legend class="px-1 text-xl font-semibold">Daty</legend>
-    <div class="grid gap-4 md:grid-cols-3">
-      <app-field
-        label="Data kosztu"
-        fieldId="wydatek-data-kosztu"
-        hint="Określa okres kosztów."
-        [required]="true"
-        [error]="errorOf(form.costDate)"
-      >
-        <input #control class="input w-full" type="date" [formField]="form.costDate" />
-      </app-field>
-      <app-field
-        label="Termin płatności"
-        fieldId="wydatek-termin"
-        hint="Planowany termin zapłaty — nie oznacza zapłaty."
-        [error]="errorOf(form.dueDate)"
-      >
-        <input #control class="input w-full" type="date" [formField]="form.dueDate" />
-      </app-field>
-      <app-field
-        label="Data zapłaty"
-        fieldId="wydatek-data-zaplaty"
-        hint="Uzupełnij dopiero po zapłacie. Data nie może być późniejsza niż dzisiaj."
-        [error]="errorOf(form.paidOn)"
-      >
-        <input
-          #control
-          class="input w-full"
-          type="date"
-          [attr.max]="today"
-          [formField]="form.paidOn"
-        />
-      </app-field>
-    </div>
-  </fieldset>
+  @if (!definitionMode()) {
+    <fieldset
+      class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+    >
+      <legend class="px-1 text-xl font-semibold">Daty</legend>
+      <div class="grid gap-4 md:grid-cols-3">
+        <app-field
+          label="Data kosztu"
+          fieldId="wydatek-data-kosztu"
+          hint="Określa okres kosztów."
+          [required]="true"
+          [error]="errorOf(form.costDate)"
+        >
+          <input #control class="input w-full" type="date" [formField]="form.costDate" />
+        </app-field>
+        <app-field
+          label="Termin płatności"
+          fieldId="wydatek-termin"
+          hint="Planowany termin zapłaty — nie oznacza zapłaty."
+          [error]="errorOf(form.dueDate)"
+        >
+          <input #control class="input w-full" type="date" [formField]="form.dueDate" />
+        </app-field>
+        <app-field
+          label="Data zapłaty"
+          fieldId="wydatek-data-zaplaty"
+          hint="Uzupełnij dopiero po zapłacie. Data nie może być późniejsza niż dzisiaj."
+          [error]="errorOf(form.paidOn)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [attr.max]="today"
+            [formField]="form.paidOn"
+          />
+        </app-field>
+      </div>
+    </fieldset>
+  }
 
   <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
-    <legend class="px-1 text-xl font-semibold">Płatność i dokument</legend>
+    <legend class="px-1 text-xl font-semibold">
+      {{ definitionMode() ? 'Płatność' : 'Płatność i dokument' }}
+    </legend>
     <div class="grid gap-4 md:grid-cols-3">
       <app-field
         label="Metoda płatności"
@@ -183,20 +253,22 @@
           [formField]="form.payer"
         />
       </app-field>
-      <app-field
-        label="Referencja dokumentu"
-        fieldId="wydatek-dokument"
-        hint="Np. numer faktury."
-        [error]="errorOf(form.documentReference)"
-      >
-        <input
-          #control
-          class="input w-full"
-          type="text"
-          autocomplete="off"
-          [formField]="form.documentReference"
-        />
-      </app-field>
+      @if (!definitionMode()) {
+        <app-field
+          label="Referencja dokumentu"
+          fieldId="wydatek-dokument"
+          hint="Np. numer faktury."
+          [error]="errorOf(form.documentReference)"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="text"
+            autocomplete="off"
+            [formField]="form.documentReference"
+          />
+        </app-field>
+      }
     </div>
   </fieldset>
 
@@ -206,6 +278,15 @@
       <textarea #control class="textarea w-full" rows="3" [formField]="form.comment"></textarea>
     </app-field>
   </fieldset>
+
+  @if (editingDefinition()) {
+    <div class="flex flex-col gap-2 rounded-box border border-(--sf-info) bg-base-100 p-4">
+      @if (pausedDefinition()) {
+        <p class="font-medium" data-testid="edycja-wstrzymana">{{ hints.pausedInfo }}</p>
+      }
+      <p>{{ hints.editInfo }}</p>
+    </div>
+  }
 
   <div class="flex flex-wrap gap-3">
     <app-button variant="primary" type="submit" [busy]="busy()" busyLabel="Zapisywanie…">

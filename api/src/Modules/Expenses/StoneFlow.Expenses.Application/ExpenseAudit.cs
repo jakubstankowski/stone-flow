@@ -8,8 +8,8 @@ namespace StoneFlow.Expenses.Application;
 /// <summary>
 /// Wpisy audytu wydatku (SF-7, konwencje „Value format”): obiekt <c>Expense</c>, data biznesowa
 /// to data kosztu, etykieta „Wydatek – {kategoria}” (bez wolnego tekstu, więc bez danych
-/// osobowych). Rodzic jest opcjonalny: w SF-15 zawsze <c>null</c>, w SF-16 definicja cykliczna
-/// dla wystąpienia. „Płatnik” to dane osobowe.
+/// osobowych). Rodzic: definicja cykliczna dla wystąpienia (<see cref="ParentOf"/>), dla
+/// pozostałych brak. „Płatnik” to dane osobowe.
 /// </summary>
 public static class ExpenseAudit
 {
@@ -56,6 +56,15 @@ public static class ExpenseAudit
             .ToList();
 
         return new AuditEntry(author, Object(expense, parent), AuditOperation.Deleted, changes);
+    }
+
+    /// <summary>Rodzic wpisu: definicja cykliczna dla wystąpienia (także po usunięciu definicji), dla pozostałych brak.</summary>
+    public static AuditObjectReference? ParentOf(Expense expense)
+    {
+        ArgumentNullException.ThrowIfNull(expense);
+        return expense.RecurringDefinitionId is { } definitionId
+            ? new AuditObjectReference(AuditObjectType.RecurringExpenseDefinition, definitionId)
+            : null;
     }
 
     /// <summary>Etykieta obiektu: „Wydatek – {etykieta kategorii}”.</summary>

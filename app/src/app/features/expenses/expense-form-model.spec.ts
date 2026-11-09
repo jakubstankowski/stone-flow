@@ -4,6 +4,7 @@ import {
   expenseFormFrom,
   grossAmountError,
   netAmountError,
+  netFromGross,
   paidEffectText,
   paidOnError,
   toExpenseInput,
@@ -93,5 +94,23 @@ describe('expense form model', () => {
     expect(paidEffectText('-200.00')).toBe(
       'Korekta / zwrot od dostawcy obniży wypływy w okresie daty zapłaty.',
     );
+  });
+});
+
+describe('netFromGross', () => {
+  it.each([
+    ['1233', '1002,44'],
+    ['123', '100,00'],
+    ['1 234,50', '1003,66'],
+    ['0,01', '0,01'],
+    ['0,02', '0,02'],
+    ['-246', '-200,00'],
+    ['0', '0,00'],
+  ])('brutto %s → netto %s (÷ 1,23, zaokrąglenie do grosza)', (gross, net) => {
+    expect(netFromGross(gross)).toBe(net);
+  });
+
+  it.each(['', 'abc', '1,234'])('brak podpowiedzi dla niepoprawnego brutto %j', (gross) => {
+    expect(netFromGross(gross)).toBeNull();
   });
 });

@@ -25,9 +25,62 @@
         <app-button (pressed)="startNext()">Dodaj kolejny wydatek</app-button>
       </div>
     }
+    @if (recurringNotice(); as current) {
+      @switch (current.kind) {
+        @case ('keyReused') {
+          <div
+            #reusedMessage
+            tabindex="-1"
+            class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+          >
+            @if (current.kind === 'keyReused' && current.definitionId; as definitionId) {
+              <p class="font-medium">
+                Ten formularz zapisał już
+                <a
+                  class="link text-(--sf-accent-text)"
+                  [routerLink]="['/wydatki', 'cykliczne', definitionId]"
+                  >wydatek cykliczny</a
+                >. Odśwież formularz, aby dodać kolejny.
+              </p>
+            } @else {
+              <p class="font-medium">
+                Ten formularz zapisał już wydatek cykliczny. Odśwież formularz, aby dodać kolejny.
+              </p>
+            }
+            <app-button (pressed)="startNext()">Dodaj kolejny wydatek</app-button>
+          </div>
+        }
+        @case ('deleted') {
+          <div
+            #reusedMessage
+            tabindex="-1"
+            class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+          >
+            <p class="font-medium">{{ deletedMessage }}</p>
+            <app-button (pressed)="startNext()">Dodaj kolejny wydatek</app-button>
+          </div>
+        }
+        @case ('retry') {
+          <div
+            role="alert"
+            class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+          >
+            <p class="font-medium text-(--sf-error)">{{ retryMessage }}</p>
+            <app-button [busy]="retrying()" (pressed)="retryRecurring()">
+              Spróbuj ponownie
+            </app-button>
+          </div>
+        }
+      }
+    }
   </div>
 
-  <app-expense-form [initial]="initial()" [action]="save" submitLabel="Zapisz">
+  <app-expense-form
+    [initial]="initial()"
+    [action]="save"
+    [recurring]="recurring()"
+    submitLabel="Zapisz"
+  >
     <app-button formActions (pressed)="goToList()">Wróć do listy</app-button>
   </app-expense-form>
 </section>

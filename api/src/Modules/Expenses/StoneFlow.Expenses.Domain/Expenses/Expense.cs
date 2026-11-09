@@ -1,3 +1,5 @@
+using StoneFlow.Expenses.Domain.Recurring;
+
 namespace StoneFlow.Expenses.Domain.Expenses;
 
 /// <summary>Treść wydatku podawana przy utworzeniu i poprawie (wartości już znormalizowane).</summary>
@@ -80,6 +82,12 @@ public sealed class Expense
     /// <summary>SHA-256 znormalizowanej komendy utworzenia (32 bajty).</summary>
     public byte[]? CreationRequestHash { get; private set; }
 
+    /// <summary>Definicja cykliczna, której wystąpieniem jest wydatek (SF-16); bez klucza obcego — zostaje po usunięciu definicji.</summary>
+    public Guid? RecurringDefinitionId { get; private set; }
+
+    /// <summary>Okres wystąpienia (pierwszy dzień miesiąca); podany wyłącznie razem z <see cref="RecurringDefinitionId"/>.</summary>
+    public DateOnly? RecurringPeriod { get; private set; }
+
     public DateTime CreatedAtUtc { get; private set; }
 
     public DateTime UpdatedAtUtc { get; private set; }
@@ -101,6 +109,32 @@ public sealed class Expense
         {
             CreationRequestId = creationRequestId,
             CreationRequestHash = creationRequestHash,
+        };
+    }
+
+    /// <summary>
+    /// Wystąpienie wydatku cyklicznego (tworzy je wyłącznie definicja): bez daty zapłaty, więc jest
+    /// kosztem i planem, a nie wypływem (niezmiennik 1); bez klucza idempotencji — duplikat okresu
+    /// odrzuca rejestr okresów.
+    /// </summary>
+    /// <exception cref="ArgumentException">Treść ma datę zapłaty albo brak identyfikatorów.</exception>
+    public static Expense CreateOccurrence(Guid id, ExpenseContent content, Guid recurringDefinitionId, RecurringPeriod period, DateTime nowUtc)
+    {
+        if (id == Guid.Empty || recurringDefinitionId == Guid.Empty)
+        {
+            throw new ArgumentException("Brak identyfikatora wydatku albo definicji.", nameof(id));
+        }
+
+        Require(content);
+        if (content.PaidOn is not null)
+        {
+            throw new ArgumentException("Wystąpienie wydatku cyklicznego powstaje bez daty zapłaty.", nameof(content));
+        }
+
+        return new Expense(id, content, nowUtc)
+        {
+            RecurringDefinitionId = recurringDefinitionId,
+            RecurringPeriod = period.FirstDay,
         };
     }
 

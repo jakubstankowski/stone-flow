@@ -14,7 +14,8 @@ public sealed record ExpenseListRowDto(
     DateOnly CostDate,
     DateOnly? DueDate,
     DateOnly? PaidOn,
-    decimal GrossAmount);
+    decimal GrossAmount,
+    Guid? RecurringDefinitionId);
 
 /// <summary>Jedna strona wierszy z bazy; <see cref="Total"/> to liczba wszystkich wydatków spełniających filtry.</summary>
 public sealed record ExpenseRowsPage(IReadOnlyList<ExpenseListRowDto> Rows, int Total);
@@ -64,6 +65,7 @@ public sealed record ExpenseListCriteria(
     ExpenseStateFilter? State,
     ExpenseSignFilter? Sign,
     string? Search,
+    Guid? RecurringDefinitionId,
     DateOnly Today);
 
 /// <summary>Parametry listy z zapytania HTTP (tekst); walidacja w handlerze.</summary>
@@ -79,7 +81,8 @@ public sealed record ListExpensesQuery(
     IReadOnlyList<string>? Category = null,
     string? State = null,
     string? Sign = null,
-    string? Search = null) : IQuery<ListExpensesResult>;
+    string? Search = null,
+    string? RecurringDefinitionId = null) : IQuery<ListExpensesResult>;
 
 /// <summary>Strona listy albo błędy parametrów (400).</summary>
 public sealed record ListExpensesResult(ExpenseListPageDto? Page, FieldErrors? Errors = null);
@@ -231,9 +234,35 @@ public sealed class ListExpensesHandler(IExpenseReader reader, TimeProvider time
             errors.Add("search", $"Wyszukiwany tekst może mieć najwyżej {SearchMaxLength} znaków.");
         }
 
+        Guid? recurringDefinitionId = null;
+        if (ExpenseInput.Text(query.RecurringDefinitionId) is { } definitionText)
+        {
+            if (Guid.TryParse(definitionText, out var parsed))
+            {
+                recurringDefinitionId = parsed;
+            }
+            else
+            {
+                errors.Add("recurringDefinitionId", "Niepoprawny identyfikator wydatku cyklicznego.");
+            }
+        }
+
         return errors.IsEmpty
             ? new ExpenseListCriteria(
-                page, pageSize, sort, descending, costDateFrom, costDateTo, paidOnFrom, paidOnTo, [.. categories.Distinct()], state, sign, search, today)
+                page,
+                pageSize,
+                sort,
+                descending,
+                costDateFrom,
+                costDateTo,
+                paidOnFrom,
+                paidOnTo,
+                [.. categories.Distinct()],
+                state,
+                sign,
+                search,
+                recurringDefinitionId,
+                today)
             : null;
     }
 

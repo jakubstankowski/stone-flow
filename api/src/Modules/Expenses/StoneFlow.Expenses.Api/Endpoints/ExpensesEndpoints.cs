@@ -53,10 +53,12 @@ internal static class ExpensesEndpoints
         [FromQuery] string[]? category = null,
         [FromQuery] string? state = null,
         [FromQuery] string? sign = null,
-        [FromQuery] string? search = null)
+        [FromQuery] string? search = null,
+        [FromQuery] string? recurringDefinitionId = null)
     {
         var result = await dispatcher.QueryAsync(
-            new ListExpensesQuery(page, pageSize, sort, direction, costDateFrom, costDateTo, paidOnFrom, paidOnTo, category, state, sign, search),
+            new ListExpensesQuery(
+                page, pageSize, sort, direction, costDateFrom, costDateTo, paidOnFrom, paidOnTo, category, state, sign, search, recurringDefinitionId),
             cancellationToken);
 
         return result.Page is { } list
@@ -156,17 +158,17 @@ internal static class ExpensesEndpoints
         };
     }
 
-    private static ValidationProblem ValidationProblem(FieldErrors? errors) =>
+    internal static ValidationProblem ValidationProblem(FieldErrors? errors) =>
         TypedResults.ValidationProblem(errors?.ToDictionary() ?? new Dictionary<string, string[]>());
 
     /// <summary>Klucz idempotencji: jeden UUID z nagłówka; brak, pusty, wielokrotny albo inny tekst to <c>null</c>.</summary>
-    private static Guid? IdempotencyKey(HttpRequest request) =>
+    internal static Guid? IdempotencyKey(HttpRequest request) =>
         request.Headers[IdempotencyKeyHeader] is { Count: 1 } values
         && Guid.TryParse(values[0], out var key)
         && key != Guid.Empty
             ? key
             : null;
 
-    private static Guid? CurrentAccount(ClaimsPrincipal user) =>
+    internal static Guid? CurrentAccount(ClaimsPrincipal user) =>
         Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 }

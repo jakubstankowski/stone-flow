@@ -43,30 +43,9 @@ public sealed partial record ExpenseInput(
         ArgumentNullException.ThrowIfNull(errors);
         var before = errors.IsEmpty;
 
-        var description = Text(Description);
-        if (description is null)
-        {
-            errors.Add(ExpenseFieldKeys.Description, ExpenseMessages.DescriptionRequired);
-        }
-        else if (description.Length > Expense.DescriptionMaxLength)
-        {
-            errors.Add(ExpenseFieldKeys.Description, ExpenseMessages.DescriptionTooLong);
-        }
+        var description = RequiredDescription(Description, errors);
 
-        ExpenseCategory? category = null;
-        if (Text(Category) is not { } categoryCode)
-        {
-            errors.Add(ExpenseFieldKeys.Category, ExpenseMessages.CategoryRequired);
-        }
-        else if (ExpenseCodes.TryParse(categoryCode, out ExpenseCategory parsedCategory))
-        {
-            category = parsedCategory;
-        }
-        else
-        {
-            errors.Add(ExpenseFieldKeys.Category, ExpenseMessages.CategoryUnknown);
-        }
-
+        var category = RequiredCategory(Category, errors);
         var counterparty = Limited(Counterparty, Expense.CounterpartyMaxLength, ExpenseFieldKeys.Counterparty, ExpenseMessages.CounterpartyTooLong, errors);
 
         DateOnly? costDate = null;
@@ -134,6 +113,40 @@ public sealed partial record ExpenseInput(
             : null;
     }
 
+    /// <summary>Opis: wymagany, najwyżej 200 znaków (wspólne z definicją cykliczną).</summary>
+    internal static string? RequiredDescription(string? text, FieldErrors errors)
+    {
+        var description = Text(text);
+        if (description is null)
+        {
+            errors.Add(ExpenseFieldKeys.Description, ExpenseMessages.DescriptionRequired);
+        }
+        else if (description.Length > Expense.DescriptionMaxLength)
+        {
+            errors.Add(ExpenseFieldKeys.Description, ExpenseMessages.DescriptionTooLong);
+        }
+
+        return description;
+    }
+
+    /// <summary>Kategoria: wymagana, znany kod (wspólne z definicją cykliczną).</summary>
+    internal static ExpenseCategory? RequiredCategory(string? text, FieldErrors errors)
+    {
+        if (Text(text) is not { } categoryCode)
+        {
+            errors.Add(ExpenseFieldKeys.Category, ExpenseMessages.CategoryRequired);
+            return null;
+        }
+
+        if (ExpenseCodes.TryParse(categoryCode, out ExpenseCategory category))
+        {
+            return category;
+        }
+
+        errors.Add(ExpenseFieldKeys.Category, ExpenseMessages.CategoryUnknown);
+        return null;
+    }
+
     /// <summary>Walidacja akcji „Oznacz jako opłacony”: data wymagana i nie późniejsza niż dzisiaj, znana metoda albo brak.</summary>
     public static ExpensePaidInput? ValidatePaid(string? paidOnText, string? methodText, FieldErrors errors, DateOnly today)
     {
@@ -193,7 +206,7 @@ public sealed partial record ExpenseInput(
     internal static bool TryParseDate(string text, out DateOnly date) =>
         DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
-    private static AmountError ParseAmount(string? text, out decimal value)
+    internal static AmountError ParseAmount(string? text, out decimal value)
     {
         value = 0;
         var trimmed = Text(text);
@@ -223,7 +236,7 @@ public sealed partial record ExpenseInput(
         return AmountError.None;
     }
 
-    private static string AmountMessage(AmountError error, string missing) => error switch
+    internal static string AmountMessage(AmountError error, string missing) => error switch
     {
         AmountError.Missing => missing,
         AmountError.Invalid => ExpenseMessages.AmountInvalid,
@@ -239,7 +252,7 @@ public sealed partial record ExpenseInput(
         _ => ExpenseMessages.AmountTooLarge,
     };
 
-    private static DateOnly? OptionalDate(string? text, string key, string invalid, FieldErrors errors)
+    internal static DateOnly? OptionalDate(string? text, string key, string invalid, FieldErrors errors)
     {
         if (Text(text) is not { } trimmed)
         {
@@ -255,7 +268,7 @@ public sealed partial record ExpenseInput(
         return null;
     }
 
-    private static ExpensePaymentMethod? OptionalMethod(string? text, FieldErrors errors)
+    internal static ExpensePaymentMethod? OptionalMethod(string? text, FieldErrors errors)
     {
         if (Text(text) is not { } code)
         {
@@ -271,7 +284,7 @@ public sealed partial record ExpenseInput(
         return null;
     }
 
-    private static string? Limited(string? text, int maxLength, string key, string message, FieldErrors errors)
+    internal static string? Limited(string? text, int maxLength, string key, string message, FieldErrors errors)
     {
         var trimmed = Text(text);
         if (trimmed is { Length: var length } && length > maxLength)
@@ -285,7 +298,7 @@ public sealed partial record ExpenseInput(
     [GeneratedRegex(@"^-?[0-9]+(\.(?<fraction>[0-9]+))?$", RegexOptions.CultureInvariant)]
     private static partial Regex AmountPattern();
 
-    private enum AmountError
+    internal enum AmountError
     {
         None,
         Missing,

@@ -45,6 +45,7 @@ describe('ExpensesApi', () => {
       state: 'overdue',
       sign: 'negative',
       search: 'FV',
+      recurringDefinitionId: 'c1',
     };
     const result = api.list(query);
     const request = http.expectOne((r) => r.url === '/api/expenses');
@@ -60,6 +61,7 @@ describe('ExpensesApi', () => {
     expect(params.getAll('category')).toEqual(['cutting', 'vatTax']);
     expect(params.get('state')).toBe('overdue');
     expect(params.get('sign')).toBe('negative');
+    expect(params.get('recurringDefinitionId')).toBe('c1');
     expect(params.get('search')).toBe('FV');
   });
 

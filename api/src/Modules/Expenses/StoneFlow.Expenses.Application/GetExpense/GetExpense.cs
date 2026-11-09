@@ -21,7 +21,11 @@ public sealed record ExpenseRecordDto(
     string? Comment,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    byte[] Version);
+    byte[] Version,
+    ExpenseRecurrenceDto? Recurring = null);
+
+/// <summary>Wystąpienie wydatku cyklicznego: definicja (może już nie istnieć) i okres (pierwszy dzień miesiąca).</summary>
+public sealed record ExpenseRecurrenceDto(Guid DefinitionId, DateOnly Period, bool DefinitionExists);
 
 /// <summary>Szczegóły: dane i stan policzony regułą domeny <see cref="ExpensePayment.Compute"/>.</summary>
 public sealed record ExpenseDetailsDto(ExpenseRecordDto Expense, ExpensePaymentInfo Payment);
