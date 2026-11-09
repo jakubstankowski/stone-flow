@@ -4,6 +4,7 @@ using StoneFlow.Expenses.Application.Abstractions;
 using StoneFlow.Expenses.Application.Recurring;
 using StoneFlow.Expenses.Infrastructure.Persistence;
 using StoneFlow.Expenses.Infrastructure.Recurring;
+using StoneFlow.Shared.Application.Operations;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
 using StoneFlow.Shared.Infrastructure.Scheduling;
@@ -20,6 +21,11 @@ public static class DependencyInjection
         services.AddScoped<IExpenseStore, ExpenseStore>();
         services.AddScoped<IExpenseReader, ExpenseReader>();
         services.AddScoped<ExpenseChangeRunner>();
+        services.AddScoped<IOwnerWithdrawalStore, OwnerWithdrawalStore>();
+        services.AddScoped<IOwnerWithdrawalReader, OwnerWithdrawalReader>();
+
+        // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
+        services.AddScoped<ICashOperationSource, ExpenseCashOperationSource>();
 
         services.AddScoped<IRecurringExpenseStore, RecurringExpenseStore>();
         services.AddScoped<IRecurringExpenseReader, RecurringExpenseReader>();

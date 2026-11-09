@@ -1,0 +1,41 @@
+<section class="flex flex-col gap-6">
+  <h1 class="text-3xl font-bold">Dodaj wypłatę</h1>
+
+  <div aria-live="polite">
+    @if (keyReused(); as withdrawalId) {
+      <div
+        #reusedMessage
+        tabindex="-1"
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+      >
+        <p class="font-medium">
+          Ten formularz zapisał już
+          <a
+            class="link text-(--sf-accent-text)"
+            [routerLink]="['/operacje', 'wyplaty', withdrawalId]"
+            >wypłatę</a
+          >.
+        </p>
+        <app-button (pressed)="startNext()">Dodaj kolejną wypłatę</app-button>
+      </div>
+    } @else if (keyReused() === '') {
+      <div
+        #reusedMessage
+        tabindex="-1"
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-warning) bg-base-100 p-4"
+      >
+        <p class="font-medium">Ten formularz zapisał już wypłatę.</p>
+        <app-button (pressed)="startNext()">Dodaj kolejną wypłatę</app-button>
+      </div>
+    }
+  </div>
+
+  <app-withdrawal-form
+    submitLabel="Zapisz"
+    cancelLabel="Wróć do listy"
+    [initial]="initial()"
+    [action]="save"
+    [people]="people()"
+    (cancelled)="goToList()"
+  />
+</section>

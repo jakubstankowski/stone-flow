@@ -1,0 +1,144 @@
+<section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-bold">Operacje</h1>
+    <app-button variant="primary" (pressed)="add()">Dodaj wypłatę</app-button>
+  </div>
+
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+
+  <div aria-live="polite">
+    @if (operations.totals(); as totals) {
+      <section
+        class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+        aria-labelledby="operacje-sumy"
+      >
+        <h2 id="operacje-sumy" class="sr-only">Podsumowanie operacji</h2>
+        <dl class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-x-10">
+          <div>
+            <dt class="text-sm text-(--sf-muted)">Wpływy</dt>
+            <dd class="text-lg font-semibold tabular-nums" data-testid="wplywy">
+              {{ formatPln(totals.inflows) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-(--sf-muted)">Wypływy</dt>
+            <dd class="text-lg font-semibold tabular-nums" data-testid="wyplywy">
+              {{ formatPln(totals.outflows) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm text-(--sf-muted)">Zmiana środków</dt>
+            <dd class="text-lg font-semibold tabular-nums" data-testid="zmiana">
+              {{ formatPln(totals.change) }}
+            </dd>
+          </div>
+        </dl>
+        <p class="text-sm text-(--sf-muted)">Kwoty brutto w PLN według daty operacji pieniężnej.</p>
+      </section>
+    }
+  </div>
+
+  <app-data-table
+    caption="Operacje"
+    [emptyTitle]="emptyTitle()"
+    [filteredEmptyTitle]="filteredEmptyTitle()"
+    [columns]="columns"
+    [rows]="operations.items()"
+    [rowKey]="rowKey"
+    [total]="operations.total()"
+    [page]="operations.page()"
+    [pageSize]="operations.pageSize"
+    [sort]="operations.sort()"
+    [filters]="operations.activeFilters()"
+    [filterable]="true"
+    [loading]="operations.loading()"
+    [error]="operations.error()"
+    (pageChange)="onPage($event)"
+    (sortChange)="onSort($event)"
+    (filterRemove)="operations.removeFilter($event)"
+    (filtersClear)="operations.clearFilters()"
+    (retry)="operations.load()"
+  >
+    <div tableFilters class="flex flex-col gap-3">
+      <form
+        novalidate
+        aria-label="Filtry operacji"
+        class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2 xl:grid-cols-4"
+        (submit)="$event.preventDefault()"
+      >
+        <app-field label="Data od" fieldId="operacje-od" [required]="true" [error]="fromError()">
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="operations.filters().from"
+            (change)="onDate('from', $event)"
+          />
+        </app-field>
+        <app-field
+          label="Data do"
+          fieldId="operacje-do"
+          [required]="true"
+          [error]="operations.toError()"
+        >
+          <input
+            #control
+            class="input w-full"
+            type="date"
+            [value]="operations.filters().to"
+            (change)="onDate('to', $event)"
+          />
+        </app-field>
+        <fieldset class="flex flex-col gap-1 md:col-span-2">
+          <legend class="text-base font-medium">Rodzaj</legend>
+          <div class="flex flex-wrap gap-x-6">
+            @for (kind of kinds; track kind) {
+              <label class="flex min-h-11 items-center gap-2">
+                <input
+                  class="checkbox"
+                  type="checkbox"
+                  [checked]="isKindChecked(kind)"
+                  (change)="onKind(kind, $event)"
+                />
+                {{ kindLabels[kind] }}
+              </label>
+            }
+          </div>
+        </fieldset>
+      </form>
+      <div aria-live="polite">
+        @if (operations.launchNotice(); as text) {
+          <p
+            class="rounded-box border border-(--sf-info) bg-base-100 p-3"
+            data-testid="uruchomienie"
+          >
+            {{ text }}
+          </p>
+        }
+      </div>
+    </div>
+
+    <ng-template appTableCell="description" [appTableCellOf]="operations.items()" let-row>
+      <a class="link font-medium text-(--sf-accent-text)" [routerLink]="sourceLink(row)">{{
+        row.sourceLabel
+      }}</a>
+      @if (row.kind === 'expense' && row.category) {
+        <span class="mt-1 block text-sm text-(--sf-muted)">{{ categoryLabels[row.category] }}</span>
+      }
+    </ng-template>
+    <ng-template appTableCell="amount" [appTableCellOf]="operations.items()" let-row>
+      {{ formatPln(row.amount) }}
+      @if (row.kind === 'expense' && isNegative(row.amount)) {
+        <span class="mt-1 block text-sm whitespace-normal text-(--sf-muted)">{{
+          negativeLabel
+        }}</span>
+      }
+    </ng-template>
+  </app-data-table>
+</section>

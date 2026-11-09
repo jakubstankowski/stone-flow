@@ -206,6 +206,7 @@ public sealed partial record ExpenseInput(
     internal static bool TryParseDate(string text, out DateOnly date) =>
         DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
+    /// <summary>Tekst kwoty w kulturze niezmiennej (wzorzec, najwyżej dwa miejsca, zakres <c>decimal(18,2)</c>); bez reguł znaku.</summary>
     internal static AmountError ParseAmount(string? text, out decimal value)
     {
         value = 0;

@@ -83,12 +83,12 @@ internal static class RecurringExpensesEndpoints
     private static async Task<Results<Created<RecurringExpenseCreatedResponse>, Ok<RecurringExpenseCreatedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> CreateAsync(
         RecurringExpenseRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken)
     {
-        if (ExpensesEndpoints.CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }
 
-        if (ExpensesEndpoints.IdempotencyKey(context.Request) is not { } key)
+        if (EndpointSupport.IdempotencyKey(context.Request) is not { } key)
         {
             return ExpenseProblems.IdempotencyKeyRequired();
         }
@@ -129,7 +129,7 @@ internal static class RecurringExpensesEndpoints
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> DeleteAsync(
         Guid id, [FromBody] RecurringExpenseVersionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken)
     {
-        if (ExpensesEndpoints.CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }
@@ -146,7 +146,7 @@ internal static class RecurringExpensesEndpoints
     private static async Task<Results<Ok<RecurringExpenseChangedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> ChangeAsync(
         HttpContext context, Func<Guid, Task<RecurringChangeResult>> send)
     {
-        if (ExpensesEndpoints.CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }

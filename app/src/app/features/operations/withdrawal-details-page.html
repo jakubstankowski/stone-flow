@@ -1,0 +1,114 @@
+<section class="flex flex-col gap-6">
+  <div role="status" aria-live="polite">
+    @if (notice(); as text) {
+      <p class="rounded-box border border-(--sf-success) bg-base-100 p-4 font-medium">
+        {{ text }}
+      </p>
+    }
+  </div>
+  <div role="alert">
+    @if (alert(); as current) {
+      <div
+        class="flex flex-col items-start gap-3 rounded-box border border-(--sf-error) bg-base-100 p-4"
+      >
+        <p class="font-medium text-(--sf-error)">{{ current.text }}</p>
+        @if (current.reload) {
+          <app-button [busy]="reloading()" busyLabel="Wczytywanie…" (pressed)="reloadCurrent()">
+            Wczytaj ponownie
+          </app-button>
+        }
+      </div>
+    }
+  </div>
+
+  <h1 class="text-3xl font-bold">Wypłata właściciela</h1>
+
+  @switch (status()) {
+    @case ('loading') {
+      <app-loading-state [rows]="4" label="Wczytywanie wypłaty…" />
+    }
+    @case ('notFound') {
+      <app-empty-state heading="Nie znaleziono wypłaty. Mogła zostać usunięta.">
+        <app-button (pressed)="goToList()">Wróć do listy</app-button>
+      </app-empty-state>
+    }
+    @case ('error') {
+      <app-error-state message="Nie udało się wczytać wypłaty." (retry)="retry()" />
+    }
+    @case ('loaded') {
+      @if (withdrawal(); as withdrawal) {
+        @if (mode() === 'edit') {
+          @if (formInitial(); as initial) {
+            <app-withdrawal-form
+              submitLabel="Zapisz zmiany"
+              cancelLabel="Zamknij bez zapisu"
+              [initial]="initial"
+              [action]="save"
+              [people]="people()"
+              (cancelled)="closeForm()"
+            />
+          }
+        } @else {
+          <div class="flex flex-wrap gap-3">
+            <app-button variant="primary" (pressed)="startEdit()">Edytuj</app-button>
+            <app-button
+              variant="danger"
+              [busy]="deleting()"
+              busyLabel="Usuwanie…"
+              (pressed)="remove()"
+            >
+              Usuń
+            </app-button>
+            <app-button (pressed)="goToList()">Wróć do listy</app-button>
+          </div>
+
+          <section
+            class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-5"
+            aria-labelledby="wyplata-dane"
+          >
+            <h2 id="wyplata-dane" class="text-xl font-semibold">Dane wypłaty</h2>
+            <dl class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Osoba</dt>
+                <dd>{{ withdrawal.person }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Kwota</dt>
+                <dd class="tabular-nums">{{ formatPln(withdrawal.amount) }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Data wypłaty</dt>
+                <dd>{{ formatDate(withdrawal.withdrawnOn) }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Metoda</dt>
+                <dd>{{ methodLabels[withdrawal.method] }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Utworzono</dt>
+                <dd>{{ formatDateTime(withdrawal.createdAtUtc) }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-(--sf-muted)">Ostatnia zmiana</dt>
+                <dd>{{ formatDateTime(withdrawal.updatedAtUtc) }}</dd>
+              </div>
+            </dl>
+          </section>
+        }
+
+        <app-confirm-dialog
+          #deleteDialog
+          heading="Usunąć wypłatę?"
+          confirmLabel="Usuń"
+          tone="danger"
+        >
+          <p>
+            Wypłata z {{ formatDate(withdrawal.withdrawnOn) }} na
+            {{ formatPln(withdrawal.amount) }} zniknie z listy „Operacje” i z wypływów. Ślad
+            usunięcia zostanie w historii zmian.
+          </p>
+        </app-confirm-dialog>
+      }
+    }
+  }
+</section>

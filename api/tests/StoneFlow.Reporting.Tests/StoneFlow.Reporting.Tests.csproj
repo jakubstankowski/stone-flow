@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Domain\StoneFlow.Reporting.Domain.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Reporting\StoneFlow.Reporting.Application\StoneFlow.Reporting.Application.csproj" />
   </ItemGroup>
 
 </Project>

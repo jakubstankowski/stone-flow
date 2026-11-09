@@ -20,7 +20,10 @@ function section(
   return { path, title: item.label, data: { section: item.label }, ...load };
 }
 
-/** Sekcje wewnątrz powłoki (SF-5); „Zamówienia” (SF-8) i „Wydatki” (SF-15) mają trasy potomne. */
+/**
+ * Sekcje wewnątrz powłoki (SF-5); „Zamówienia” (SF-8), „Wydatki” (SF-15) i „Operacje” (SF-17)
+ * mają trasy potomne.
+ */
 export const sectionRoutes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'pulpit' },
   section('pulpit', {
@@ -34,8 +37,8 @@ export const sectionRoutes: Routes = [
       import('./features/expenses/expenses.routes').then((m) => m.EXPENSES_ROUTES),
   }),
   section('operacje', {
-    loadComponent: () =>
-      import('./features/operations/operations-page').then((m) => m.OperationsPage),
+    loadChildren: () =>
+      import('./features/operations/operations.routes').then((m) => m.OPERATIONS_ROUTES),
   }),
   section('historia-zmian', {
     loadComponent: () =>

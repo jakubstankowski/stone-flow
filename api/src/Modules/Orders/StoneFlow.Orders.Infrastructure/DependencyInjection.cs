@@ -5,6 +5,7 @@ using StoneFlow.Orders.Application.Payments;
 using StoneFlow.Orders.Application.ShopSync;
 using StoneFlow.Orders.Domain.Payments;
 using StoneFlow.Orders.Infrastructure.Persistence;
+using StoneFlow.Shared.Application.Operations;
 using StoneFlow.Shared.Application.ShopOrders;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
@@ -32,6 +33,9 @@ public static class DependencyInjection
         services.AddScoped<OrderEntryWriter<Payment>>();
         services.AddScoped<OrderEntryWriter<Refund>>();
         services.AddScoped<OrderEntryWriter<SalesCorrection>>();
+
+        // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
+        services.AddScoped<ICashOperationSource, OrderCashOperationSource>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 
