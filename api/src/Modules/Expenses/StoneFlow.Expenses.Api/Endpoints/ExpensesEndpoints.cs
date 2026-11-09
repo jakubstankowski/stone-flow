@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -24,8 +23,6 @@ namespace StoneFlow.Expenses.Api.Endpoints;
 /// </summary>
 internal static class ExpensesEndpoints
 {
-    public const string IdempotencyKeyHeader = "Idempotency-Key";
-
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/expenses").WithTags("Expenses");
@@ -74,12 +71,12 @@ internal static class ExpensesEndpoints
     private static async Task<Results<Created<ExpenseCreatedResponse>, Ok<ExpenseCreatedResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> CreateAsync(
         ExpenseRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken)
     {
-        if (CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }
 
-        if (IdempotencyKey(context.Request) is not { } key)
+        if (EndpointSupport.IdempotencyKey(context.Request) is not { } key)
         {
             return ExpenseProblems.IdempotencyKeyRequired();
         }
@@ -121,7 +118,7 @@ internal static class ExpensesEndpoints
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> DeleteAsync(
         Guid id, [FromBody] ExpenseVersionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken)
     {
-        if (CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }
@@ -139,7 +136,7 @@ internal static class ExpensesEndpoints
     private static async Task<Results<Ok<ExpenseVersionResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> ChangeAsync(
         HttpContext context, Func<Guid, Task<ExpenseChangeResult>> send)
     {
-        if (CurrentAccount(context.User) is not { } accountId)
+        if (EndpointSupport.CurrentAccount(context.User) is not { } accountId)
         {
             return TypedResults.Unauthorized();
         }
@@ -158,15 +155,4 @@ internal static class ExpensesEndpoints
 
     private static ValidationProblem ValidationProblem(FieldErrors? errors) =>
         TypedResults.ValidationProblem(errors?.ToDictionary() ?? new Dictionary<string, string[]>());
-
-    /// <summary>Klucz idempotencji: jeden UUID z nagłówka; brak, pusty, wielokrotny albo inny tekst to <c>null</c>.</summary>
-    private static Guid? IdempotencyKey(HttpRequest request) =>
-        request.Headers[IdempotencyKeyHeader] is { Count: 1 } values
-        && Guid.TryParse(values[0], out var key)
-        && key != Guid.Empty
-            ? key
-            : null;
-
-    private static Guid? CurrentAccount(ClaimsPrincipal user) =>
-        Guid.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 }

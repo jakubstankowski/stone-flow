@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StoneFlow.Expenses.Application;
 using StoneFlow.Expenses.Application.Abstractions;
 using StoneFlow.Expenses.Infrastructure.Persistence;
+using StoneFlow.Shared.Application.Operations;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
 
@@ -17,6 +18,11 @@ public static class DependencyInjection
         services.AddScoped<IExpenseStore, ExpenseStore>();
         services.AddScoped<IExpenseReader, ExpenseReader>();
         services.AddScoped<ExpenseChangeRunner>();
+        services.AddScoped<IOwnerWithdrawalStore, OwnerWithdrawalStore>();
+        services.AddScoped<IOwnerWithdrawalReader, OwnerWithdrawalReader>();
+
+        // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
+        services.AddScoped<ICashOperationSource, ExpenseCashOperationSource>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 

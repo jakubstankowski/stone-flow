@@ -259,6 +259,11 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[CreationRequestId] IS NOT NULL");
 
+                    b.HasIndex("Date")
+                        .HasDatabaseName("IX_Payments_PaidOn");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Date"), new[] { "Amount", "OrderId" });
+
                     b.HasIndex("OrderId");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("OrderId"), new[] { "Amount" });
@@ -325,6 +330,11 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                     b.HasIndex("CreationRequestId")
                         .IsUnique()
                         .HasFilter("[CreationRequestId] IS NOT NULL");
+
+                    b.HasIndex("Date")
+                        .HasDatabaseName("IX_Refunds_RefundedOn");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Date"), new[] { "Amount", "OrderId" });
 
                     b.HasIndex("OrderId");
 

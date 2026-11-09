@@ -57,6 +57,11 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 
         builder.Property(payment => payment.Method).HasConversion<string>().HasMaxLength(OrderEntryConfiguration.CodeMaxLength);
         builder.Property(payment => payment.ReceivedBy).HasMaxLength(Payment.ReceivedByMaxLength);
+
+        // Lista operacji pieniężnych (SF-17) filtruje po dacie wpłaty.
+        builder.HasIndex(payment => payment.Date)
+            .IncludeProperties(payment => new { payment.Amount, payment.OrderId })
+            .HasDatabaseName("IX_Payments_PaidOn");
     }
 }
 
@@ -71,6 +76,11 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(refund => refund.Kind).HasConversion<string>().HasMaxLength(OrderEntryConfiguration.CodeMaxLength);
         builder.Property(refund => refund.Method).HasConversion<string>().HasMaxLength(OrderEntryConfiguration.CodeMaxLength);
         builder.Property(refund => refund.Reason).HasMaxLength(Refund.ReasonMaxLength).IsRequired();
+
+        // Lista operacji pieniężnych (SF-17) filtruje po dacie zwrotu.
+        builder.HasIndex(refund => refund.Date)
+            .IncludeProperties(refund => new { refund.Amount, refund.OrderId })
+            .HasDatabaseName("IX_Refunds_RefundedOn");
     }
 }
 

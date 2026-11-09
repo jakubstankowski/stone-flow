@@ -116,6 +116,68 @@ namespace StoneFlow.Expenses.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_Expenses_NetAmount", "[NetAmount] IS NULL OR (ABS([NetAmount]) <= ABS([GrossAmount]) AND ([NetAmount] = 0 OR SIGN([NetAmount]) = SIGN([GrossAmount])))");
                         });
                 });
+
+            modelBuilder.Entity("StoneFlow.Expenses.Domain.OwnerWithdrawals.OwnerWithdrawal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("CreationRequestHash")
+                        .HasColumnType("binary(32)");
+
+                    b.Property<Guid?>("CreationRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Person")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly>("WithdrawnOn")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreationRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_OwnerWithdrawals_CreationRequestId")
+                        .HasFilter("[CreationRequestId] IS NOT NULL");
+
+                    b.HasIndex("WithdrawnOn")
+                        .HasDatabaseName("IX_OwnerWithdrawals_WithdrawnOn");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("WithdrawnOn"), new[] { "Amount" });
+
+                    b.ToTable("OwnerWithdrawals", "expenses", t =>
+                        {
+                            t.HasCheckConstraint("CK_OwnerWithdrawals_Amount", "[Amount] > 0");
+
+                            t.HasCheckConstraint("CK_OwnerWithdrawals_CreationRequest", "([CreationRequestId] IS NULL AND [CreationRequestHash] IS NULL) OR ([CreationRequestId] IS NOT NULL AND [CreationRequestHash] IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_OwnerWithdrawals_Method", "[Method] IN (N'Transfer', N'Blik', N'Cash')");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }

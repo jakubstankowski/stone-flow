@@ -12,15 +12,14 @@ import { ChangeHistoryPage } from './features/change-history/change-history-page
 import { DashboardPage } from './features/dashboard/dashboard-page';
 import { ExpensesListPage } from './features/expenses/expenses-list-page';
 import { IntegrationPage } from './features/integration/integration-page';
-import { OperationsPage } from './features/operations/operations-page';
+import { OperationsListPage } from './features/operations/operations-list-page';
 import { OrdersListPage } from './features/orders/orders-list-page';
 import { NAV_ITEMS } from './layout/nav-items';
 import { discardIntegrationRequests } from '../testing/integration-testing';
 
-/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki” testuje osobny blok — SF-15). */
+/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki” i „Operacje” testują osobne bloki — SF-15, SF-17). */
 const SECTIONS: [string, string, Type<unknown>, boolean][] = [
   ['/pulpit', 'Pulpit', DashboardPage, true],
-  ['/operacje', 'Operacje', OperationsPage, true],
   ['/historia-zmian', 'Historia zmian', ChangeHistoryPage, true],
   ['/integracja', 'Integracja', IntegrationPage, false],
 ];
@@ -112,6 +111,39 @@ describe('app routes', () => {
       expect(
         harness.routeDebugElement?.query(
           (node) => node.componentInstance instanceof ExpensesListPage,
+        ),
+      ).not.toBeNull();
+    }
+  });
+
+  it.each([
+    ['/operacje', 'Operacje'],
+    ['/operacje/wyplaty/nowa', 'Dodaj wypłatę'],
+  ])('loads the operations section at %s with the heading %s', async (url, heading) => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl(url);
+    if (url === '/operacje') {
+      (await nextRequest((request) => request.url === '/api/operations')).flush({
+        items: [],
+        page: 1,
+        pageSize: 25,
+        total: 0,
+        totals: { inflows: '0.00', outflows: '0.00', change: '0.00' },
+        effectiveFrom: '2026-11-01',
+        launchDate: '2026-11-01',
+      });
+    } else {
+      (await nextRequest('/api/owner-withdrawals/people')).flush({ people: [] });
+    }
+    await navigation;
+
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(heading);
+    if (url === '/operacje') {
+      expect(
+        harness.routeDebugElement?.query(
+          (node) => node.componentInstance instanceof OperationsListPage,
         ),
       ).not.toBeNull();
     }

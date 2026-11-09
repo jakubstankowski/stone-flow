@@ -193,7 +193,8 @@ public sealed partial record ExpenseInput(
     internal static bool TryParseDate(string text, out DateOnly date) =>
         DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
 
-    private static AmountError ParseAmount(string? text, out decimal value)
+    /// <summary>Tekst kwoty w kulturze niezmiennej (wzorzec, najwyżej dwa miejsca, zakres <c>decimal(18,2)</c>); bez reguł znaku.</summary>
+    internal static AmountError ParseAmount(string? text, out decimal value)
     {
         value = 0;
         var trimmed = Text(text);
@@ -285,7 +286,7 @@ public sealed partial record ExpenseInput(
     [GeneratedRegex(@"^-?[0-9]+(\.(?<fraction>[0-9]+))?$", RegexOptions.CultureInvariant)]
     private static partial Regex AmountPattern();
 
-    private enum AmountError
+    internal enum AmountError
     {
         None,
         Missing,

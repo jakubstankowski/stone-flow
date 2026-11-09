@@ -1,0 +1,106 @@
+<form novalidate class="flex flex-col gap-6" (submit)="onSubmit($event)">
+  @if (summary().length > 0) {
+    <div
+      #summaryBox
+      role="alert"
+      tabindex="-1"
+      aria-labelledby="wyplata-bledy-naglowek"
+      class="flex flex-col gap-2 rounded-box border border-(--sf-error) bg-base-100 p-4"
+    >
+      <h2 id="wyplata-bledy-naglowek" class="font-semibold text-(--sf-error)">
+        Popraw błędy w formularzu
+      </h2>
+      <ul class="list-disc pl-5">
+        @for (item of summary(); track $index) {
+          <li>
+            @if (item.id; as id) {
+              <a class="link" [href]="'#' + id" (click)="focusField($event, id)">{{
+                item.message
+              }}</a>
+            } @else {
+              {{ item.message }}
+            }
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
+  <fieldset class="flex flex-col gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-5">
+    <legend class="px-1 text-xl font-semibold">Wypłata właściciela</legend>
+    <div class="grid gap-4 md:grid-cols-2">
+      <app-field
+        label="Osoba"
+        fieldId="wyplata-osoba"
+        hint="Wybierz z podpowiedzi albo wpisz nową osobę."
+        [required]="true"
+        [error]="errorOf(form.person)"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="text"
+          autocomplete="off"
+          list="wyplata-osoby"
+          [formField]="form.person"
+        />
+      </app-field>
+      <datalist id="wyplata-osoby">
+        @for (person of people(); track person) {
+          <option [value]="person"></option>
+        }
+      </datalist>
+      <app-field
+        label="Kwota (zł)"
+        fieldId="wyplata-kwota"
+        hint="Np. 2 000,00. Kwota większa od 0 zł."
+        [required]="true"
+        [error]="errorOf(form.amount)"
+      >
+        <input
+          #control
+          class="input w-full tabular-nums"
+          type="text"
+          inputmode="decimal"
+          autocomplete="off"
+          [formField]="form.amount"
+        />
+      </app-field>
+      <app-field
+        label="Data wypłaty"
+        fieldId="wyplata-data"
+        hint="Nie może być późniejsza niż dzisiaj."
+        [required]="true"
+        [error]="errorOf(form.withdrawnOn)"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="date"
+          [attr.max]="today"
+          [formField]="form.withdrawnOn"
+        />
+      </app-field>
+      <app-field
+        label="Metoda"
+        fieldId="wyplata-metoda"
+        [required]="true"
+        [error]="errorOf(form.method)"
+      >
+        <select #control class="select w-full" [formField]="form.method">
+          <option value="">Wybierz…</option>
+          @for (method of methods; track method) {
+            <option [value]="method">{{ methodLabels[method] }}</option>
+          }
+        </select>
+      </app-field>
+    </div>
+  </fieldset>
+
+  <div class="flex flex-wrap gap-3">
+    <app-button variant="primary" type="submit" [busy]="busy()" busyLabel="Zapisywanie…">
+      {{ submitLabel() }}
+    </app-button>
+    <app-button (pressed)="cancelled.emit()">{{ cancelLabel() }}</app-button>
+  </div>
+</form>

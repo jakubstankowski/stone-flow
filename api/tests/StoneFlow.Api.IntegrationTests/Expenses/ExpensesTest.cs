@@ -47,9 +47,14 @@ internal sealed class ExpensesTest : IAsyncDisposable
 
     /// <summary>
     /// Baza z migracjami i zalogowany właściciel. <paramref name="hooks"/> wstawia przed port zapisu
-    /// dekorator, który wykonuje zmianę „z innej karty” w trakcie jednostki pracy (deterministyczny wyścig).
+    /// dekorator, który wykonuje zmianę „z innej karty” w trakcie jednostki pracy (deterministyczny wyścig);
+    /// <paramref name="configureServices"/> pozwala podmienić inne porty (np. zapis wypłat).
     /// </summary>
-    public static async Task<ExpensesTest> CreateAsync(SqlServerFixture sqlServer, DateTimeOffset? now = null, ExpenseStoreHooks? hooks = null)
+    public static async Task<ExpensesTest> CreateAsync(
+        SqlServerFixture sqlServer,
+        DateTimeOffset? now = null,
+        ExpenseStoreHooks? hooks = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var connectionString = sqlServer.NewDatabase("expenses");
         var factory = new StoneFlowApiFactory
@@ -61,6 +66,8 @@ internal sealed class ExpensesTest : IAsyncDisposable
                 {
                     HookedExpenseStore.Register(services, hooks);
                 }
+
+                configureServices?.Invoke(services);
             },
         }.WithDatabase(connectionString);
         await TestDatabase.MigrateAsync(factory);
@@ -173,14 +180,16 @@ internal sealed class ExpensesTest : IAsyncDisposable
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
-    public async Task<IReadOnlyList<ExpenseAuditRow>> AuditRowsAsync(Guid expenseId)
+    /// <summary>Wpisy audytu obiektu (domyślnie wydatku; <c>OwnerWithdrawal</c> dla wypłat) w kolejności zapisu.</summary>
+    public async Task<IReadOnlyList<ExpenseAuditRow>> AuditRowsAsync(Guid id, string objectType = "Expense")
     {
         await using var connection = await OpenAsync();
         await using var command = new SqlCommand(
             "SELECT Operation, AuthorKind, ObjectLabel, ObjectBusinessDate, Changes FROM reporting.AuditEntries "
-            + "WHERE ObjectType = N'Expense' AND ObjectId = @id ORDER BY Id",
+            + "WHERE ObjectType = @type AND ObjectId = @id ORDER BY Id",
             connection);
-        command.Parameters.AddWithValue("@id", expenseId);
+        command.Parameters.AddWithValue("@type", objectType);
+        command.Parameters.AddWithValue("@id", id);
         await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
         var rows = new List<ExpenseAuditRow>();
         while (await reader.ReadAsync(TestContext.Current.CancellationToken))
