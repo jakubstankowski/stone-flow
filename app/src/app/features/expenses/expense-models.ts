@@ -1,16 +1,14 @@
 import { StatusTone } from '../../shared/ui/status-badge';
 
-/** Kategoria kosztu (stały kod API, PRD §7). */
-export type ExpenseCategory =
-  | 'materialPurchase'
-  | 'cutting'
-  | 'hdsTransport'
-  | 'marketing'
-  | 'otherOperations'
-  | 'vatTax'
-  | 'ppeTax';
+import { ExpenseCategory } from '../../shared/dictionaries/expense-categories';
+import { PaymentMethodCode } from '../../shared/dictionaries/payment-methods';
 
-export type ExpensePaymentMethod = 'transfer' | 'blik' | 'cash' | 'cashOnDelivery';
+// Słowniki wspólne z innymi obszarami są w `shared/dictionaries`; tu eksport pod dotychczasowymi nazwami.
+export type { ExpenseCategory } from '../../shared/dictionaries/expense-categories';
+export { EXPENSE_CATEGORY_LABELS as CATEGORY_LABELS } from '../../shared/dictionaries/expense-categories';
+export { PAYMENT_METHOD_LABELS } from '../../shared/dictionaries/payment-methods';
+
+export type ExpensePaymentMethod = PaymentMethodCode;
 
 /** Stan wydatku z backendu: wynika wyłącznie z daty zapłaty. */
 export type ExpensePaymentStatus = 'planned' | 'paid';
@@ -138,29 +136,12 @@ export const CATEGORIES: readonly ExpenseCategory[] = [
   'ppeTax',
 ];
 
-export const CATEGORY_LABELS: Readonly<Record<ExpenseCategory, string>> = {
-  materialPurchase: 'Zakup materiału u dostawców',
-  cutting: 'Cięcie',
-  hdsTransport: 'Transport HDS',
-  marketing: 'Marketing',
-  otherOperations: 'Pozostała działalność',
-  vatTax: 'Podatek VAT',
-  ppeTax: 'Podatek PPE',
-};
-
 export const PAYMENT_METHODS: readonly ExpensePaymentMethod[] = [
   'transfer',
   'blik',
   'cash',
   'cashOnDelivery',
 ];
-
-export const PAYMENT_METHOD_LABELS: Readonly<Record<ExpensePaymentMethod, string>> = {
-  transfer: 'Przelew',
-  blik: 'BLIK',
-  cash: 'Gotówka',
-  cashOnDelivery: 'Pobranie',
-};
 
 export const PAYMENT_STATUS_LABELS: Readonly<Record<ExpensePaymentStatus, string>> = {
   planned: 'Planowany',

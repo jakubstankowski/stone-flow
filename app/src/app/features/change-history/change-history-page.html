@@ -1,4 +1,211 @@
 <section class="flex flex-col gap-6">
   <h1 class="text-3xl font-bold">Historia zmian</h1>
-  <app-empty-state heading="Ten widok powstanie w kolejnych etapach." />
+
+  @if (history.generalError(); as message) {
+    <p
+      class="rounded-box border border-(--sf-error) bg-base-100 p-4 font-medium text-(--sf-error)"
+      role="alert"
+    >
+      {{ message }}
+    </p>
+  }
+
+  <app-data-table
+    caption="Historia zmian"
+    [emptyTitle]="emptyTitle"
+    [filteredEmptyTitle]="filteredEmptyTitle"
+    [columns]="columns"
+    [rows]="history.items()"
+    [rowKey]="rowKey"
+    [total]="history.total()"
+    [page]="history.page()"
+    [pageSize]="history.pageSize"
+    [sort]="history.sort()"
+    [filters]="history.activeFilters()"
+    [filterable]="true"
+    [mobileCards]="true"
+    [loading]="history.loading()"
+    [error]="history.error()"
+    (pageChange)="onPage($event)"
+    (sortChange)="onSort($event)"
+    (filterRemove)="history.removeFilter($event)"
+    (filtersClear)="history.clearFilters()"
+    (retry)="history.load()"
+  >
+    <form
+      tableFilters
+      novalidate
+      aria-label="Filtry historii zmian"
+      class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2 xl:grid-cols-4"
+      (submit)="$event.preventDefault()"
+    >
+      <app-field
+        label="Zmiana od"
+        fieldId="historia-zmiana-od"
+        [required]="true"
+        [error]="history.changedFromError()"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="date"
+          [value]="history.filters().changedFrom"
+          (change)="onDate('changedFrom', $event)"
+        />
+      </app-field>
+      <app-field
+        label="Zmiana do"
+        fieldId="historia-zmiana-do"
+        [required]="true"
+        [error]="history.changedToError()"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="date"
+          [value]="history.filters().changedTo"
+          (change)="onDate('changedTo', $event)"
+        />
+      </app-field>
+      <app-field
+        label="Data biznesowa od"
+        fieldId="historia-biznesowa-od"
+        [hint]="businessDateHint"
+        [error]="history.businessFromError()"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="date"
+          [value]="history.filters().businessFrom"
+          (change)="onDate('businessFrom', $event)"
+        />
+      </app-field>
+      <app-field
+        label="Data biznesowa do"
+        fieldId="historia-biznesowa-do"
+        [error]="history.businessToError()"
+      >
+        <input
+          #control
+          class="input w-full"
+          type="date"
+          [value]="history.filters().businessTo"
+          (change)="onDate('businessTo', $event)"
+        />
+      </app-field>
+      <fieldset
+        class="flex flex-col gap-1 md:col-span-2 xl:col-span-4"
+        [attr.aria-describedby]="history.objectTypeError() ? 'historia-rodzaj-blad' : null"
+      >
+        <legend class="text-base font-medium">Rodzaj obiektu</legend>
+        <div class="flex flex-wrap gap-x-6">
+          @for (type of objectTypes; track type) {
+            <label class="flex min-h-11 items-center gap-2">
+              <input
+                class="checkbox"
+                type="checkbox"
+                [checked]="isTypeChecked(type)"
+                (change)="onObjectType(type, $event)"
+              />
+              {{ objectTypeLabels[type] }}
+            </label>
+          }
+        </div>
+        @if (history.objectTypeError(); as message) {
+          <p class="text-sm font-medium text-(--sf-error)" id="historia-rodzaj-blad">
+            {{ message }}
+          </p>
+        }
+      </fieldset>
+    </form>
+
+    <ng-template appTableCell="occurredAt" [appTableCellOf]="history.items()" let-row>
+      <time [attr.datetime]="row.occurredAt">{{ formatDateTime(row.occurredAt) }}</time>
+    </ng-template>
+
+    <ng-template appTableCell="object" [appTableCellOf]="history.items()" let-row>
+      <span class="sr-only">{{ objectTypeLabels[row.object.type] }}: </span>
+      @if (objectLink(row); as link) {
+        <a class="link font-medium text-(--sf-accent-text)" [routerLink]="link">{{
+          row.object.label
+        }}</a>
+      } @else {
+        <span class="font-medium">{{ row.object.label }}</span>
+        @if (row.object.deleted) {
+          <app-status-badge class="ml-2" [label]="deletedLabel" [tone]="deletedTone" />
+        }
+      }
+      <span class="mt-1 block text-sm text-(--sf-muted)">{{
+        formatDate(row.object.businessDate)
+      }}</span>
+    </ng-template>
+
+    <ng-template appTableCell="operation" [appTableCellOf]="history.items()" let-row>
+      <app-status-badge
+        [label]="operationLabels[row.operation]"
+        [tone]="operationTones[row.operation]"
+      />
+    </ng-template>
+
+    <ng-template appTableCell="changes" [appTableCellOf]="history.items()" let-row>
+      @let summary = changeSummary(row);
+      <ul class="flex flex-col gap-0.5 whitespace-normal">
+        @for (line of summary.lines; track $index) {
+          <li>{{ line }}</li>
+        }
+        @if (summary.more > 0) {
+          <li class="text-(--sf-muted)">i {{ summary.more }} więcej</li>
+        }
+      </ul>
+      <button
+        type="button"
+        class="btn btn-link btn-sm min-h-11 px-0 text-(--sf-accent-text)"
+        [attr.aria-expanded]="isExpanded(row)"
+        [attr.aria-controls]="panelId(row)"
+        [attr.aria-label]="toggleLabel(row)"
+        (click)="toggle(row)"
+      >
+        {{ isExpanded(row) ? 'Ukryj zmiany' : 'Pokaż zmiany' }}
+      </button>
+      <div [id]="panelId(row)" [hidden]="!isExpanded(row)">
+        @if (isExpanded(row)) {
+          <table class="table table-sm mt-2 whitespace-normal">
+            <caption class="sr-only">
+              Zmiany:
+              {{
+                row.object.label
+              }}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Pole</th>
+                @if (row.operation !== 'created') {
+                  <th scope="col">Było</th>
+                }
+                @if (row.operation !== 'deleted') {
+                  <th scope="col">Jest</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (change of row.changes; track $index) {
+                <tr>
+                  <th scope="row" class="font-medium">
+                    {{ fieldLabel(row.object.type, change.field) }}
+                  </th>
+                  @if (row.operation !== 'created') {
+                    <td>{{ formatFieldValue(row.object.type, change.field, change.oldValue) }}</td>
+                  }
+                  @if (row.operation !== 'deleted') {
+                    <td>{{ formatFieldValue(row.object.type, change.field, change.newValue) }}</td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    </ng-template>
+  </app-data-table>
 </section>

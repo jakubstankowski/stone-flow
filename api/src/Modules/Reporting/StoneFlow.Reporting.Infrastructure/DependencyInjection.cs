@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using StoneFlow.Reporting.Application.Abstractions;
 using StoneFlow.Reporting.Infrastructure.Audit;
 using StoneFlow.Reporting.Infrastructure.Persistence;
 using StoneFlow.Shared.Application.Audit;
@@ -15,6 +16,7 @@ public static class DependencyInjection
             options.UseModuleSqlServer<ReportingDbContext>(serviceProvider, ReportingDbContext.Schema));
 
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IChangeHistoryReader, ChangeHistoryReader>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 
