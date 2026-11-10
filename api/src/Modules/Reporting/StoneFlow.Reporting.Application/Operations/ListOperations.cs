@@ -41,6 +41,7 @@ public sealed record ListOperationsResult(OperationsPageDto? Page, FieldErrors? 
 /// wywoływane po kolei (wspólne połączenie, bez równoległych zapytań), łączenie, sumy, sortowanie i
 /// stronicowanie w pamięci. To odstępstwo od stronicowania w bazie uzasadnia skala (D-08, setki
 /// operacji rocznie); bezpiecznik <see cref="MaxOperations"/> jest egzekwowany limitem w SQL źródeł.
+/// Odczyt źródeł i kolejność to wspólna operacja <see cref="CashOperationReader"/> (SF-20).
 /// </summary>
 public sealed class ListOperationsHandler(IEnumerable<ICashOperationSource> sources, ILaunchDate launchDate)
     : IQueryHandler<ListOperationsQuery, ListOperationsResult>
@@ -48,8 +49,8 @@ public sealed class ListOperationsHandler(IEnumerable<ICashOperationSource> sour
     public const int DefaultPageSize = 25;
     public const int MaxPageSize = 100;
 
-    /// <summary>Najwięcej operacji w filtrze; więcej to <c>422 operations_range_too_large</c>.</summary>
-    public const int MaxOperations = 10_000;
+    /// <summary>Najwięcej operacji w filtrze; więcej to <c>422 operations_range_too_large</c> (bezpiecznik <see cref="CashOperationReader"/>).</summary>
+    public const int MaxOperations = CashOperationReader.MaxOperations;
 
     private readonly IReadOnlyList<ICashOperationSource> _sources = [.. sources];
 
@@ -73,39 +74,17 @@ public sealed class ListOperationsHandler(IEnumerable<ICashOperationSource> sour
                 new OperationsPageDto([], criteria.Page, criteria.PageSize, 0, CashFlowTotals.Of([]), effectiveFrom, launch));
         }
 
-        var loaded = new List<CashOperation>();
-        foreach (var source in _sources)
-        {
-            var requested = new HashSet<CashOperationKind>(criteria.Kinds.Where(source.Kinds.Contains));
-            if (requested.Count == 0)
-            {
-                continue;
-            }
-
-            var remaining = MaxOperations + 1 - loaded.Count;
-            if (remaining <= 0)
-            {
-                break;
-            }
-
-            loaded.AddRange(await source.ListAsync(effectiveFrom, criteria.To, requested, remaining, cancellationToken));
-        }
-
-        if (loaded.Count > MaxOperations)
+        var loaded = await CashOperationReader.ReadAsync(_sources, effectiveFrom, criteria.To, criteria.Kinds, cancellationToken);
+        if (loaded is null)
         {
             return new ListOperationsResult(null, TooManyOperations: true);
         }
 
         var totals = CashFlowTotals.Of(loaded.Select(operation => new CashMovement(operation.Kind, operation.Amount)));
-        var ordered = criteria.Descending
-            ? loaded.OrderByDescending(operation => operation.Date)
-            : loaded.OrderBy(operation => operation.Date);
         var skip = (long)(criteria.Page - 1) * criteria.PageSize;
         List<OperationItemDto> items = skip >= loaded.Count
             ? []
-            : [.. ordered
-                .ThenBy(operation => operation.Kind)
-                .ThenBy(operation => operation.Id)
+            : [.. CashOperationReader.Order(loaded, criteria.Descending)
                 .Skip((int)skip)
                 .Take(criteria.PageSize)
                 .Select(operation => new OperationItemDto(operation, CashFlowPolicy.DirectionOf(operation.Kind)))];

@@ -1,4 +1,6 @@
-/** Wybór okresu raportu (kod API `GET /api/reports/sales`). */
+import { OperationItem, OperationKind } from '../../shared/dictionaries/operations';
+
+/** Wybór okresu raportu (kod API `GET /api/reports/sales`, `GET /api/reports/cash-flow`). */
 export type PeriodKind = 'currentMonth' | 'previousMonth' | 'year' | 'custom';
 
 export type Granularity = 'day' | 'month';
@@ -102,18 +104,57 @@ export interface CategoryAmount {
   readonly amount: string;
 }
 
+/** Część wspólna raportów Pulpitu: okres, nagłówek porównania i chwila wyliczenia (nagłówek strony). */
+export interface ReportHeader {
+  readonly period: ReportPeriod;
+  readonly comparison: ReportComparisonHeader;
+  readonly calculatedAtUtc: string;
+}
+
 /**
  * Raport widoku „Sprzedaż”. Wszystkie kwoty, sumy, porównania i podziały liczy backend;
  * `kpis = null` i puste listy przy okresie w całości przed uruchomieniem (brak danych ≠ zero).
  */
-export interface SalesReport {
-  readonly period: ReportPeriod;
-  readonly comparison: ReportComparisonHeader;
+export interface SalesReport extends ReportHeader {
   readonly kpis: SalesKpis | null;
   readonly series: readonly SeriesPoint[];
   readonly channels: readonly ChannelAmount[];
   readonly categories: readonly CategoryAmount[];
-  readonly calculatedAtUtc: string;
+}
+
+export interface CashFlowKpis {
+  readonly inflows: AmountKpi;
+  readonly outflows: AmountKpi;
+  readonly change: AmountKpi;
+}
+
+/** Przedział wykresu przepływów: kwoty policzone w backendzie. */
+export interface CashFlowSeriesPoint {
+  readonly from: string;
+  readonly to: string;
+  readonly inflows: string;
+  readonly outflows: string;
+  readonly change: string;
+}
+
+/** Rodzaj wypływu w podziale (kod API, jak filtr listy „Operacje”). */
+export type OutflowKind = Exclude<OperationKind, 'payment'>;
+
+export interface OutflowKindAmount {
+  readonly kind: OutflowKind;
+  readonly amount: string;
+}
+
+/**
+ * Raport widoku „Przepływy pieniężne” (SF-20). Karty, przedziały, podział wypływów i ostatnie
+ * operacje (do 10, w kolejności listy „Operacje”) liczy backend; `kpis = null` i puste listy przy
+ * okresie w całości przed uruchomieniem. Bez salda.
+ */
+export interface CashFlowReport extends ReportHeader {
+  readonly kpis: CashFlowKpis | null;
+  readonly series: readonly CashFlowSeriesPoint[];
+  readonly outflowsByKind: readonly OutflowKindAmount[];
+  readonly recentOperations: readonly OperationItem[];
 }
 
 /** Pozycja zestawienia; `amount` to kwota ze znakiem (zwrot i korekta ujemne). */
@@ -212,3 +253,20 @@ export const COMPONENTS_BASIS_LABEL =
   'Kwoty brutto w PLN. Zamówienia według daty zamówienia, zwroty sprzedaży i korekty sprzedaży według ich dat.';
 
 export const NO_BASIS_TEXT = 'brak podstawy porównania';
+
+export const OUTFLOW_KIND_LABELS: Readonly<Record<OutflowKind, string>> = {
+  expense: 'Opłacone wydatki',
+  withdrawal: 'Wypłaty właścicieli',
+  refund: 'Zwroty',
+};
+
+/** Opisy podstaw kart widoku „Przepływy pieniężne” (spec SF-20, UI pkt 3). */
+export const CASH_FLOW_KPI_DESCRIPTIONS = {
+  inflows: 'Wpłaty za zamówienia według daty wpłaty. Nieopłacone zamówienia ich nie zwiększają.',
+  outflows:
+    'Zwroty, opłacone wydatki według daty zapłaty i wypłaty właścicieli. Ujemne opłacone wydatki pomniejszają wypływy.',
+  change: 'Wpływy minus wypływy w tym samym okresie.',
+} as const;
+
+export const OUTFLOWS_BREAKDOWN_LABEL =
+  'Suma pozycji równa się wypływom. Ujemne opłacone wydatki pomniejszają swoją pozycję.';

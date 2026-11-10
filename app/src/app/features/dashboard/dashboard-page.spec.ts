@@ -9,6 +9,7 @@ import {
 } from '../../../testing/auth-testing';
 import {
   beforeLaunchReport,
+  cashFlowReport,
   reportPeriod,
   salesComponentItem,
   salesComponentsPage,
@@ -79,7 +80,7 @@ describe('DashboardPage', () => {
   const text = (element: HTMLElement, id: string) =>
     element.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() ?? null;
 
-  it('shows the view switch as radios in a fieldset and the cash flow placeholder', async () => {
+  it('shows the view switch as radios in a fieldset and the cash flow view instead of a placeholder', async () => {
     const { element, settle } = await render();
     const legend = element.querySelector('fieldset legend');
     const radios = Array.from(
@@ -95,14 +96,66 @@ describe('DashboardPage', () => {
 
     radios[1].checked = true;
     radios[1].dispatchEvent(new Event('change'));
+    (await nextRequest((r) => r.url === '/api/reports/cash-flow')).flush(cashFlowReport());
     await settle(() =>
-      expect(element.textContent).toContain(
-        'Widok przepływów pieniężnych powstanie w kolejnym etapie.',
+      expect(element.querySelector('app-cash-flow-view app-kpi-card')).not.toBeNull(),
+    );
+    expect(element.textContent).not.toContain('powstanie w kolejnym etapie');
+    expect(element.querySelector('app-sales-view')).toBeNull();
+    expect(element.querySelector('app-period-picker')).not.toBeNull();
+  });
+
+  it('keeps one period picker and header for both views and switches the basis, cards and charts together', async () => {
+    // F-P1
+    integration.view.set(knownView(syncStatus({ openErrors: 2 })));
+    const { element, settle } = await render();
+    const notice = 'Nie pobrano wszystkich zamówień. Wyniki mogą być niepełne.';
+    expect(text(element, 'podstawa')).toBe(
+      'Kwoty brutto w PLN. Raporty obejmują dane od 01.09.2026.',
+    );
+    expect(element.textContent).toContain(notice);
+
+    TestBed.inject(DashboardService).setView('cashFlow');
+    // W trakcie wczytywania nowego widoku nie ma nagłówka poprzedniego.
+    await settle(() => expect(element.querySelector('[data-testid="okres"]')).toBeNull());
+    expect(element.querySelector('app-period-picker')).not.toBeNull();
+    expect(element.querySelector('[data-testid="stan-na"]')).toBeNull();
+    expect(element.querySelector('app-sales-view')).toBeNull();
+    (await nextRequest((r) => r.url === '/api/reports/cash-flow')).flush(
+      cashFlowReport({ calculatedAtUtc: '2026-11-09T12:40:00+00:00' }),
+    );
+
+    await settle(() =>
+      expect(text(element, 'podstawa')).toBe(
+        'Kwoty brutto w PLN według daty operacji pieniężnej: wpłaty, zwrotu, zapłaty wydatku albo wypłaty. Raporty obejmują dane od 01.09.2026.',
       ),
     );
-    expect(element.textContent).toContain('Operacje pieniężne są na liście „Operacje”.');
-    expect(element.querySelector('a[href="/operacje"]')).not.toBeNull();
-    expect(element.querySelector('app-period-picker')).toBeNull();
+    expect(text(element, 'okres')).toBe('listopad 2026, 01.11–30.11.2026');
+    expect(text(element, 'stan-na')).toBe(`Stan na ${formatDateTime('2026-11-09T12:40:00+00:00')}`);
+    expect(element.querySelectorAll('app-period-picker')).toHaveLength(1);
+    expect(element.querySelectorAll('app-incomplete-data-notice')).toHaveLength(1);
+    expect(element.textContent).toContain(notice);
+    expect(
+      Array.from(element.querySelectorAll('app-kpi-card [data-kpi]')).map((card) =>
+        card.getAttribute('data-kpi'),
+      ),
+    ).toEqual(['inflows', 'outflows', 'change']);
+    expect(element.querySelector('canvas')?.getAttribute('aria-label')).toContain(
+      'Wpływy i wypływy w czasie',
+    );
+
+    TestBed.inject(DashboardService).setView('sales');
+    (await nextRequest((r) => r.url === '/api/reports/sales')).flush(salesReport());
+    (await nextRequest((r) => r.url === '/api/reports/sales/components')).flush(
+      salesComponentsPage(),
+    );
+    await settle(() =>
+      expect(text(element, 'podstawa')).toBe(
+        'Kwoty brutto w PLN. Raporty obejmują dane od 01.09.2026.',
+      ),
+    );
+    expect(element.querySelectorAll('app-kpi-card')).toHaveLength(4);
+    expect(element.querySelector('app-cash-flow-view')).toBeNull();
   });
 
   it('shows the period, comparison description, freshness, basis and the integration notice', async () => {

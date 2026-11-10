@@ -165,7 +165,7 @@ export class SalesView {
               shape: 'bar',
             },
           ],
-          ariaLabel: 'Sprzedaż według kanałów w zł. Wartości na liście obok.',
+          ariaLabel: 'Sprzedaż według kanałów w zł. Wartości są też na liście przy wykresie.',
         };
   });
 
@@ -184,7 +184,7 @@ export class SalesView {
               shape: 'bar',
             },
           ],
-          ariaLabel: 'Koszty według kategorii w zł. Wartości na liście obok.',
+          ariaLabel: 'Koszty według kategorii w zł. Wartości są też na liście przy wykresie.',
         };
   });
 

@@ -207,4 +207,37 @@ describe('OperationsService', () => {
     expect(service.rangeError()).toBeNull();
     expect(service.totals()).toBeNull();
   });
+  it('takes the period and kinds from the dashboard with the default sort and first page', async () => {
+    const sorted = service.setSort({ key: 'date', direction: 'asc' });
+    listRequest().flush(operationListPage());
+    await sorted;
+    const paged = service.setPage(4);
+    listRequest().flush(operationListPage({ page: 4 }));
+    await paged;
+
+    const filtered = service.filterFromDashboard({
+      from: '2026-11-03',
+      to: '2026-11-30',
+      kinds: ['withdrawal', 'refund', 'expense'],
+    });
+    const request = listRequest();
+    request.flush(
+      operationListPage({ totals: { inflows: '0.00', outflows: '-50.00', change: '50.00' } }),
+    );
+    await filtered;
+
+    expect(service.filters()).toEqual({
+      from: '2026-11-03',
+      to: '2026-11-30',
+      kinds: ['refund', 'expense', 'withdrawal'],
+    });
+    expect(service.sort()).toEqual({ key: 'date', direction: 'desc' });
+    expect(service.page()).toBe(1);
+    expect(request.request.params.get('from')).toBe('2026-11-03');
+    expect(request.request.params.get('to')).toBe('2026-11-30');
+    expect(request.request.params.getAll('kind')).toEqual(['refund', 'expense', 'withdrawal']);
+    expect(request.request.params.get('direction')).toBe('desc');
+    expect(request.request.params.get('page')).toBe('1');
+    expect(service.totals()).toEqual({ inflows: '0.00', outflows: '-50.00', change: '50.00' });
+  });
 });

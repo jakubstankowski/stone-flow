@@ -1,11 +1,13 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import {
+  CashFlowReport,
   ReportPeriod,
   SalesComponentItem,
   SalesComponentsPage,
   SalesReport,
 } from '../app/features/dashboard/report-models';
+import { OperationItem } from '../app/shared/dictionaries/operations';
 
 /** Fikcyjne dane raportu sprzedaży do testów (bez danych identyfikujących). Tylko specyfikacje. */
 export function reportPeriod(overrides: Partial<ReportPeriod> = {}): ReportPeriod {
@@ -88,6 +90,110 @@ export function beforeLaunchReport(): SalesReport {
   });
 }
 
+/** Pozycja ostatnich operacji (kształt pozycji `GET /api/operations`). */
+export function cashFlowOperation(overrides: Partial<OperationItem> = {}): OperationItem {
+  return {
+    kind: 'payment',
+    id: 'p1',
+    date: '2026-11-05',
+    direction: 'inflow',
+    amount: '1500.00',
+    method: 'transfer',
+    refundKind: null,
+    description: 'ZAM/2026/11/0001',
+    category: null,
+    sourceType: 'order',
+    sourceId: 'o1',
+    sourceLabel: 'ZAM/2026/11/0001',
+    ...overrides,
+  };
+}
+
+/** Fikcyjny raport przepływów (SF-20): kwoty z API jako ciągi, bez liczenia w testach. */
+export function cashFlowReport(overrides: Partial<CashFlowReport> = {}): CashFlowReport {
+  return {
+    period: reportPeriod({ effectiveFrom: '2026-11-03' }),
+    comparison: { from: '2026-10-01', to: '2026-10-31', available: true, reason: null },
+    kpis: {
+      inflows: {
+        value: '1500.00',
+        comparison: { status: 'available', base: '1000.00', difference: '500.00', percent: '50.0' },
+      },
+      outflows: {
+        value: '700.00',
+        comparison: { status: 'noBasis', base: null, difference: null, percent: null },
+      },
+      change: {
+        value: '800.00',
+        comparison: {
+          status: 'available',
+          base: '1000.00',
+          difference: '-200.00',
+          percent: '-20.0',
+        },
+      },
+    },
+    series: [
+      {
+        from: '2026-11-03',
+        to: '2026-11-03',
+        inflows: '1500.00',
+        outflows: '400.00',
+        change: '1100.00',
+      },
+      {
+        from: '2026-11-04',
+        to: '2026-11-04',
+        inflows: '0.00',
+        outflows: '300.00',
+        change: '-300.00',
+      },
+    ],
+    outflowsByKind: [
+      { kind: 'expense', amount: '300.00' },
+      { kind: 'withdrawal', amount: '250.00' },
+      { kind: 'refund', amount: '150.00' },
+    ],
+    recentOperations: [
+      cashFlowOperation(),
+      cashFlowOperation({
+        kind: 'expense',
+        id: 'e1',
+        date: '2026-11-04',
+        direction: 'outflow',
+        amount: '-50.00',
+        method: null,
+        description: 'Zwrot za cięcie',
+        category: 'cutting',
+        sourceType: 'expense',
+        sourceId: 'e1',
+        sourceLabel: 'Zwrot za cięcie',
+      }),
+    ],
+    calculatedAtUtc: '2026-11-09T11:15:00+00:00',
+    ...overrides,
+  };
+}
+
+/** Raport przepływów okresu w całości przed uruchomieniem: bez kart i list. */
+export function beforeLaunchCashFlowReport(): CashFlowReport {
+  return cashFlowReport({
+    period: reportPeriod({
+      kind: 'custom',
+      from: '2026-08-01',
+      to: '2026-08-31',
+      effectiveFrom: '2026-09-01',
+      beforeLaunch: true,
+      inProgress: false,
+    }),
+    comparison: { from: '2026-07-01', to: '2026-07-31', available: false, reason: 'beforeLaunch' },
+    kpis: null,
+    series: [],
+    outflowsByKind: [],
+    recentOperations: [],
+  });
+}
+
 export function salesComponentItem(
   overrides: Partial<SalesComponentItem> = {},
 ): SalesComponentItem {
@@ -119,7 +225,7 @@ export function salesComponentsPage(
 }
 
 /**
- * Odrzuca otwarte żądania raportu sprzedaży: Pulpit (SF-19) wczytuje raport przy każdym wejściu,
+ * Odrzuca otwarte żądania raportów Pulpitu: Pulpit wczytuje raport aktywnego widoku przy każdym wejściu,
  * a testy powłoki i tras, które go nie dotyczą, nawigują na `/pulpit`.
  */
 export function discardReportRequests(): void {

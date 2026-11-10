@@ -25,45 +25,35 @@
     </div>
   </fieldset>
 
-  @if (dashboard.view() === 'sales') {
-    <app-period-picker
-      [selection]="dashboard.selection()"
-      [errors]="dashboard.selectionErrors()"
-      [rangeError]="dashboard.rangeError()"
-      [yearOptions]="dashboard.yearOptions()"
-      [maxDate]="dashboard.maxDate()"
-      (selectionChange)="onSelection($event)"
-    />
+  <app-period-picker
+    [selection]="dashboard.selection()"
+    [errors]="dashboard.selectionErrors()"
+    [rangeError]="dashboard.rangeError()"
+    [yearOptions]="dashboard.yearOptions()"
+    [maxDate]="dashboard.maxDate()"
+    (selectionChange)="onSelection($event)"
+  />
 
-    <div class="flex flex-col gap-2" data-testid="aktualnosc">
-      @if (header(); as text) {
-        <p class="text-lg font-semibold" data-testid="okres">{{ text.period }}</p>
-        @if (text.launch; as launch) {
-          <p
-            class="rounded-box border border-(--sf-info) bg-base-100 p-3"
-            data-testid="uruchomienie"
-          >
-            {{ launch }}
-          </p>
-        }
-        @if (text.comparison; as comparison) {
-          <p class="text-sm" data-testid="opis-porownania">{{ comparison }}</p>
-        }
-        <p class="text-sm text-(--sf-muted)" data-testid="stan-na">{{ text.calculatedAt }}</p>
-        <p class="text-sm text-(--sf-muted)" data-testid="podstawa">{{ text.basis }}</p>
+  <div class="flex flex-col gap-2" data-testid="aktualnosc">
+    @if (header(); as text) {
+      <p class="text-lg font-semibold" data-testid="okres">{{ text.period }}</p>
+      @if (text.launch; as launch) {
+        <p class="rounded-box border border-(--sf-info) bg-base-100 p-3" data-testid="uruchomienie">
+          {{ launch }}
+        </p>
       }
-      <app-incomplete-data-notice />
-    </div>
+      @if (text.comparison; as comparison) {
+        <p class="text-sm" data-testid="opis-porownania">{{ comparison }}</p>
+      }
+      <p class="text-sm text-(--sf-muted)" data-testid="stan-na">{{ text.calculatedAt }}</p>
+      <p class="text-sm text-(--sf-muted)" data-testid="podstawa">{{ text.basis }}</p>
+    }
+    <app-incomplete-data-notice />
+  </div>
 
+  @if (dashboard.view() === 'sales') {
     <app-sales-view />
   } @else {
-    <app-empty-state
-      heading="Widok przepływów pieniężnych powstanie w kolejnym etapie."
-      description="Operacje pieniężne są na liście „Operacje”."
-    >
-      <a class="link font-medium text-(--sf-accent-text)" routerLink="/operacje"
-        >Przejdź do listy „Operacje”</a
-      >
-    </app-empty-state>
+    <app-cash-flow-view />
   }
 </section>

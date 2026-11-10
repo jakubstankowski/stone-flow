@@ -1,6 +1,7 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { Router, convertToParamMap, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import {
   nextRequest,
   provideTestHttp,
@@ -10,8 +11,8 @@ import {
 import { operationItem, operationListPage } from '../../../testing/operations-testing';
 import { formatPln } from '../../shared/format/pl-format';
 import { OperationListPage } from './operation-models';
-import { OperationsListPage } from './operations-list-page';
-import { OperationsService } from './operations.service';
+import { OperationsListPage, dashboardFilterFromParams } from './operations-list-page';
+import { OperationsService, currentMonth } from './operations.service';
 
 const ITEMS = [
   operationItem(),
@@ -228,5 +229,113 @@ describe('OperationsListPage', () => {
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).querySelector('.skeleton')).not.toBeNull();
     request.flush(operationListPage());
+  });
+  describe('filter from the dashboard parameters od, do, rodzaj (SF-20)', () => {
+    async function open(url: string, before?: () => void) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([
+            { path: 'operacje', component: OperationsListPage },
+            { path: '**', children: [] },
+          ]),
+          provideTestHttp(),
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      before?.();
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl(url);
+      const list = await nextRequest((r) => r.url === '/api/operations');
+      list.flush(operationListPage());
+      await vi.waitFor(async () => {
+        await harness.fixture.whenStable();
+        expect(harness.routeNativeElement?.querySelector('.skeleton')).toBeNull();
+      });
+      return {
+        harness,
+        params: list.request.params,
+        element: harness.routeNativeElement as HTMLElement,
+      };
+    }
+
+    it('sets the period and kinds in the fixed order with the default sort and first page', async () => {
+      const { params, element } = await open(
+        '/operacje?od=2026-11-01&do=2026-11-15&rodzaj=expense&rodzaj=refund',
+      );
+
+      expect(params.get('from')).toBe('2026-11-01');
+      expect(params.get('to')).toBe('2026-11-15');
+      expect(params.getAll('kind')).toEqual(['refund', 'expense']);
+      expect(params.get('direction')).toBe('desc');
+      expect(params.get('page')).toBe('1');
+      expect(element.textContent).toContain('Okres: 01.11.2026 – 15.11.2026');
+      expect(element.textContent).toContain('Rodzaj: Zwrot');
+      expect(element.textContent).toContain('Rodzaj: Opłacony wydatek');
+    });
+
+    it('removes the parameters from the address without a new history entry', async () => {
+      let navigate: ReturnType<typeof vi.spyOn> | undefined;
+      const { harness } = await open('/operacje?od=2026-11-01&do=2026-11-15&rodzaj=payment', () => {
+        navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+      });
+      const router = TestBed.inject(Router);
+
+      expect(navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({ queryParams: {}, replaceUrl: true }),
+      );
+      await vi.waitFor(() => expect(router.url).toBe('/operacje'));
+
+      // Zmiana filtra na liście, potem powrót na `/operacje` bez parametrów: stan serwisu zostaje.
+      const service = TestBed.inject(OperationsService);
+      const change = service.toggleKind('withdrawal', true);
+      (await nextRequest((r) => r.url === '/api/operations')).flush(operationListPage());
+      await change;
+      await harness.navigateByUrl('/pulpit');
+      await harness.navigateByUrl('/operacje');
+      const again = await nextRequest((r) => r.url === '/api/operations');
+      expect(again.request.params.get('from')).toBe('2026-11-01');
+      expect(again.request.params.getAll('kind')).toEqual(['payment', 'withdrawal']);
+      again.flush(operationListPage());
+    });
+  });
+});
+
+describe('dashboardFilterFromParams', () => {
+  const month = currentMonth();
+  const filter = (query: Record<string, string | string[]>) =>
+    dashboardFilterFromParams(convertToParamMap(query));
+
+  it('is null without any of od, do, rodzaj', () => {
+    expect(filter({})).toBeNull();
+    expect(filter({ strona: '2' })).toBeNull();
+  });
+
+  it('reads a valid period and known kinds in the fixed order', () => {
+    expect(
+      filter({ od: '2026-11-03', do: '2026-11-30', rodzaj: ['withdrawal', 'payment'] }),
+    ).toEqual({ from: '2026-11-03', to: '2026-11-30', kinds: ['payment', 'withdrawal'] });
+  });
+
+  it.each([
+    [{ od: '2026-11-31', do: '2026-11-30' }],
+    [{ od: '2026-12-01', do: '2026-11-30' }],
+    [{ od: '2026-11-01' }],
+    [{ od: '01.11.2026', do: '2026-11-30' }],
+  ])('uses the whole current month for an invalid window %o', (query) => {
+    expect(filter(query)).toEqual({ ...month, kinds: [] });
+  });
+
+  it('uses the current month with the kind when only rodzaj is given', () => {
+    expect(filter({ rodzaj: 'payment' })).toEqual({ ...month, kinds: ['payment'] });
+  });
+
+  it('skips unknown kinds and means all kinds when none is known', () => {
+    expect(filter({ od: '2026-11-01', do: '2026-11-30', rodzaj: 'xyz' })).toEqual({
+      from: '2026-11-01',
+      to: '2026-11-30',
+      kinds: [],
+    });
   });
 });

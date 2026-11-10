@@ -215,6 +215,21 @@ export class OperationsService {
     return Promise.resolve();
   }
 
+  /**
+   * Przejście z Pulpitu (SF-20): okres i rodzaje z adresu zastępują filtr, sortowanie wraca do
+   * domyślnego (data malejąco), strona do pierwszej. Rodzaje w stałej kolejności `OPERATION_KINDS`.
+   */
+  filterFromDashboard(filter: OperationFilters): Promise<void> {
+    this.filtersState.set({
+      from: filter.from,
+      to: filter.to,
+      kinds: OPERATION_KINDS.filter((kind) => filter.kinds.includes(kind)),
+    });
+    this.sortState.set(DEFAULT_SORT);
+    this.pageState.set(1);
+    return this.load();
+  }
+
   clearFilters(): Promise<void> {
     return this.update(defaultFilters());
   }

@@ -6,8 +6,9 @@ namespace StoneFlow.Reporting.Api;
 
 /// <summary>
 /// Rejestracja modułu w hoście: endpointy <c>/api/operations</c> (lista operacji pieniężnych, SF-17),
-/// <c>/api/change-history</c> (historia zmian z audytu, SF-18) i <c>/api/reports/sales</c>
-/// (raport sprzedaży i zestawienie składników, SF-19).
+/// <c>/api/change-history</c> (historia zmian z audytu, SF-18), <c>/api/reports/sales</c>
+/// (raport sprzedaży i zestawienie składników, SF-19) i <c>/api/reports/cash-flow</c> (raport
+/// przepływów pieniężnych, SF-20).
 /// </summary>
 public static class ReportingModule
 {
@@ -17,6 +18,7 @@ public static class ReportingModule
     {
         OperationsEndpoints.Map(endpoints);
         SalesReportEndpoints.Map(endpoints);
+        CashFlowReportEndpoints.Map(endpoints);
         ChangeHistoryEndpoints.Map(endpoints);
         return endpoints;
     }

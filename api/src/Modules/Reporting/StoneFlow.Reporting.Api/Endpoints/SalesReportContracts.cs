@@ -69,11 +69,7 @@ internal static class SalesReportContracts
 {
     public static SalesReportResponse ToResponse(SalesReportDto report) => new(
         ToResponse(report.Period),
-        new SalesReportComparisonResponse(
-            OperationCodes.FormatDate(report.Period.Base.From),
-            OperationCodes.FormatDate(report.Period.Base.To),
-            report.ComparisonAvailable,
-            report.ComparisonAvailable ? null : SalesReportCodes.BeforeLaunchReason),
+        ComparisonOf(report.Period, report.ComparisonAvailable),
         report.Kpis is { } kpis
             ? new SalesKpisResponse(
                 ToResponse(kpis.Sales),
@@ -106,7 +102,15 @@ internal static class SalesReportContracts
         page.Total,
         page.Sum is { } sum ? OperationCodes.FormatAmount(sum) : null);
 
-    private static SalesReportPeriodResponse ToResponse(ReportPeriod period) => new(
+    /// <summary>Nagłówek porównania (okres bazowy i dostępność); współdzielony z raportem przepływów (SF-20).</summary>
+    internal static SalesReportComparisonResponse ComparisonOf(ReportPeriod period, bool available) => new(
+        OperationCodes.FormatDate(period.Base.From),
+        OperationCodes.FormatDate(period.Base.To),
+        available,
+        available ? null : SalesReportCodes.BeforeLaunchReason);
+
+    /// <summary>Okres raportu; współdzielony z raportem przepływów (SF-20).</summary>
+    internal static SalesReportPeriodResponse ToResponse(ReportPeriod period) => new(
         SalesReportCodes.Of(period.Kind),
         OperationCodes.FormatDate(period.Range.From),
         OperationCodes.FormatDate(period.Range.To),
@@ -116,7 +120,8 @@ internal static class SalesReportContracts
         period.InProgress,
         SalesReportCodes.Of(period.Granularity));
 
-    private static AmountKpiResponse ToResponse(AmountKpiDto kpi) => new(
+    /// <summary>Karta z kwotą i porównaniem; współdzielona z raportem przepływów (SF-20).</summary>
+    internal static AmountKpiResponse ToResponse(AmountKpiDto kpi) => new(
         OperationCodes.FormatAmount(kpi.Value),
         new AmountComparisonResponse(
             SalesReportCodes.Of(kpi.Comparison.Status),
