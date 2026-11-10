@@ -2,7 +2,8 @@ import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { provideTestHttp, signIn } from '../../testing/auth-testing';
+import { nextRequest, provideTestHttp, signIn } from '../../testing/auth-testing';
+import { changeHistoryPage } from '../../testing/change-history-testing';
 import { sectionRoutes } from '../app.routes';
 import { AppShell } from './app-shell';
 import { discardReportRequests } from '../../testing/dashboard-testing';
@@ -60,8 +61,22 @@ describe('AppShell', () => {
   });
 
   it('shows the product name linking to the dashboard and the current section', async () => {
-    // Sekcje bez zapytań do API (listy wydatków od SF-15 i operacji od SF-17 pobierają dane).
-    const { fixture, element } = await render('/historia-zmian');
+    // Lista „Historia zmian” (SF-18) pyta API przy wejściu: odpowiadamy pustą stroną.
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl('/historia-zmian');
+    (await nextRequest((request) => request.url === '/api/change-history')).flush(
+      changeHistoryPage(),
+    );
+    await navigation;
+    const fixture = TestBed.createComponent(AppShell);
+    await fixture.whenStable();
+    for (const request of TestBed.inject(HttpTestingController).match(
+      (candidate) => candidate.url === '/api/change-history',
+    )) {
+      request.flush(changeHistoryPage());
+    }
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
     const header = element.querySelector('header') as HTMLElement;
 
     expect(header.querySelector('a[href="/pulpit"]')?.textContent?.trim()).toBe('Stone Flow');

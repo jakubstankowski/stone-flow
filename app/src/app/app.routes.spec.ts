@@ -15,6 +15,7 @@ import { IntegrationPage } from './features/integration/integration-page';
 import { OperationsListPage } from './features/operations/operations-list-page';
 import { OrdersListPage } from './features/orders/orders-list-page';
 import { NAV_ITEMS } from './layout/nav-items';
+import { changeHistoryPage } from '../testing/change-history-testing';
 import {
   beforeLaunchReport,
   discardReportRequests,
@@ -22,9 +23,8 @@ import {
 } from '../testing/dashboard-testing';
 import { discardIntegrationRequests } from '../testing/integration-testing';
 
-/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki”, „Operacje” i „Pulpit” testują osobne bloki — SF-15, SF-17, SF-19). */
+/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki”, „Operacje”, „Historia zmian” i „Pulpit” testują osobne bloki — SF-15, SF-17, SF-18, SF-19). */
 const SECTIONS: [string, string, Type<unknown>, boolean][] = [
-  ['/historia-zmian', 'Historia zmian', ChangeHistoryPage, true],
   ['/integracja', 'Integracja', IntegrationPage, false],
 ];
 
@@ -175,6 +175,29 @@ describe('app routes', () => {
     expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe('Pulpit');
     expect(
       harness.routeDebugElement?.query((node) => node.componentInstance instanceof DashboardPage),
+    ).not.toBeNull();
+    expect(harness.routeNativeElement?.textContent).not.toContain(
+      'Ten widok powstanie w kolejnych etapach.',
+    );
+  });
+
+  it('loads the change history section with its list page', async () => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl('/historia-zmian');
+    (await nextRequest((request) => request.url === '/api/change-history')).flush(
+      changeHistoryPage(),
+    );
+    await navigation;
+
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe(
+      'Historia zmian',
+    );
+    expect(
+      harness.routeDebugElement?.query(
+        (node) => node.componentInstance instanceof ChangeHistoryPage,
+      ),
     ).not.toBeNull();
     expect(harness.routeNativeElement?.textContent).not.toContain(
       'Ten widok powstanie w kolejnych etapach.',

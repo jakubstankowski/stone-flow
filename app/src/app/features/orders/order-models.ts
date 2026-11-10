@@ -1,4 +1,33 @@
+import {
+  CHANNEL_LABELS,
+  CUSTOMER_KIND_LABELS,
+  CustomerKind,
+  FULFILLMENT_STATUS_LABELS,
+  FulfillmentStatus,
+  OrderChannel,
+  REFUND_KIND_LABELS,
+  RefundKind,
+} from '../../shared/dictionaries/order-dictionaries';
+import {
+  PAYMENT_METHOD_LABELS,
+  PaymentMethodCode,
+} from '../../shared/dictionaries/payment-methods';
 import { StatusTone } from '../../shared/ui/status-badge';
+
+// Słowniki wspólne z innymi obszarami są w `shared/dictionaries`; tu eksport pod dotychczasowymi nazwami.
+export type {
+  CustomerKind,
+  FulfillmentStatus,
+  OrderChannel,
+  RefundKind,
+} from '../../shared/dictionaries/order-dictionaries';
+export {
+  CHANNEL_LABELS,
+  CUSTOMER_KIND_LABELS,
+  FULFILLMENT_STATUS_LABELS as STATUS_LABELS,
+  REFUND_KIND_LABELS,
+} from '../../shared/dictionaries/order-dictionaries';
+export { PAYMENT_METHOD_LABELS } from '../../shared/dictionaries/payment-methods';
 
 /**
  * Typy kontraktu `/api/orders` (SF-8 i wpisy płatności SF-9, spec „Data / API”). Kwoty są ciągami dziesiętnymi
@@ -7,9 +36,6 @@ import { StatusTone } from '../../shared/ui/status-badge';
  */
 
 export type OrderSource = 'manual' | 'wooCommerce';
-export type OrderChannel = 'shop' | 'olx' | 'acquaintance' | 'phone' | 'other';
-export type FulfillmentStatus = 'inProgress' | 'completed' | 'problem' | 'cancelled';
-export type CustomerKind = 'person' | 'company';
 
 /** Pola zamówienia WooCommerce tylko do odczytu w edycji (`OrderDetails.shopOwnedFields`). */
 export type ShopOwnedField = 'orderDate' | 'value' | 'channel' | 'customer';
@@ -53,10 +79,9 @@ export interface OrderUpdate extends OrderInput {
 }
 
 /** Metody wpłaty (SF-9). Pobranie jest tylko metodą: zamówienie bez wpłaty pozostaje Nieopłacone. */
-export type PaymentMethod = 'transfer' | 'blik' | 'cash' | 'cashOnDelivery';
+export type PaymentMethod = PaymentMethodCode;
 /** Metody zwrotu: bez pobrania. */
 export type RefundMethod = 'transfer' | 'blik' | 'cash';
-export type RefundKind = 'salesReturn' | 'moneyReturn';
 /** Stan płatności wyliczany przez backend; zamówienie anulowane ma `null`. */
 export type PaymentState = 'unpaid' | 'partiallyPaid' | 'paid';
 /** Wartość filtra listy: stany oraz `none` (bez stanu, czyli zamówienia anulowane). */
@@ -252,22 +277,10 @@ export const ENTRY_PROBLEM = {
   salesReductionLimitExceeded: 'sales_reduction_limit_exceeded',
 } as const;
 
-export const PAYMENT_METHOD_LABELS: Readonly<Record<PaymentMethod, string>> = {
-  transfer: 'Przelew',
-  blik: 'BLIK',
-  cash: 'Gotówka',
-  cashOnDelivery: 'Pobranie',
-};
-
 export const REFUND_METHOD_LABELS: Readonly<Record<RefundMethod, string>> = {
   transfer: 'Przelew',
   blik: 'BLIK',
   cash: 'Gotówka',
-};
-
-export const REFUND_KIND_LABELS: Readonly<Record<RefundKind, string>> = {
-  salesReturn: 'Zwrot sprzedaży',
-  moneyReturn: 'Zwrot pieniędzy',
 };
 
 /** Krótki opis wpływu rodzaju zwrotu na sprzedaż (design guide, szczegóły zamówienia). */
@@ -293,24 +306,9 @@ export const PAYMENT_STATE_FILTER_LABELS: Readonly<Record<PaymentStateFilter, st
   none: 'Bez stanu (anulowane)',
 };
 
-export const CHANNEL_LABELS: Readonly<Record<OrderChannel, string>> = {
-  shop: 'Sklep',
-  olx: 'OLX',
-  acquaintance: 'Znajomy',
-  phone: 'Telefon',
-  other: 'Inne',
-};
-
 export const SOURCE_LABELS: Readonly<Record<OrderSource, string>> = {
   manual: 'Ręczne',
   wooCommerce: 'Sklep',
-};
-
-export const STATUS_LABELS: Readonly<Record<FulfillmentStatus, string>> = {
-  inProgress: 'W trakcie',
-  completed: 'Zakończone',
-  problem: 'Problem / reklamacja',
-  cancelled: 'Anulowane',
 };
 
 export const STATUS_TONES: Readonly<Record<FulfillmentStatus, StatusTone>> = {
@@ -320,14 +318,9 @@ export const STATUS_TONES: Readonly<Record<FulfillmentStatus, StatusTone>> = {
   cancelled: 'neutral',
 };
 
-export const CUSTOMER_KIND_LABELS: Readonly<Record<CustomerKind, string>> = {
-  person: 'Osoba',
-  company: 'Firma',
-};
-
 export const CHANNELS = Object.keys(CHANNEL_LABELS) as readonly OrderChannel[];
 export const SOURCES = Object.keys(SOURCE_LABELS) as readonly OrderSource[];
-export const STATUSES = Object.keys(STATUS_LABELS) as readonly FulfillmentStatus[];
+export const STATUSES = Object.keys(FULFILLMENT_STATUS_LABELS) as readonly FulfillmentStatus[];
 /** Statusy do wyboru w formularzu: „Anulowane” ustawia tylko akcja „Anuluj zamówienie”. */
 export const EDITABLE_STATUSES: readonly FulfillmentStatus[] = [
   'inProgress',

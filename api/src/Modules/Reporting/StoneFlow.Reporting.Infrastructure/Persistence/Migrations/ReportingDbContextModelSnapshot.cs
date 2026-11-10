@@ -76,6 +76,8 @@ namespace StoneFlow.Reporting.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ObjectBusinessDate");
+
                     b.HasIndex("OccurredAtUtc");
 
                     b.HasIndex("ObjectType", "ObjectId");
