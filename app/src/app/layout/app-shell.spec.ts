@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { provideTestHttp, signIn } from '../../testing/auth-testing';
 import { sectionRoutes } from '../app.routes';
 import { AppShell } from './app-shell';
+import { discardReportRequests } from '../../testing/dashboard-testing';
 import { discardIntegrationRequests } from '../../testing/integration-testing';
 
 describe('AppShell', () => {
@@ -18,6 +19,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     discardIntegrationRequests();
+    discardReportRequests();
     TestBed.inject(HttpTestingController).verify();
   });
 

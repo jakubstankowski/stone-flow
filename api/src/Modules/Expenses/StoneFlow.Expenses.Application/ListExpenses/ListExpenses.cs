@@ -17,13 +17,17 @@ public sealed record ExpenseListRowDto(
     decimal GrossAmount,
     Guid? RecurringDefinitionId);
 
-/// <summary>Jedna strona wierszy z bazy; <see cref="Total"/> to liczba wszystkich wydatków spełniających filtry.</summary>
-public sealed record ExpenseRowsPage(IReadOnlyList<ExpenseListRowDto> Rows, int Total);
+/// <summary>
+/// Jedna strona wierszy z bazy; <see cref="Total"/> to liczba, a <see cref="GrossTotal"/> suma kwot
+/// brutto wszystkich wydatków spełniających filtry (nie strony, SF-19).
+/// </summary>
+public sealed record ExpenseRowsPage(IReadOnlyList<ExpenseListRowDto> Rows, int Total, decimal GrossTotal);
 
 /// <summary>Pozycja listy: wiersz i stan policzony tą samą regułą domeny co w szczegółach.</summary>
 public sealed record ExpenseListItemDto(ExpenseListRowDto Row, ExpensePaymentInfo Payment);
 
-public sealed record ExpenseListPageDto(IReadOnlyList<ExpenseListItemDto> Items, int Page, int PageSize, int Total);
+/// <summary>Strona listy; <see cref="Total"/> i <see cref="GrossTotal"/> dotyczą całego filtra.</summary>
+public sealed record ExpenseListPageDto(IReadOnlyList<ExpenseListItemDto> Items, int Page, int PageSize, int Total, decimal GrossTotal);
 
 public enum ExpenseSort
 {
@@ -132,7 +136,7 @@ public sealed class ListExpensesHandler(IExpenseReader reader, TimeProvider time
         var items = rows.Rows
             .Select(row => new ExpenseListItemDto(row, ExpensePayment.Compute(row.PaidOn, row.DueDate, today)))
             .ToList();
-        return new ListExpensesResult(new ExpenseListPageDto(items, criteria.Page, criteria.PageSize, rows.Total));
+        return new ListExpensesResult(new ExpenseListPageDto(items, criteria.Page, criteria.PageSize, rows.Total, rows.GrossTotal));
     }
 
     /// <summary>Domyślnie: strona 1, 25 pozycji, data kosztu malejąco. Podany <c>sort</c> bez <c>direction</c> sortuje rosnąco.</summary>

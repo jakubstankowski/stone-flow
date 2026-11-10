@@ -1,3 +1,4 @@
+using StoneFlow.Reporting.Domain.Periods;
 using StoneFlow.Shared.Kernel.Operations;
 
 namespace StoneFlow.Reporting.Domain.CashFlow;
@@ -28,7 +29,8 @@ public static class CashFlowPolicy
 
     /// <summary>
     /// Pierwszy dzień liczonych operacji: późniejszy z początku filtra i daty uruchomienia. Gdy
-    /// wynik jest późniejszy niż koniec okresu, okres w całości leży przed uruchomieniem.
+    /// wynik jest późniejszy niż koniec okresu, okres w całości leży przed uruchomieniem. Deleguje do
+    /// wspólnej reguły <see cref="LaunchCutoff"/> (SF-19).
     /// </summary>
-    public static DateOnly EffectiveFrom(DateOnly from, DateOnly launchDate) => from > launchDate ? from : launchDate;
+    public static DateOnly EffectiveFrom(DateOnly from, DateOnly launchDate) => LaunchCutoff.EffectiveFrom(from, launchDate);
 }

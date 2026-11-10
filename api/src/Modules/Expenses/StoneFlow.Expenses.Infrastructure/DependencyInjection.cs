@@ -4,6 +4,7 @@ using StoneFlow.Expenses.Application.Abstractions;
 using StoneFlow.Expenses.Application.Recurring;
 using StoneFlow.Expenses.Infrastructure.Persistence;
 using StoneFlow.Expenses.Infrastructure.Recurring;
+using StoneFlow.Shared.Application.Costs;
 using StoneFlow.Shared.Application.Operations;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
@@ -26,6 +27,9 @@ public static class DependencyInjection
 
         // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
         services.AddScoped<ICashOperationSource, ExpenseCashOperationSource>();
+
+        // Kontrakt z jedną implementacją (SF-19): koszty dla raportu sprzedaży.
+        services.AddScoped<ICostSource, ExpenseCostSource>();
 
         services.AddScoped<IRecurringExpenseStore, RecurringExpenseStore>();
         services.AddScoped<IRecurringExpenseReader, RecurringExpenseReader>();

@@ -91,6 +91,8 @@ export interface ExpenseListPage {
   readonly page: number;
   readonly pageSize: number;
   readonly total: number;
+  /** Suma kwot brutto wszystkich wydatków spełniających filtry (backend, ciąg dziesiętny, SF-19). */
+  readonly grossTotal: string;
 }
 
 export interface ExpenseListQuery {

@@ -27,7 +27,7 @@ describe('ExpensesListPage', () => {
 
   afterEach(() => http.verify());
 
-  async function render(items: readonly ExpenseListItem[]) {
+  async function render(items: readonly ExpenseListItem[], grossTotal = '0.00') {
     const fixture = TestBed.createComponent(ExpensesListPage);
     (await nextRequest('/api/jobs')).flush([]);
     (await nextRequest((r) => r.url === '/api/expenses')).flush({
@@ -35,6 +35,7 @@ describe('ExpensesListPage', () => {
       page: 1,
       pageSize: 25,
       total: items.length,
+      grossTotal,
     });
     await vi.waitFor(async () => {
       await fixture.whenStable();
@@ -145,6 +146,86 @@ describe('ExpensesListPage', () => {
     expect(rows[0].textContent).toContain('Cykliczny');
     expect(rows[1].textContent).not.toContain('Cykliczny');
     expect(element.textContent).toContain('Wydatki cykliczne');
+  });
+
+  it('shows the gross total of the whole filter with its label and a minus sign', async () => {
+    const element = await render([expenseListItem()], '-150.50');
+
+    const total = element.querySelector('[data-testid="suma-brutto"]');
+    expect(total?.textContent).toContain(`Suma brutto: ${formatPln('-150.50')}`);
+    expect(total?.textContent).toContain(
+      'Suma kwot brutto wydatków spełniających filtry; korekty i zwroty od dostawców ją pomniejszają.',
+    );
+    expect(total?.parentElement?.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('hides the gross total when the list fails', async () => {
+    const fixture = TestBed.createComponent(ExpensesListPage);
+    (await nextRequest('/api/jobs')).flush([]);
+    respondNetworkError(await nextRequest((r) => r.url === '/api/expenses'));
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(fixture.nativeElement.textContent).toContain('Nie udało się wczytać wydatków.');
+    });
+
+    expect(fixture.nativeElement.querySelector('[data-testid="suma-brutto"]')).toBeNull();
+  });
+
+  describe('filter from the dashboard parameters kosztOd, kosztDo, kategoria (SF-19)', () => {
+    async function open(url: string) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideRouter([{ path: 'wydatki', component: ExpensesListPage }]),
+          provideTestHttp(),
+        ],
+      });
+      http = TestBed.inject(HttpTestingController);
+      const harness = await RouterTestingHarness.create();
+      await harness.navigateByUrl(url);
+      (await nextRequest('/api/jobs')).flush([]);
+      const list = await nextRequest((r) => r.url === '/api/expenses');
+      list.flush({ items: [], page: 1, pageSize: 25, total: 0, grossTotal: '0.00' });
+      await vi.waitFor(async () => {
+        await harness.fixture.whenStable();
+        expect(harness.routeNativeElement?.querySelector('.skeleton')).toBeNull();
+      });
+      return { params: list.request.params, element: harness.routeNativeElement as HTMLElement };
+    }
+
+    it('sets the cost date and categories with the default sort and shows them as chips', async () => {
+      const { params, element } = await open(
+        '/wydatki?kosztOd=2026-11-03&kosztDo=2026-11-30&kategoria=cutting&kategoria=marketing',
+      );
+
+      expect(params.get('costDateFrom')).toBe('2026-11-03');
+      expect(params.get('costDateTo')).toBe('2026-11-30');
+      expect(params.getAll('category')).toEqual(['cutting', 'marketing']);
+      expect(params.get('sort')).toBe('costDate');
+      expect(params.get('direction')).toBe('desc');
+      expect(params.get('page')).toBe('1');
+      expect(element.textContent).toContain('Data kosztu od: 03.11.2026');
+      expect(element.textContent).toContain('Kategoria: Cięcie');
+    });
+
+    it('skips invalid values one by one', async () => {
+      const { params } = await open(
+        '/wydatki?kosztOd=2026-02-30&kosztDo=2026-11-30&kategoria=fuel&kategoria=vatTax',
+      );
+
+      expect(params.has('costDateFrom')).toBe(false);
+      expect(params.get('costDateTo')).toBe('2026-11-30');
+      expect(params.getAll('category')).toEqual(['vatTax']);
+    });
+
+    it('drops both dates when the start is later than the end and starts from default filters', async () => {
+      const { params } = await open('/wydatki?kosztOd=2026-12-01&kosztDo=2026-11-30&kategoria=x');
+
+      expect(params.has('costDateFrom')).toBe(false);
+      expect(params.has('costDateTo')).toBe(false);
+      expect(params.has('category')).toBe(false);
+      expect(params.get('sort')).toBe('costDate');
+    });
   });
 
   describe('filter from the wydatekCykliczny parameter (SF-16)', () => {

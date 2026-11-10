@@ -4,6 +4,7 @@ import { Router, provideRouter } from '@angular/router';
 import { nextRequest, provideTestHttp } from '../testing/auth-testing';
 import { App } from './app';
 import { routes } from './app.routes';
+import { discardReportRequests } from '../testing/dashboard-testing';
 import { discardIntegrationRequests } from '../testing/integration-testing';
 
 describe('App', () => {
@@ -16,6 +17,7 @@ describe('App', () => {
 
   afterEach(() => {
     discardIntegrationRequests();
+    discardReportRequests();
     TestBed.inject(HttpTestingController).verify();
   });
 

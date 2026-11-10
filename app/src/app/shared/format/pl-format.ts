@@ -83,6 +83,24 @@ export function formatPln(value: AmountInput): string {
   return amountFormat.format(trimmed as `${number}`);
 }
 
+const PERCENT = /^(-?)(\d+)\.(\d)$/;
+
+/**
+ * Zmiana procentowa z API (tekst z jednym miejscem po kropce) → `+12,5%`, `-3,0%`, `0,0%`.
+ * Wyłącznie operacja na tekście (znak i przecinek), bez konwersji na liczbę. Minus to `-`
+ * (U+002D), jak w `formatPln`. Niepoprawny tekst i `null` → „Brak danych”.
+ */
+export function formatPercent(value: string | null | undefined): string {
+  const match = PERCENT.exec((value ?? '').trim());
+  if (!match) {
+    return NO_DATA;
+  }
+  const [, minus, integer, fraction] = match;
+  const zero = /^0+$/.test(integer) && fraction === '0';
+  const sign = zero ? '' : minus === '-' ? '-' : '+';
+  return `${sign}${integer.replace(/^0+(?=\d)/, '')},${fraction}%`;
+}
+
 /** Data biznesowa `yyyy-MM-dd` → `28.10.2026`. */
 export function formatDate(value: string | null | undefined): string {
   const date = parseIsoDate(value);

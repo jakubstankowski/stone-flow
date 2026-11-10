@@ -1,0 +1,53 @@
+<form
+  novalidate
+  aria-label="Okres raportu"
+  class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2 xl:grid-cols-4"
+  (submit)="$event.preventDefault()"
+>
+  <app-field label="Okres" fieldId="pulpit-okres">
+    <select #control class="select w-full" (change)="onKind($event)">
+      @for (kind of kinds; track kind) {
+        <option [value]="kind" [selected]="kind === selection().kind">{{ labels[kind] }}</option>
+      }
+    </select>
+  </app-field>
+
+  @if (selection().kind === 'year') {
+    <app-field label="Rok" fieldId="pulpit-rok">
+      <select #control class="select w-full" (change)="onYear($event)">
+        @for (year of yearOptions(); track year) {
+          <option [value]="year" [selected]="year === selection().year">{{ year }}</option>
+        }
+      </select>
+    </app-field>
+  }
+
+  @if (selection().kind === 'custom') {
+    <app-field label="Data od" fieldId="pulpit-od" [required]="true" [error]="errors().from">
+      <input
+        #control
+        class="input w-full"
+        type="date"
+        [max]="maxDate()"
+        [value]="selection().from"
+        (change)="onDate('from', $event)"
+      />
+    </app-field>
+    <app-field label="Data do" fieldId="pulpit-do" [required]="true" [error]="errors().to">
+      <input
+        #control
+        class="input w-full"
+        type="date"
+        [max]="maxDate()"
+        [value]="selection().to"
+        (change)="onDate('to', $event)"
+      />
+    </app-field>
+  }
+</form>
+
+@if (rangeError(); as text) {
+  <p role="alert" class="rounded-box border border-(--sf-error) bg-base-100 p-3 font-medium">
+    {{ text }}
+  </p>
+}

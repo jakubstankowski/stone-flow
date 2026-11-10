@@ -26,6 +26,20 @@
       <app-button variant="primary" (pressed)="add()">Dodaj wydatek</app-button>
     </app-empty-state>
   } @else {
+    <div aria-live="polite">
+      @if (expenses.grossTotal(); as grossTotal) {
+        <div
+          class="flex flex-col gap-1 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+          data-testid="suma-brutto"
+        >
+          <p class="text-lg font-semibold">
+            Suma brutto: <span class="tabular-nums">{{ formatPln(grossTotal) }}</span>
+          </p>
+          <p class="text-sm text-(--sf-muted)">{{ grossTotalLabel }}</p>
+        </div>
+      }
+    </div>
+
     <app-data-table
       caption="Wydatki"
       emptyTitle="Brak wydatków"

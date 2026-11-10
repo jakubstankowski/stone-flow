@@ -377,6 +377,29 @@ public sealed class ExpensesApiTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task List_gross_total_covers_the_whole_filter_not_the_page()
+    {
+        await using var test = await ExpensesTest.CreateAsync(sqlServer);
+        await test.CreateExpenseAsync(Input(costDate: "2026-10-05", grossAmount: "1000.00", netAmount: null));
+        await test.CreateExpenseAsync(Input(costDate: "2026-10-28", dueDate: null, paidOn: "2026-11-02", category: "marketing", grossAmount: "250.50", netAmount: null));
+        await test.CreateExpenseAsync(Input(costDate: "2026-11-03", grossAmount: "-200.00", netAmount: null));
+
+        async Task<(string? GrossTotal, int Items)> ListAsync(string query)
+        {
+            var page = await test.GetJsonAsync($"/api/expenses{query}");
+            return (page.GetProperty("grossTotal").GetString(), page.GetProperty("items").GetArrayLength());
+        }
+
+        Assert.Equal(("1050.50", 3), await ListAsync(string.Empty));
+        Assert.Equal(("1050.50", 1), await ListAsync("?pageSize=1"));
+        Assert.Equal(("1050.50", 0), await ListAsync("?page=9"));
+        Assert.Equal(("800.00", 2), await ListAsync("?category=cutting"));
+        Assert.Equal(("250.50", 1), await ListAsync("?state=paid"));
+        Assert.Equal(("-200.00", 1), await ListAsync("?costDateFrom=2026-11-01&costDateTo=2026-11-30"));
+        Assert.Equal(("0.00", 0), await ListAsync("?costDateFrom=2026-12-01"));
+    }
+
+    [Fact]
     public async Task State_filter_matches_the_state_computed_by_the_domain()
     {
         await using var test = await ExpensesTest.CreateAsync(sqlServer);

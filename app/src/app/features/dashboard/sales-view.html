@@ -1,0 +1,163 @@
+@if (dashboard.reportLoading()) {
+  <app-loading-state [rows]="6" label="Wczytywanie raportu…" />
+} @else if (dashboard.reportError(); as message) {
+  <app-error-state [message]="message" (retry)="dashboard.loadReport()" />
+} @else if (beforeLaunch(); as message) {
+  <p role="status" class="rounded-box border border-(--sf-info) bg-base-100 p-4 font-medium">
+    {{ message }}
+  </p>
+} @else if (report()?.kpis) {
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="karty">
+    @for (card of cards(); track card.key) {
+      <app-kpi-card
+        [label]="card.label"
+        [value]="card.value"
+        [description]="card.description"
+        [comparison]="card.comparison"
+        [icon]="card.key"
+        [action]="card.action"
+        [hint]="card.hint"
+        (activate)="onCard(card.key)"
+      />
+    }
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-[2fr_1fr]">
+    @if (timeline(); as spec) {
+      <section
+        class="flex min-w-0 flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+        aria-labelledby="pulpit-wykres-czas"
+      >
+        <div>
+          <h2 id="pulpit-wykres-czas" class="text-lg font-semibold">Sprzedaż i koszty w czasie</h2>
+          <p class="text-sm text-(--sf-muted)">{{ periodText() }}, kwoty w zł</p>
+        </div>
+        <app-chart-canvas [spec]="spec" />
+        <div>
+          <button
+            type="button"
+            class="btn btn-sm min-h-11 border-(--sf-border-strong) bg-base-100 font-medium"
+            [attr.aria-expanded]="tableOpen()"
+            [attr.aria-controls]="tableId"
+            (click)="tableOpen.set(!tableOpen())"
+          >
+            {{ tableOpen() ? 'Ukryj dane w tabeli' : 'Pokaż dane w tabeli' }}
+          </button>
+        </div>
+        <div
+          class="overflow-x-auto rounded-box border border-(--sf-secondary)"
+          [id]="tableId"
+          [hidden]="!tableOpen()"
+        >
+          @if (tableOpen()) {
+            <table class="table table-sm">
+              <caption class="sr-only">
+                Sprzedaż i koszty w czasie, dane wykresu
+              </caption>
+              <thead>
+                <tr class="bg-base-200">
+                  <th scope="col">Okres</th>
+                  <th scope="col" class="text-right">Sprzedaż</th>
+                  <th scope="col" class="text-right">Koszty</th>
+                  <th scope="col" class="text-right">Wynik przed wypłatami</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (point of report()?.series ?? []; track point.from) {
+                  <tr>
+                    <th scope="row" class="font-normal">{{ bucketRange(point) }}</th>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(point.sales) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(point.costs) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(point.result) }}
+                    </td>
+                  </tr>
+                }
+              </tbody>
+              @if (report()?.kpis; as kpis) {
+                <tfoot>
+                  <tr class="font-semibold" data-testid="razem">
+                    <th scope="row">Razem</th>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.sales.value) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.costs.value) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.result.value) }}
+                    </td>
+                  </tr>
+                </tfoot>
+              }
+            </table>
+          }
+        </div>
+      </section>
+    }
+
+    <div class="flex min-w-0 flex-col gap-4">
+      @if (channelsChart(); as spec) {
+        <section
+          class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+          aria-labelledby="pulpit-kanaly"
+        >
+          <div>
+            <h2 id="pulpit-kanaly" class="text-lg font-semibold">Sprzedaż według kanałów</h2>
+            <p class="text-sm text-(--sf-muted)">{{ periodText() }}, kwoty w zł</p>
+          </div>
+          <app-chart-canvas [spec]="spec" />
+          <ul class="flex flex-col" data-testid="kanaly">
+            @for (item of report()?.channels ?? []; track item.channel) {
+              <li>
+                <button
+                  type="button"
+                  class="flex min-h-11 w-full items-center justify-between gap-3 rounded-field px-2 text-left hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-(--sf-accent)"
+                  (click)="onChannel(item.channel)"
+                >
+                  <span>{{ channelLabels[item.channel] }}</span>
+                  <span class="tabular-nums">{{ formatPln(item.amount) }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (categoriesChart(); as spec) {
+        <section
+          class="flex flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+          aria-labelledby="pulpit-kategorie"
+        >
+          <div>
+            <h2 id="pulpit-kategorie" class="text-lg font-semibold">Koszty według kategorii</h2>
+            <p class="text-sm text-(--sf-muted)">{{ periodText() }}, kwoty w zł</p>
+          </div>
+          <app-chart-canvas [spec]="spec" />
+          <ul class="flex flex-col" data-testid="kategorie">
+            @for (item of report()?.categories ?? []; track item.category) {
+              <li>
+                @if (categoryLink(item.category); as target) {
+                  <a
+                    class="flex min-h-11 items-center justify-between gap-3 rounded-field px-2 hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-(--sf-accent)"
+                    [routerLink]="target.link"
+                    [queryParams]="target.queryParams"
+                  >
+                    <span>{{ categoryLabels[item.category] }}</span>
+                    <span class="tabular-nums">{{ formatPln(item.amount) }}</span>
+                  </a>
+                }
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+  </div>
+
+  <app-sales-components />
+}

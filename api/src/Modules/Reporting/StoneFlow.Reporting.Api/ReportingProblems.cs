@@ -15,4 +15,15 @@ public static class ReportingProblems
             detail: RangeTooLargeDetail,
             statusCode: StatusCodes.Status422UnprocessableEntity,
             extensions: new Dictionary<string, object?> { ["code"] = RangeTooLargeCode });
+
+    /// <summary>Raport sprzedaży (SF-19): ponad 10 000 składników sprzedaży albo wydatków w okresie.</summary>
+    public const string ReportRangeTooLargeCode = "report_range_too_large";
+
+    public const string ReportRangeTooLargeDetail = "Za dużo danych w wybranym okresie. Wybierz krótszy okres.";
+
+    public static ProblemHttpResult ReportRangeTooLarge() =>
+        TypedResults.Problem(
+            detail: ReportRangeTooLargeDetail,
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            extensions: new Dictionary<string, object?> { ["code"] = ReportRangeTooLargeCode });
 }

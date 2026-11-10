@@ -22,10 +22,13 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
         var expenses = Filter(context.Expenses.AsNoTracking(), criteria);
         var total = await expenses.CountAsync(cancellationToken);
 
+        // Suma brutto całego filtra (SF-19): ten sam predykat co liczba; pusty wynik daje 0.
+        var grossTotal = await expenses.SumAsync(e => e.GrossAmount, cancellationToken);
+
         var skip = (long)(criteria.Page - 1) * criteria.PageSize;
         if (skip >= total)
         {
-            return new ExpenseRowsPage([], total);
+            return new ExpenseRowsPage([], total, grossTotal);
         }
 
         var rows = await Sort(expenses, criteria)
@@ -34,7 +37,7 @@ internal sealed class ExpenseReader(ExpensesDbContext context) : IExpenseReader
             .Select(e => new ExpenseListRowDto(e.Id, e.Description, e.Category, e.Counterparty, e.CostDate, e.DueDate, e.PaidOn, e.GrossAmount, e.RecurringDefinitionId))
             .ToListAsync(cancellationToken);
 
-        return new ExpenseRowsPage(rows, total);
+        return new ExpenseRowsPage(rows, total, grossTotal);
     }
 
     public async Task<ExpenseRecordDto?> GetAsync(Guid id, CancellationToken cancellationToken)
