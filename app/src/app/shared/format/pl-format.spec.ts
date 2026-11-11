@@ -3,6 +3,7 @@ import {
   formatDate,
   formatDateTime,
   formatMonth,
+  formatPercent,
   formatPln,
   formatReadTime,
   formatTime,
@@ -36,6 +37,26 @@ describe('formatPln', () => {
     'shows missing data for %s',
     (value) => {
       expect(formatPln(value)).toBe(NO_DATA);
+    },
+  );
+});
+
+describe('formatPercent', () => {
+  it.each([
+    ['12.5', '+12,5%'],
+    ['-3.0', '-3,0%'],
+    ['0.0', '0,0%'],
+    ['-0.0', '0,0%'],
+    ['100.0', '+100,0%'],
+    ['-33.3', '-33,3%'],
+  ])('formats %s as %s', (value, expected) => {
+    expect(formatPercent(value)).toBe(expected);
+  });
+
+  it.each([null, undefined, '', 'abc', '12', '12,5', '1.25', '+1.0'])(
+    'shows missing data for %s',
+    (value) => {
+      expect(formatPercent(value)).toBe(NO_DATA);
     },
   );
 });

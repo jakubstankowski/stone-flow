@@ -391,6 +391,11 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[CreationRequestId] IS NOT NULL");
 
+                    b.HasIndex("Date")
+                        .HasDatabaseName("IX_SalesCorrections_CorrectedOn");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("Date"), new[] { "Amount", "OrderId" });
+
                     b.HasIndex("OrderId");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("OrderId"), new[] { "Amount" });

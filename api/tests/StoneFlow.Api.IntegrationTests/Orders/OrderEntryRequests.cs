@@ -26,10 +26,10 @@ internal static class OrderEntryRequests
         };
     }
 
-    internal static object Order(string value, string? comment = null, string? version = null) => new
+    internal static object Order(string value, string? comment = null, string? version = null, string orderDate = "2026-10-28", string channel = "olx") => new
     {
-        orderDate = "2026-10-28",
-        channel = "olx",
+        orderDate,
+        channel,
         value,
         fulfillmentStatus = version is null ? null : "inProgress",
         customer = new { kind = "person", name = "Jan Testowy" },

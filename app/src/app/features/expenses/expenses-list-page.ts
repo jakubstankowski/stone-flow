@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { NO_DATA, formatDate, formatPln } from '../../shared/format/pl-format';
 import { Button } from '../../shared/ui/button';
 import { DataTable, DataTableColumn, SortState } from '../../shared/ui/data-table';
@@ -25,10 +25,51 @@ import {
   STATE_FILTER_LABELS,
   isNegativeAmount,
 } from './expense-models';
-import { DATE_RANGE_MESSAGE, ExpensesService, SEARCH_MAX_LENGTH } from './expenses.service';
+import {
+  CostPeriodFilter,
+  DATE_RANGE_MESSAGE,
+  ExpensesService,
+  SEARCH_MAX_LENGTH,
+} from './expenses.service';
 import { ExpensesSubnav } from './expenses-subnav';
 import { RECURRING_MARK } from './recurring-expense-models';
 import { RecurringJobNotice } from './recurring-job-notice';
+
+/** Parametry przejścia z Pulpitu (SF-19): data kosztu od/do i kategorie (powtarzalny). */
+const COST_PERIOD_PARAMS = ['kosztOd', 'kosztDo', 'kategoria'] as const;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export const GROSS_TOTAL_LABEL =
+  'Suma kwot brutto wydatków spełniających filtry; korekty i zwroty od dostawców ją pomniejszają.';
+
+/**
+ * Filtr z parametrów przejścia z Pulpitu albo `null`, gdy żadnego parametru nie ma. Każdy
+ * niepoprawny parametr jest pomijany osobno: data spoza `yyyy-MM-dd` albo nieistniejąca, „od”
+ * późniejsze niż „do” (obie daty pominięte), nieznana kategoria.
+ */
+export function costPeriodFromParams(params: ParamMap): CostPeriodFilter | null {
+  if (!COST_PERIOD_PARAMS.some((name) => params.has(name))) {
+    return null;
+  }
+  let from = validDate(params.get('kosztOd'));
+  let to = validDate(params.get('kosztDo'));
+  // Daty `yyyy-MM-dd` porównują się poprawnie jako tekst.
+  if (from !== '' && to !== '' && from > to) {
+    from = '';
+    to = '';
+  }
+  const requested = params.getAll('kategoria');
+  return {
+    from,
+    to,
+    categories: CATEGORIES.filter((category) => requested.includes(category)),
+  };
+}
+
+function validDate(value: string | null): string {
+  return value !== null && ISO_DATE.test(value) && formatDate(value) !== NO_DATA ? value : '';
+}
 
 const COLUMNS: readonly DataTableColumn<ExpenseListItem>[] = [
   {
@@ -66,7 +107,9 @@ const COLUMNS: readonly DataTableColumn<ExpenseListItem>[] = [
  * Ekran `/wydatki`: jedna strona z API, filtry przy tabeli (na telefonie w panelu „Filtry”),
  * sortowanie przez API. Pusta ewidencja (bez filtrów) pokazuje „Brak wydatków” z akcją.
  * Parametr `wydatekCykliczny` (odczytany raz) ustawia filtr wystąpień jednej definicji; wiersz
- * wystąpienia ma pod opisem tekst „Cykliczny” (SF-16).
+ * wystąpienia ma pod opisem tekst „Cykliczny” (SF-16). Parametry `kosztOd`, `kosztDo` i
+ * `kategoria` (przejście z Pulpitu, SF-19) ustawiają filtr daty kosztu i kategorii; nad tabelą
+ * „Suma brutto” całego filtra z API.
  */
 @Component({
   selector: 'app-expenses-list-page',
@@ -106,6 +149,8 @@ export class ExpensesListPage {
   protected readonly isNegative = isNegativeAmount;
   protected readonly searchMaxLength = SEARCH_MAX_LENGTH;
   protected readonly dateRangeMessage = DATE_RANGE_MESSAGE;
+  protected readonly grossTotalLabel = GROSS_TOTAL_LABEL;
+  protected readonly formatPln = formatPln;
   /** Pusty wynik: przy filtrze daty tekst z design guide §8, w pozostałych przypadkach ogólny. */
   protected readonly filteredEmptyTitle = computed(() =>
     this.expenses.dateFilterActive()
@@ -114,9 +159,13 @@ export class ExpensesListPage {
   );
 
   constructor() {
-    const definitionId = inject(ActivatedRoute).snapshot.queryParamMap.get('wydatekCykliczny');
+    const params = inject(ActivatedRoute).snapshot.queryParamMap;
+    const definitionId = params.get('wydatekCykliczny');
+    const costPeriod = costPeriodFromParams(params);
     if (definitionId) {
       void this.expenses.filterByRecurring(definitionId);
+    } else if (costPeriod) {
+      void this.expenses.filterByCostPeriod(costPeriod);
     } else {
       void this.expenses.load();
     }

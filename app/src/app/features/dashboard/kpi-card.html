@@ -1,0 +1,77 @@
+<article
+  class="flex h-full flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+  [attr.data-kpi]="icon()"
+>
+  @if (link(); as target) {
+    <a
+      class="-m-2 flex flex-col gap-2 rounded-field p-2 hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-(--sf-accent)"
+      [routerLink]="target.link"
+      [queryParams]="target.queryParams"
+    >
+      <ng-container *ngTemplateOutlet="head" />
+    </a>
+  } @else if (button()) {
+    <button
+      type="button"
+      class="-m-2 flex flex-col gap-2 rounded-field p-2 text-left hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-(--sf-accent)"
+      (click)="activate.emit()"
+    >
+      <ng-container *ngTemplateOutlet="head" />
+    </button>
+  } @else {
+    <div class="flex flex-col gap-2">
+      <ng-container *ngTemplateOutlet="head" />
+    </div>
+  }
+  <p class="text-sm text-(--sf-muted)">{{ description() }}</p>
+  <p class="text-sm" data-testid="porownanie">
+    @if (comparison().arrow; as arrow) {
+      <span aria-hidden="true">{{ arrow }}</span>
+    }
+    {{ comparison().text }}
+  </p>
+</article>
+
+<ng-template #head>
+  <span class="flex items-center gap-3">
+    <span
+      class="flex size-10 shrink-0 items-center justify-center rounded-field bg-base-200 text-(--sf-accent-text)"
+      aria-hidden="true"
+    >
+      <svg
+        class="size-5"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        focusable="false"
+      >
+        @switch (icon()) {
+          @case ('sales') {
+            <path d="M3 17l6-6 4 4 8-8" />
+            <path d="M14 7h7v7" />
+          }
+          @case ('costs') {
+            <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z" />
+            <path d="M9 7h6M9 11h6M9 15h4" />
+          }
+          @case ('result') {
+            <path d="M12 3v18M5 7h14" />
+            <path d="M5 7l-3 7h6l-3-7ZM19 7l-3 7h6l-3-7Z" />
+          }
+          @case ('orders') {
+            <path d="M3 7l9-4 9 4-9 4-9-4Z" />
+            <path d="M3 7v10l9 4 9-4V7M12 11v10" />
+          }
+        }
+      </svg>
+    </span>
+    <span class="font-medium">{{ label() }}</span>
+  </span>
+  <span class="text-3xl font-bold tabular-nums" data-testid="wartosc">{{ value() }}</span>
+  @if (hint(); as text) {
+    <span class="text-sm font-medium text-(--sf-accent-text) underline">{{ text }}</span>
+  }
+</ng-template>

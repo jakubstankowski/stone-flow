@@ -1,4 +1,69 @@
 <section class="flex flex-col gap-6">
   <h1 class="text-3xl font-bold">Pulpit</h1>
-  <app-empty-state heading="Ten widok powstanie w kolejnych etapach." />
+
+  <fieldset class="flex flex-col gap-1">
+    <legend class="text-base font-medium">Widok</legend>
+    <div class="join">
+      <input
+        class="btn join-item min-h-11"
+        type="radio"
+        name="pulpit-widok"
+        value="sales"
+        aria-label="Sprzedaż"
+        [checked]="dashboard.view() === 'sales'"
+        (change)="onView('sales')"
+      />
+      <input
+        class="btn join-item min-h-11"
+        type="radio"
+        name="pulpit-widok"
+        value="cashFlow"
+        aria-label="Przepływy pieniężne"
+        [checked]="dashboard.view() === 'cashFlow'"
+        (change)="onView('cashFlow')"
+      />
+    </div>
+  </fieldset>
+
+  @if (dashboard.view() === 'sales') {
+    <app-period-picker
+      [selection]="dashboard.selection()"
+      [errors]="dashboard.selectionErrors()"
+      [rangeError]="dashboard.rangeError()"
+      [yearOptions]="dashboard.yearOptions()"
+      [maxDate]="dashboard.maxDate()"
+      (selectionChange)="onSelection($event)"
+    />
+
+    <div class="flex flex-col gap-2" data-testid="aktualnosc">
+      @if (header(); as text) {
+        <p class="text-lg font-semibold" data-testid="okres">{{ text.period }}</p>
+        @if (text.launch; as launch) {
+          <p
+            class="rounded-box border border-(--sf-info) bg-base-100 p-3"
+            data-testid="uruchomienie"
+          >
+            {{ launch }}
+          </p>
+        }
+        @if (text.comparison; as comparison) {
+          <p class="text-sm" data-testid="opis-porownania">{{ comparison }}</p>
+        }
+        <p class="text-sm text-(--sf-muted)" data-testid="stan-na">{{ text.calculatedAt }}</p>
+        <p class="text-sm text-(--sf-muted)" data-testid="podstawa">{{ text.basis }}</p>
+      }
+      <app-incomplete-data-notice />
+    </div>
+
+    <app-sales-view />
+  } @else {
+    <app-empty-state
+      heading="Widok przepływów pieniężnych powstanie w kolejnym etapie."
+      description="Operacje pieniężne są na liście „Operacje”."
+    >
+      <a class="link font-medium text-(--sf-accent-text)" routerLink="/operacje"
+        >Przejdź do listy „Operacje”</a
+      >
+    </app-empty-state>
+  }
 </section>

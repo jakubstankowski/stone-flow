@@ -93,5 +93,10 @@ internal sealed class SalesCorrectionConfiguration : IEntityTypeConfiguration<Sa
         OrderEntryConfiguration.Configure(builder, Table, "CorrectedOn", _ => { });
 
         builder.Property(correction => correction.Reason).HasMaxLength(SalesCorrection.ReasonMaxLength).IsRequired();
+
+        // Raport sprzedaży (SF-19) filtruje korekty po dacie korekty.
+        builder.HasIndex(correction => correction.Date)
+            .IncludeProperties(correction => new { correction.Amount, correction.OrderId })
+            .HasDatabaseName("IX_SalesCorrections_CorrectedOn");
     }
 }

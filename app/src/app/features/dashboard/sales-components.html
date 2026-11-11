@@ -1,0 +1,76 @@
+<h2 #heading class="text-xl font-semibold focus:outline-none" tabindex="-1" [id]="headingId">
+  Zestawienie składników sprzedaży
+</h2>
+
+<div aria-live="polite">
+  @if (sum(); as value) {
+    <div
+      class="flex flex-col gap-1 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+      data-testid="suma-zestawienia"
+    >
+      <p class="text-lg font-semibold">
+        Suma zestawienia: <span class="tabular-nums">{{ formatPln(value) }}</span>
+      </p>
+      <p class="text-sm text-(--sf-muted)">{{ basisLabel }}</p>
+    </div>
+  }
+</div>
+
+<app-data-table
+  caption="Zestawienie składników sprzedaży"
+  emptyTitle="Brak składników sprzedaży w wybranym okresie"
+  filteredEmptyTitle="Brak składników dla wybranych filtrów"
+  [columns]="columns"
+  [rows]="items()"
+  [rowKey]="rowKey"
+  [total]="total()"
+  [page]="dashboard.page()"
+  [pageSize]="dashboard.pageSize"
+  [sort]="dashboard.sort()"
+  [filters]="dashboard.activeComponentFilters()"
+  [filterable]="true"
+  [loading]="dashboard.componentsLoading()"
+  [error]="dashboard.componentsError()"
+  (pageChange)="onPage($event)"
+  (sortChange)="onSort($event)"
+  (filterRemove)="dashboard.removeComponentFilter($event)"
+  (filtersClear)="dashboard.showAllComponents()"
+  (retry)="dashboard.loadComponents()"
+>
+  <form
+    tableFilters
+    novalidate
+    aria-label="Filtry zestawienia"
+    class="grid gap-4 rounded-box border border-(--sf-secondary) bg-base-100 p-4 md:grid-cols-2"
+    (submit)="$event.preventDefault()"
+  >
+    <app-field label="Kanał" fieldId="zestawienie-kanal">
+      <select #control class="select w-full" (change)="onChannel($event)">
+        <option value="" [selected]="dashboard.channel() === null">Wszystkie</option>
+        @for (channel of channels(); track channel) {
+          <option [value]="channel" [selected]="channel === dashboard.channel()">
+            {{ channelLabels[channel] }}
+          </option>
+        }
+      </select>
+    </app-field>
+    <app-field label="Rodzaj" fieldId="zestawienie-rodzaj">
+      <select #control class="select w-full" (change)="onKind($event)">
+        <option value="" [selected]="dashboard.kind() === null">Wszystkie</option>
+        @for (kind of kinds; track kind) {
+          <option [value]="kind" [selected]="kind === dashboard.kind()">
+            {{ kindLabels[kind] }}
+          </option>
+        }
+      </select>
+    </app-field>
+  </form>
+
+  <ng-template appTableCell="order" [appTableCellOf]="items()" let-row>
+    <a
+      class="link font-medium text-(--sf-accent-text)"
+      [routerLink]="['/zamowienia', row.orderId]"
+      >{{ row.orderNumber }}</a
+    >
+  </ng-template>
+</app-data-table>

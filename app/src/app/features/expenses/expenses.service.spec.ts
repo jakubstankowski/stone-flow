@@ -15,10 +15,10 @@ describe('ExpensesService', () => {
 
   afterEach(() => http.verify());
 
-  function flushList(total = 0): void {
+  function flushList(total = 0, grossTotal = '0.00'): void {
     http
       .expectOne((r) => r.url === '/api/expenses')
-      .flush({ items: [], page: 1, pageSize: 25, total });
+      .flush({ items: [], page: 1, pageSize: 25, total, grossTotal });
   }
 
   it('lists active filters and treats the registry as empty only without filters', async () => {
@@ -46,6 +46,57 @@ describe('ExpensesService', () => {
     flushList();
     await removal;
     expect(service.filters().categories).toEqual([]);
+  });
+
+  it('keeps the gross total from the API across pages and hides it for a changed filter and on error', async () => {
+    const load = service.load();
+    expect(service.grossTotal()).toBeNull();
+    flushList(30, '-150.50');
+    await load;
+    expect(service.grossTotal()).toBe('-150.50');
+
+    const page = service.setPage(2);
+    expect(service.grossTotal()).toBe('-150.50');
+    flushList(30, '-150.50');
+    await page;
+
+    const filtered = service.updateFilters({ state: 'paid' });
+    expect(service.grossTotal()).toBeNull();
+    http.expectOne((r) => r.url === '/api/expenses').error(new ProgressEvent('error'));
+    await filtered;
+    expect(service.grossTotal()).toBeNull();
+  });
+
+  it('filters by the cost period from the dashboard and resets other filters, sort and page', async () => {
+    const setup = service.updateFilters({ search: 'abc', state: 'planned', sign: 'negative' });
+    flushList();
+    await setup;
+    const sorted = service.setSort({ key: 'grossAmount', direction: 'asc' });
+    flushList();
+    await sorted;
+    const paged = service.setPage(3);
+    flushList();
+    await paged;
+
+    const filtered = service.filterByCostPeriod({
+      from: '2026-11-03',
+      to: '2026-11-30',
+      categories: ['vatTax', 'cutting'],
+    });
+    const request = http.expectOne((r) => r.url === '/api/expenses');
+    request.flush({ items: [], page: 1, pageSize: 25, total: 0, grossTotal: '0.00' });
+    await filtered;
+
+    const params = request.request.params;
+    expect(params.get('costDateFrom')).toBe('2026-11-03');
+    expect(params.get('costDateTo')).toBe('2026-11-30');
+    expect(params.getAll('category')).toEqual(['cutting', 'vatTax']);
+    expect(params.get('sort')).toBe('costDate');
+    expect(params.get('direction')).toBe('desc');
+    expect(params.get('page')).toBe('1');
+    expect(params.has('search')).toBe(false);
+    expect(params.has('state')).toBe(false);
+    expect(params.has('sign')).toBe(false);
   });
 
   it('does not ask the API for an inverted payment date range', async () => {

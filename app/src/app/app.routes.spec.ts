@@ -16,11 +16,15 @@ import { OperationsListPage } from './features/operations/operations-list-page';
 import { OrdersListPage } from './features/orders/orders-list-page';
 import { NAV_ITEMS } from './layout/nav-items';
 import { changeHistoryPage } from '../testing/change-history-testing';
+import {
+  beforeLaunchReport,
+  discardReportRequests,
+  salesComponentsPage,
+} from '../testing/dashboard-testing';
 import { discardIntegrationRequests } from '../testing/integration-testing';
 
-/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki”, „Operacje” i „Historia zmian” testują osobne bloki — SF-15, SF-17, SF-18). */
+/** Sekcja: adres, nagłówek, komponent i czy to jeszcze placeholder (SF-14 wypełnia „Integracja”; „Wydatki”, „Operacje”, „Historia zmian” i „Pulpit” testują osobne bloki — SF-15, SF-17, SF-18, SF-19). */
 const SECTIONS: [string, string, Type<unknown>, boolean][] = [
-  ['/pulpit', 'Pulpit', DashboardPage, true],
   ['/integracja', 'Integracja', IntegrationPage, false],
 ];
 
@@ -37,6 +41,7 @@ describe('app routes', () => {
 
   afterEach(() => {
     discardIntegrationRequests();
+    discardReportRequests();
     TestBed.inject(HttpTestingController).verify();
   });
 
@@ -151,6 +156,29 @@ describe('app routes', () => {
         ),
       ).not.toBeNull();
     }
+  });
+
+  it('loads the dashboard at /pulpit with the report requests answered', async () => {
+    await signIn();
+    const harness = await RouterTestingHarness.create();
+    const navigation = harness.navigateByUrl('/pulpit');
+    (await nextRequest((request) => request.url === '/api/reports/sales')).flush(
+      beforeLaunchReport(),
+    );
+    (await nextRequest((request) => request.url === '/api/reports/sales/components')).flush(
+      salesComponentsPage({ sum: null }),
+    );
+    await navigation;
+    await harness.fixture.whenStable();
+
+    expect(harness.routeNativeElement?.tagName.toLowerCase()).toBe('app-shell');
+    expect(harness.routeNativeElement?.querySelector('h1')?.textContent?.trim()).toBe('Pulpit');
+    expect(
+      harness.routeDebugElement?.query((node) => node.componentInstance instanceof DashboardPage),
+    ).not.toBeNull();
+    expect(harness.routeNativeElement?.textContent).not.toContain(
+      'Ten widok powstanie w kolejnych etapach.',
+    );
   });
 
   it('loads the change history section with its list page', async () => {

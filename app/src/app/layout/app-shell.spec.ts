@@ -6,6 +6,7 @@ import { nextRequest, provideTestHttp, signIn } from '../../testing/auth-testing
 import { changeHistoryPage } from '../../testing/change-history-testing';
 import { sectionRoutes } from '../app.routes';
 import { AppShell } from './app-shell';
+import { discardReportRequests } from '../../testing/dashboard-testing';
 import { discardIntegrationRequests } from '../../testing/integration-testing';
 
 describe('AppShell', () => {
@@ -19,6 +20,7 @@ describe('AppShell', () => {
 
   afterEach(() => {
     discardIntegrationRequests();
+    discardReportRequests();
     TestBed.inject(HttpTestingController).verify();
   });
 

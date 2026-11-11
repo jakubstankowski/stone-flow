@@ -47,7 +47,8 @@ public sealed record ExpenseListItemResponse(
     bool Overdue,
     Guid? RecurringDefinitionId);
 
-public sealed record ExpenseListPageResponse(IReadOnlyList<ExpenseListItemResponse> Items, int Page, int PageSize, int Total);
+/// <summary>Strona listy; <c>grossTotal</c> to suma kwot brutto całego filtra (<c>"0.00"</c> dla pustego wyniku).</summary>
+public sealed record ExpenseListPageResponse(IReadOnlyList<ExpenseListItemResponse> Items, int Page, int PageSize, int Total, string GrossTotal);
 
 public sealed record ExpenseDetailsResponse(
     Guid Id,
@@ -92,7 +93,7 @@ internal static class ExpenseContracts
             request.Comment);
 
     public static ExpenseListPageResponse ToResponse(ExpenseListPageDto page) =>
-        new([.. page.Items.Select(ToResponse)], page.Page, page.PageSize, page.Total);
+        new([.. page.Items.Select(ToResponse)], page.Page, page.PageSize, page.Total, ExpenseInput.FormatAmount(page.GrossTotal));
 
     public static ExpenseDetailsResponse ToResponse(ExpenseDetailsDto details)
     {

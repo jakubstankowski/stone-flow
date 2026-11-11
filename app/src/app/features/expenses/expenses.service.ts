@@ -64,6 +64,13 @@ const DEFAULT_SORT: SortState = { key: 'costDate', direction: 'desc' };
 const SORT_KEYS: readonly ExpenseSort[] = ['costDate', 'dueDate', 'paidOn', 'grossAmount'];
 
 export const LIST_ERROR_MESSAGE = 'Nie udało się wczytać wydatków.';
+
+/** Okres kosztu i kategorie z przejścia z Pulpitu (`/wydatki?kosztOd=&kosztDo=&kategoria=`, SF-19). */
+export interface CostPeriodFilter {
+  readonly from: string;
+  readonly to: string;
+  readonly categories: readonly ExpenseCategory[];
+}
 export const DATE_RANGE_MESSAGE = 'Data „od” nie może być późniejsza niż data „do”.';
 
 export type LoadExpenseOutcome =
@@ -101,6 +108,7 @@ export class ExpensesService {
   private readonly filtersState = signal<ExpenseFilters>(EMPTY_FILTERS);
   private readonly itemsState = signal<readonly ExpenseListItem[]>([]);
   private readonly totalState = signal(0);
+  private readonly grossTotalState = signal<string | null>(null);
   private readonly loadingState = signal(false);
   private readonly errorState = signal<string | null>(null);
   private readonly loadedState = signal(false);
@@ -113,6 +121,11 @@ export class ExpensesService {
   readonly filters = this.filtersState.asReadonly();
   readonly items = this.itemsState.asReadonly();
   readonly total = this.totalState.asReadonly();
+  /**
+   * Suma brutto całego filtra z API (SF-19); `null` przy błędzie i w trakcie odczytu zmienionego
+   * filtra (bez fikcyjnego zera). Zmiana strony i sortowania jej nie chowa — suma jest ta sama.
+   */
+  readonly grossTotal = this.grossTotalState.asReadonly();
   readonly loading = this.loadingState.asReadonly();
   readonly error = this.errorState.asReadonly();
   readonly loaded = this.loadedState.asReadonly();
@@ -180,12 +193,16 @@ export class ExpensesService {
       this.activeFilters().length === 0,
   );
 
-  async load(): Promise<void> {
+  async load(keepGrossTotal = false): Promise<void> {
     const seq = ++this.requestSeq;
+    if (!keepGrossTotal) {
+      this.grossTotalState.set(null);
+    }
     if (this.costDateRangeInvalid() || this.paidOnRangeInvalid()) {
       // API odrzuca „od” późniejsze niż „do”; formularz filtrów pokazuje błąd przy polu.
       this.itemsState.set([]);
       this.totalState.set(0);
+      this.grossTotalState.set(null);
       this.errorState.set(null);
       this.loadingState.set(false);
       return;
@@ -199,12 +216,14 @@ export class ExpensesService {
       }
       this.itemsState.set(result.items);
       this.totalState.set(result.total);
+      this.grossTotalState.set(result.grossTotal);
       this.loadedState.set(true);
     } catch {
       if (seq !== this.requestSeq) {
         return;
       }
       this.itemsState.set([]);
+      this.grossTotalState.set(null);
       this.errorState.set(LIST_ERROR_MESSAGE);
     } finally {
       if (seq === this.requestSeq) {
@@ -215,7 +234,7 @@ export class ExpensesService {
 
   setPage(page: number): Promise<void> {
     this.pageState.set(Math.max(1, Math.floor(page)));
-    return this.load();
+    return this.load(true);
   }
 
   setSort(sort: SortState): Promise<void> {
@@ -224,7 +243,7 @@ export class ExpensesService {
     }
     this.sortState.set(sort);
     this.pageState.set(1);
-    return this.load();
+    return this.load(true);
   }
 
   /** Każda zmiana filtra wraca do pierwszej strony. */
@@ -265,6 +284,23 @@ export class ExpensesService {
     this.recurringDescription.set(undefined);
     const list = this.updateFilters({ ...EMPTY_FILTERS, recurringDefinitionId: definitionId });
     await Promise.all([list, this.loadRecurringDescription(definitionId)]);
+  }
+
+  /**
+   * Filtr z przejścia z Pulpitu (karta „Koszty”, wiersz kategorii): data kosztu i kategorie, a
+   * pozostałe filtry, sortowanie i strona wracają do domyślnych. Suma brutto listy jest wtedy
+   * równa wartości karty albo kategorii.
+   */
+  filterByCostPeriod(filter: CostPeriodFilter): Promise<void> {
+    this.filtersState.set({
+      ...EMPTY_FILTERS,
+      costDateFrom: filter.from,
+      costDateTo: filter.to,
+      categories: CATEGORIES.filter((category) => filter.categories.includes(category)),
+    });
+    this.sortState.set(DEFAULT_SORT);
+    this.pageState.set(1);
+    return this.load();
   }
 
   private async loadRecurringDescription(definitionId: string): Promise<void> {

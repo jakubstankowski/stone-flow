@@ -6,6 +6,7 @@ using StoneFlow.Orders.Application.ShopSync;
 using StoneFlow.Orders.Domain.Payments;
 using StoneFlow.Orders.Infrastructure.Persistence;
 using StoneFlow.Shared.Application.Operations;
+using StoneFlow.Shared.Application.Sales;
 using StoneFlow.Shared.Application.ShopOrders;
 using StoneFlow.Shared.Infrastructure.Cqrs;
 using StoneFlow.Shared.Infrastructure.Persistence;
@@ -36,6 +37,9 @@ public static class DependencyInjection
 
         // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
         services.AddScoped<ICashOperationSource, OrderCashOperationSource>();
+
+        // Kontrakt z jedną implementacją (SF-19): składniki sprzedaży dla raportu.
+        services.AddScoped<ISalesComponentSource, OrderSalesComponentSource>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);
 
