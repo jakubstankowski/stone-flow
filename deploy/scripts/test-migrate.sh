@@ -13,6 +13,8 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
+# shellcheck source=sql-common.sh
+source deploy/scripts/sql-common.sh
 : "${STONEFLOW_TEST_SQLSERVER:?Brak STONEFLOW_TEST_SQLSERVER}"
 : "${SQLCMD:?Brak SQLCMD}"
 
@@ -20,26 +22,9 @@ run_id="$(date +%s)$$"
 db_ok="StoneFlowDeployTest_ok_${run_id}"
 db_fail="StoneFlowDeployTest_fail_${run_id}"
 
-sql() { # sql <baza> <zapytanie> → wynik bez nagłówków
-  $SQLCMD -d "$1" -h -1 -W -b -Q "SET NOCOUNT ON; $2" | tr -d '\r' | sed '/^$/d'
-}
-
-connection_for() { # connection string do wskazanej bazy (zastępuje/dodaje Database=)
-  local part key result=""
-  local -a parts
-  IFS=';' read -ra parts <<<"$STONEFLOW_TEST_SQLSERVER"
-  for part in "${parts[@]}"; do
-    key="${part%%=*}"
-    key="$(printf '%s' "$key" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
-    [[ -z "$key" || "$key" == "database" || "$key" == "initialcatalog" ]] && continue
-    result+="${part};"
-  done
-  printf '%sDatabase=%s' "$result" "$1"
-}
-
 cleanup() {
   for db in "$db_ok" "$db_fail"; do
-    sql master "IF DB_ID('${db}') IS NOT NULL BEGIN ALTER DATABASE [${db}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [${db}]; END" >/dev/null || true
+    drop_database "$db" || true
   done
 }
 trap cleanup EXIT
