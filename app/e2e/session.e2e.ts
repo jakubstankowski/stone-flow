@@ -4,6 +4,7 @@
 // npx playwright test --project=session --no-deps
 import { expect, test } from '@playwright/test';
 import { OWNER_EMAIL, ownerPassword } from './support/env';
+import { fillSecret } from './support/ui';
 
 test('złe hasło, logowanie i wygaśnięcie sesji po wylogowaniu z innego urządzenia', async ({
   browser,
@@ -12,7 +13,7 @@ test('złe hasło, logowanie i wygaśnięcie sesji po wylogowaniu z innego urzą
   const a = await first.newPage();
   await a.goto('/logowanie');
   await a.getByLabel('E-mail').fill(OWNER_EMAIL);
-  await a.getByLabel('Hasło').fill(`${ownerPassword()}-zle`);
+  await fillSecret(a.getByLabel('Hasło'), `${ownerPassword()}-zle`);
   await a.getByRole('button', { name: 'Zaloguj' }).click();
   // Komunikat ogólny: nie wskazuje, czy błędny jest e-mail, czy hasło.
   await expect(
@@ -20,7 +21,7 @@ test('złe hasło, logowanie i wygaśnięcie sesji po wylogowaniu z innego urzą
   ).toBeVisible();
   await expect(a).toHaveURL(/\/logowanie/);
 
-  await a.getByLabel('Hasło').fill(ownerPassword());
+  await fillSecret(a.getByLabel('Hasło'), ownerPassword());
   await a.getByRole('button', { name: 'Zaloguj' }).click();
   await expect(a).toHaveURL(/\/pulpit$/);
   await expect(a.locator('[data-kpi]').first()).toBeVisible();
@@ -29,7 +30,7 @@ test('złe hasło, logowanie i wygaśnięcie sesji po wylogowaniu z innego urzą
   const b = await second.newPage();
   await b.goto('/logowanie');
   await b.getByLabel('E-mail').fill(OWNER_EMAIL);
-  await b.getByLabel('Hasło').fill(ownerPassword());
+  await fillSecret(b.getByLabel('Hasło'), ownerPassword());
   await b.getByRole('button', { name: 'Zaloguj' }).click();
   await expect(b).toHaveURL(/\/pulpit$/);
   await b.getByRole('button', { name: 'Wyloguj' }).click();

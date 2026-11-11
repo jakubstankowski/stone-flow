@@ -2,7 +2,7 @@
 
 > Manifest zaktualizowany po przeglądzie kodu (`05-code-review.md`: **PASS WITH ISSUES**). Przegląd
 > znalazł jeden błąd krytyczny (C-1, `docker exec -i` w pętli `verify-restore.sh`), poprawiony razem z
-> T-1, N-3 i N-4; uwagi N-1, N-2, T-2 zostają otwarte (Open Items).
+> T-1, N-3 i N-4, a po przeglądzie także N-2 (`fillSecret`); uwagi N-1 i T-2 zostają otwarte (Open Items).
 
 ## Summary
 
@@ -180,8 +180,9 @@ przebiegiem. Pełny przebieg na świeżej bazie przeszedł bez ponowień.
 - `verify-restore.sh` i `test-verify-restore.sh` ustawiają `SET QUOTED_IDENTIFIER ON` dla `DBCC
   CHECKDB` i wstawiania danych (tabele z indeksami filtrowanymi).
 - Instrukcja lokalnego E2E w `.sdd/context/conventions.md` (Verification) zamiast w README (D-6).
-- Hasło właściciela E2E trafia do raportu HTML Playwright (tytuł kroku `Fill "…"`), wbrew
-  rozstrzygnięciu planu „hasło nie trafia na dysk” — uwaga N-2 przeglądu, otwarta.
+- N-2 (poprawione po przeglądzie): hasło właściciela E2E wpisuje `fillSecret` (`app/e2e/support/ui.ts`)
+  przez `evaluate()`, więc nie trafia do tytułu kroku `Fill "…"` w raporcie HTML. Pełny przebieg E2E
+  po poprawce (LocalDB, porty 5280/4400): 27/27.
 
 ## Additional Implementation
 
@@ -197,8 +198,7 @@ Additional implementation not covered by the original documents:
    odtworzenie do właściwej bazy i częściowy revert), `verify-restore.sh` (brak `REPLACE`, sprzątanie,
    brak wypisywania danych), zadanie `e2e` bez sekretów, brak danych identyfikujących.
 2. Uwagi otwarte z przeglądu kodu (`05-code-review.md`): **N-1** kontrola reguły gitleaks w `secrets`
-   nie sprawdza `RuleID` (zalecenie: raport JSON i `grep` na `woocommerce-rest-key`); **N-2** hasło
-   konta testowego E2E w `playwright-report` (artefakt CI przy błędzie) — decyzja autora; **T-2**
+   nie sprawdza `RuleID` (zalecenie: raport JSON i `grep` na `woocommerce-rest-key`); **N-2** poprawione (`fillSecret`); **T-2**
    asercja negatywna w `expenses.e2e.ts` przed opłaceniem może przejść przed wczytaniem listy.
 3. Push gałęzi, PR i zielone CI: `backend`, `frontend`, `secrets`, `deploy-dry-run`, `e2e` — nie
    uruchomione. W CI odnotować testy E2E zielone dopiero przy ponowieniu (niestabilne).

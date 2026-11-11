@@ -121,3 +121,17 @@ export async function dashboardCards(
 export function rowWith(page: Page, text: string | RegExp): Locator {
   return page.getByRole('row').filter({ hasText: text });
 }
+
+/**
+ * Wpisuje wartość poufną (hasło) bez śladu w raporcie: `fill()` zapisuje wartość w tytule kroku
+ * („Fill "…"”), a argumenty `evaluate()` nie trafiają do raportu ani do śladu.
+ */
+export async function fillSecret(input: Locator, value: string): Promise<void> {
+  await input.evaluate((element, secret) => {
+    const control = element as HTMLInputElement;
+    control.focus();
+    control.value = secret;
+    control.dispatchEvent(new Event('input', { bubbles: true }));
+    control.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}

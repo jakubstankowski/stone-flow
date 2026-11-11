@@ -52,7 +52,7 @@ None. (Błąd krytyczny C-1 dotyczy poprawności — sekcja „Correctness Issue
    `--report-format json --report-path "$RUNNER_TEMP/gitleaks-rule.json"` i `grep` na
    `"RuleID": "woocommerce-rest-key"`. **Otwarte** — gitleaks nie jest dostępny lokalnie, więc zmiany
    kroku nie dało się sprawdzić przed CI.
-2. **N-2 — hasło właściciela E2E trafia do raportu HTML Playwright.** Playwright 1.64 zapisuje tytuł
+2. **N-2 — hasło właściciela E2E trafia do raportu HTML Playwright.** **Rozwiązane po przeglądzie:** `fillSecret` w `app/e2e/support/ui.ts` wpisuje hasło przez `evaluate()`; E2E 27/27. Playwright 1.64 zapisuje tytuł
    kroku `Fill "{value}"` (`Frame.fill` w `playwright-core/lib/coreBundle.js`), więc
    `app/e2e/auth.setup.ts:9` i `app/e2e/session.e2e.ts:15,23,32` wpisują hasło jawnym tekstem do
    `app/playwright-report/index.html` (sprawdzone na lokalnym przebiegu `setup`). W CI raport jest
