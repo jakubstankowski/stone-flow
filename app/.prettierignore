@@ -4,3 +4,6 @@ coverage/
 node_modules/
 package-lock.json
 .vercel/
+/playwright-report
+/test-results
+/e2e/.auth
