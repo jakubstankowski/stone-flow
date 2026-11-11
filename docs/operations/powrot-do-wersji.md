@@ -55,7 +55,9 @@ done
 git commit -m "revert: <opis> (bez migracji <nazwa>)"
 ```
 
-- Warunek konieczny: brak oczekujących zmian modelu w każdym kontekście. W przeciwnym razie
+- Warunek konieczny: brak oczekujących zmian modelu w każdym kontekście — każde polecenie pętli
+  musi zakończyć się kodem 0. Jeśli którekolwiek zgłosi zmiany modelu, **nie rób commita** (pętla
+  nie przerywa się sama) i przejdź do fix forward. W przeciwnym razie
   `dotnet ef database update` w `migrate.sh` zatrzyma publikację na ostrzeżeniu o zmianach modelu.
 - Zielone `deploy-dry-run` na PR revertu potwierdza, że migracje przechodzą.
 - **Fix forward zamiast revertu**, gdy migracja była krokiem „contract” (usunięcie kolumny lub

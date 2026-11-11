@@ -1,7 +1,8 @@
 # Implementation done — SF-21
 
-> Manifest dostawy spisany **przed przeglądem kodu** (`05-code-review.md` jeszcze nie istnieje).
-> Po przeglądzie zostanie zaktualizowany (wynik przeglądu, poprawki, otwarte uwagi).
+> Manifest zaktualizowany po przeglądzie kodu (`05-code-review.md`: **PASS WITH ISSUES**). Przegląd
+> znalazł jeden błąd krytyczny (C-1, `docker exec -i` w pętli `verify-restore.sh`), poprawiony razem z
+> T-1, N-3 i N-4; uwagi N-1, N-2, T-2 zostają otwarte (Open Items).
 
 ## Summary
 
@@ -27,7 +28,7 @@
 | Requirement | Status | Note |
 |---|---|---|
 | A. Procedura kopii i odtworzenia | Implemented | `docs/operations/kopie-i-odtworzenie.md`; kroki hostingowe otwarte dla właściciela |
-| B. `verify-restore.sh` + `test-verify-restore.sh` w `deploy-dry-run` | Implemented | lokalnie na LocalDB przeszło (sekcja Verification) |
+| B. `verify-restore.sh` + `test-verify-restore.sh` w `deploy-dry-run` | Implemented | po poprawce C-1 z przeglądu (stdin `docker exec -i`); lokalnie na LocalDB przeszło także z symulacją `docker exec -i` (sekcja Verification) |
 | C. Powrót do działającej wersji | Implemented | `powrot-do-wersji.md` ze ścieżką częściowego revertu commitu z migracją |
 | D. Data uruchomienia | Implemented | `data-uruchomienia.md`; bez zmian kodu, dowód `LaunchDateStartupTests` |
 | E. Checklista odbioru | Implemented | `odbior-mvp.md`: 7 kryteriów SF-21, PRD §11, 9 pozycji design guide §10, pozycje właściciela; linki CI jako placeholder |
@@ -60,6 +61,8 @@
 ### Modified
 
 - `deploy/scripts/test-migrate.sh`
+- po przeglądzie kodu: `deploy/scripts/sql-common.sh`, `deploy/scripts/verify-restore.sh`,
+  `deploy/scripts/test-verify-restore.sh`, `docs/operations/powrot-do-wersji.md`
 - `.gitleaks.toml`, `.github/workflows/ci.yml`, `.github/workflows/deploy.yml`
 - `app/package.json`, `app/package-lock.json`, `app/angular.json`, `app/.gitignore`, `app/.prettierignore`
 - `app/src/app/features/orders/order-details-page.html`
@@ -114,7 +117,7 @@ None.
 | H-15 `Change_of_a_past_period_is_explained_by_change_history` | Exists | Passed (LocalDB) |
 | `LaunchDateStartupTests` (bez zmian) | Exists | Passed (LocalDB, razem z H: 21/21) |
 | M-1 `test-migrate.sh` po refaktorze | Exists | Passed (LocalDB) |
-| R-1…R-5 `test-verify-restore.sh` | Exists | Passed (LocalDB, 4 przypadki + sprzątanie) |
+| R-1…R-5 `test-verify-restore.sh` | Exists | Passed (LocalDB, 4 przypadki + sprzątanie); po poprawce C-1 Passed też z `SQLCMD` czytającym stdin (symulacja `docker exec -i`), przed poprawką ten wariant Failed (`Msg 1834`) |
 | G-1 kontrola reguły gitleaks | Exists | odpowiednik lokalnie: gitleaks 8.30.1 wykrył próbkę (kod 1), próbka 39 znaków nie (kod 0); krok CI Not run |
 | S-1…S-5 `check-bundle-secrets.test.mjs` | Exists | Passed (`npm run test:scripts` 20/20) |
 | S-6 skan `dist` | Exists | Passed (44 pliki) |
@@ -131,7 +134,11 @@ None.
 | `dotnet test … --filter-class …MvpFinancialScenariosTests --filter-class …LaunchDateStartupTests` (LocalDB) | Passed (21/21) |
 | `dotnet test --solution stone-flow.slnx` (pełny) | Not run — zostawione dla CI (ponad 20 min, plan V-L) |
 | `deploy/scripts/test-migrate.sh` (LocalDB) | Passed |
-| `deploy/scripts/test-verify-restore.sh` (LocalDB, `RESTORE_TEST_DIR` w `%LOCALAPPDATA%\Temp`) | Passed |
+| `deploy/scripts/test-verify-restore.sh` (LocalDB, `RESTORE_TEST_DIR` w `%LOCALAPPDATA%\Temp`) | Passed (przed przeglądem i ponownie po poprawkach C-1/T-1) |
+| `deploy/scripts/test-verify-restore.sh` z `SQLCMD` = wrapper czytający stdin (symulacja `docker exec -i`, przegląd) | Failed przed poprawką C-1 (`Msg 1834`); Passed po poprawce |
+| `deploy/scripts/test-migrate.sh` po zmianie `sql-common.sh` (przegląd) | Passed |
+| `dotnet test … MvpFinancialScenariosTests` + `LaunchDateStartupTests` po przeglądzie | Passed (21/21) |
+| `npx playwright test e2e/expenses.e2e.ts` (porty 5280/4400, przegląd) | Passed (3/3) |
 | `npm run typecheck` | Passed |
 | `npm run lint` | Passed |
 | `npm run format:check` | Passed |
@@ -173,6 +180,8 @@ przebiegiem. Pełny przebieg na świeżej bazie przeszedł bez ponowień.
 - `verify-restore.sh` i `test-verify-restore.sh` ustawiają `SET QUOTED_IDENTIFIER ON` dla `DBCC
   CHECKDB` i wstawiania danych (tabele z indeksami filtrowanymi).
 - Instrukcja lokalnego E2E w `.sdd/context/conventions.md` (Verification) zamiast w README (D-6).
+- Hasło właściciela E2E trafia do raportu HTML Playwright (tytuł kroku `Fill "…"`), wbrew
+  rozstrzygnięciu planu „hasło nie trafia na dysk” — uwaga N-2 przeglądu, otwarta.
 
 ## Additional Implementation
 
@@ -187,7 +196,10 @@ Additional implementation not covered by the original documents:
 1. **Human review required before merge** (risk `high`): procedury `docs/operations/*` (zwłaszcza
    odtworzenie do właściwej bazy i częściowy revert), `verify-restore.sh` (brak `REPLACE`, sprzątanie,
    brak wypisywania danych), zadanie `e2e` bez sekretów, brak danych identyfikujących.
-2. Przegląd kodu (`sdd-review-code SF-21`) — `05-code-review.md` nie istnieje; manifest do aktualizacji.
+2. Uwagi otwarte z przeglądu kodu (`05-code-review.md`): **N-1** kontrola reguły gitleaks w `secrets`
+   nie sprawdza `RuleID` (zalecenie: raport JSON i `grep` na `woocommerce-rest-key`); **N-2** hasło
+   konta testowego E2E w `playwright-report` (artefakt CI przy błędzie) — decyzja autora; **T-2**
+   asercja negatywna w `expenses.e2e.ts` przed opłaceniem może przejść przed wczytaniem listy.
 3. Push gałęzi, PR i zielone CI: `backend`, `frontend`, `secrets`, `deploy-dry-run`, `e2e` — nie
    uruchomione. W CI odnotować testy E2E zielone dopiero przy ponowieniu (niestabilne).
 4. Linki do przebiegów CI w `odbior-mvp.md` (placeholder `<link do przebiegu CI — uzupełnia właściciel po merge>`).

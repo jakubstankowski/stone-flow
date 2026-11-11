@@ -66,7 +66,7 @@ schema_of() { # AccessDbContext → access
 }
 
 echo "== Odczyt kopii"
-if ! filelist="$($SQLCMD -d master -h -1 -W -s '|' -b -Q "SET NOCOUNT ON; RESTORE FILELISTONLY FROM DISK = N'${backup}';" 2>&1 | tr -d '\r')"; then
+if ! filelist="$($SQLCMD -d master -h -1 -W -s '|' -b -Q "SET NOCOUNT ON; RESTORE FILELISTONLY FROM DISK = N'${backup}';" </dev/null 2>&1 | tr -d '\r')"; then
   printf '%s\n' "$filelist" >&2
   fail "Krok „Odczyt kopii”: plik nie istnieje albo nie jest kopią SQL Server."
 fi
@@ -79,13 +79,14 @@ while IFS='|' read -r logical _physical type _rest; do
     L) dir_property="InstanceDefaultLogPath"; ext="ldf" ;;
     *) fail "Krok „Odczyt kopii”: nieobsługiwany typ pliku w kopii (${type})." ;;
   esac
-  dir="$(sql master "SELECT CAST(SERVERPROPERTY('${dir_property}') AS nvarchar(4000));")"     || fail "Krok „Odtworzenie”: nie udało się odczytać ${dir_property}."
+  dir="$(sql master "SELECT CAST(SERVERPROPERTY('${dir_property}') AS nvarchar(4000));")" \
+    || fail "Krok „Odtworzenie”: nie udało się odczytać ${dir_property}."
   [[ -n "$dir" && "$dir" != "NULL" ]] || fail "Krok „Odtworzenie”: serwer nie podaje katalogu ${dir_property}."
   n=$((n + 1))
   moves+="${moves:+, }MOVE N'${logical//\'/\'\'}' TO N'${dir}${db}_${n}.${ext}'"
 done <<<"$filelist"
 [[ "$n" -gt 0 ]] || fail "Krok „Odczyt kopii”: plik nie istnieje albo nie jest kopią SQL Server."
-if ! output="$($SQLCMD -d master -b -Q "RESTORE VERIFYONLY FROM DISK = N'${backup}';" 2>&1 | tr -d '\r')"; then
+if ! output="$($SQLCMD -d master -b -Q "RESTORE VERIFYONLY FROM DISK = N'${backup}';" </dev/null 2>&1 | tr -d '\r')"; then
   printf '%s\n' "$output" >&2
   fail "Krok „Odczyt kopii”: kopia jest nieczytelna (RESTORE VERIFYONLY)."
 fi
@@ -94,7 +95,7 @@ echo "== Odtworzenie do bazy roboczej ${db}"
 [[ "$(sql master "SELECT CASE WHEN DB_ID('${db}') IS NULL THEN 0 ELSE 1 END;")" == "0" ]] \
   || { echo "::error::Krok „Odtworzenie”: baza ${db} już istnieje — skrypt jej nie nadpisuje."; exit 1; }
 restore_started=1
-if ! output="$($SQLCMD -d master -b -Q "RESTORE DATABASE [${db}] FROM DISK = N'${backup}' WITH ${moves};" 2>&1 | tr -d '\r')"; then
+if ! output="$($SQLCMD -d master -b -Q "RESTORE DATABASE [${db}] FROM DISK = N'${backup}' WITH ${moves};" </dev/null 2>&1 | tr -d '\r')"; then
   printf '%s\n' "$output" >&2
   if grep -q 'Msg 3169,' <<<"$output"; then
     fail "Krok „Odtworzenie”: kopia pochodzi z nowszej wersji SQL Server niż serwer próby — użyj zgodnego obrazu (patrz docs/operations/kopie-i-odtworzenie.md)."

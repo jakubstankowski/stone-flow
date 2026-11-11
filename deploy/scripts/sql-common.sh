@@ -7,8 +7,10 @@
 #            "docker exec -i <id> /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ...";
 #   STONEFLOW_TEST_SQLSERVER — connection string do tego serwera (bez bazy lub z master).
 
+# Każde wywołanie $SQLCMD dostaje stdin z /dev/null: `docker exec -i` (CI, wariant Docker) czyta
+# stdin rodzica, więc w pętli `while read … done <<<…` zjadłby pozostałe wiersze pętli.
 sql() { # sql <baza> <zapytanie> → wynik bez nagłówków
-  $SQLCMD -d "$1" -h -1 -W -b -Q "SET NOCOUNT ON; $2" | tr -d '\r' | sed '/^$/d'
+  $SQLCMD -d "$1" -h -1 -W -b -Q "SET NOCOUNT ON; $2" </dev/null | tr -d '\r' | sed '/^$/d'
 }
 
 connection_for() { # connection string do wskazanej bazy (zastępuje/dodaje Database=)

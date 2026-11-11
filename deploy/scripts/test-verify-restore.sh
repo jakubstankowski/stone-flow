@@ -91,6 +91,8 @@ while read -r table count; do
   rows=$((rows + 1))
 done < <(sed -n 's/^Wiersze \([^:]*\): \([0-9]*\)$/\1 \2/p' "$log")
 [[ "$rows" -gt 0 ]] || fail "verify-restore.sh nie wypisał liczby wierszy tabel głównych."
+# Każdy wypisany wiersz „Wiersze …” został porównany (pętla nie może skończyć się wcześniej).
+[[ "$rows" -eq "$(grep -c '^Wiersze ' "$log")" ]] || fail "Porównano ${rows} tabel z wyjścia verify-restore.sh, a wypisano więcej."
 grep -qx 'Wiersze expenses.OwnerWithdrawals: 2' "$log" || fail "Brak 2 wierszy expenses.OwnerWithdrawals w odtworzonej kopii."
 expect_no_work_database "kopia pełna"
 
