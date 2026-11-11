@@ -127,6 +127,9 @@ jobs:
       - name: Brak sekretów w pakiecie frontendu
         run: '"${{ steps.gitleaks.outputs.path }}" dir .vercel/output/static --config .gitleaks.toml --redact --verbose --exit-code 1'
 
+      - name: Brak wzorców sekretów w pakiecie (skrypt)
+        run: node app/scripts/check-bundle-secrets.mjs .vercel/output/static
+
       - name: Vercel — publikacja
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

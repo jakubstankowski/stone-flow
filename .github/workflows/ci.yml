@@ -97,6 +97,9 @@ jobs:
       - name: Brak sekretów w pakiecie frontendu
         run: '"${{ steps.gitleaks.outputs.path }}" dir dist --config ../.gitleaks.toml --redact --verbose --exit-code 1'
 
+      - name: Brak wzorców sekretów w pakiecie (skrypt)
+        run: node scripts/check-bundle-secrets.mjs dist
+
   secrets:
     name: secrets
     runs-on: ubuntu-latest
