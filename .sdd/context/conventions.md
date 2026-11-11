@@ -315,6 +315,7 @@ the `app` prefix (`app-data-table`), enforced by ESLint.
 | `layout/` | Application shell, main navigation (`nav-items.ts` is the single list of sections), page title strategy |
 | `shared/ui/` | Reusable UI elements: `app-button`, `app-field`, `app-confirm-dialog`, `app-data-table`, `app-status-badge`, `app-loading-state`, `app-empty-state`, `app-error-state` |
 | `shared/format/` | Polish formatting functions and pipes (`plnAmount`, `plDate`, `plMonth`, `plDateTime`; `formatTime`, `formatReadTime` without pipes) |
+| `shared/dictionaries/` | Code-to-label dictionaries used by more than one feature area (expense categories, payment methods, order dictionaries, shop status); feature models re-export them under their own names, and feature areas never import each other |
 
 Routes use Polish slugs without diacritics (`/pulpit`, `/zamowienia`, `/wydatki`, `/operacje`,
 `/historia-zmian`, `/integracja`), with `title` and `data.section` equal to the section label.
@@ -336,6 +337,8 @@ specifics are in `docs/DESIGN-GUID-stone-flow.md` section 6. Before adding a new
   events; it never sorts or pages locally. Filters are projected with the `tableFilters`
   attribute. A column shows text from `value(row)`, or any content (status, link to the object,
   marker) from `<ng-template appTableCell="{key}" [appTableCellOf]="rows" let-row>`.
+  `[mobileCards]="true"` (off by default) turns rows into cards below `md`, with the column
+  header shown in every cell; other lists keep the plain table.
 - Headings of empty states and dialogs are passed as `heading`, never `title` (a `title` input
   would leave a native tooltip on the host element).
 - Statuses use `app-status-badge` with visible text; the tone only reinforces it.

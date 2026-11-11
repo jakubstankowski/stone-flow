@@ -23,7 +23,7 @@ import {
   STATUS_TONES,
 } from './order-models';
 import { ChangeOrderOutcome, OrdersService } from './orders.service';
-import { shopStatusLabel } from './shop-status';
+import { shopStatusLabel } from '../../shared/dictionaries/shop-status';
 
 export const CONFLICT_MESSAGE = 'Zamówienie zostało zmienione w międzyczasie.';
 const STATE_CHANGED_MESSAGE = 'Stan zamówienia zmienił się w międzyczasie.';

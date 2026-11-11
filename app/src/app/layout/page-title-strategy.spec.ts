@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Title } from '@angular/platform-browser';
 import { TitleStrategy, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { provideTestHttp, signIn, signOut } from '../../testing/auth-testing';
+import { nextRequest, provideTestHttp, signIn, signOut } from '../../testing/auth-testing';
+import { changeHistoryPage } from '../../testing/change-history-testing';
 import { routes } from '../app.routes';
 import { PageTitleStrategy } from './page-title-strategy';
 import { discardIntegrationRequests } from '../../testing/integration-testing';
@@ -27,7 +28,11 @@ describe('PageTitleStrategy', () => {
   it('sets the document title to "{section} · Stone Flow"', async () => {
     await signIn();
     const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/historia-zmian');
+    const navigation = harness.navigateByUrl('/historia-zmian');
+    (await nextRequest((request) => request.url === '/api/change-history')).flush(
+      changeHistoryPage(),
+    );
+    await navigation;
 
     expect(TestBed.inject(Title).getTitle()).toBe('Historia zmian · Stone Flow');
   });
