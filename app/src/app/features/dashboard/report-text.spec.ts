@@ -7,6 +7,7 @@ import {
   beforeLaunchMessage,
   bucketLabel,
   bucketRange,
+  cashFlowBasisLabel,
   comparisonDescription,
   countComparisonText,
   launchNotice,
@@ -42,6 +43,16 @@ describe('report text', () => {
     expect(basisLabel('2026-11-03')).toBe(
       'Kwoty brutto w PLN. Raporty obejmują dane od 03.11.2026.',
     );
+  });
+
+  it('labels the cash flow basis with the launch date and without profit or balance words', () => {
+    const label = cashFlowBasisLabel('2026-11-03');
+
+    expect(label).toBe(
+      'Kwoty brutto w PLN według daty operacji pieniężnej: wpłaty, zwrotu, zapłaty wydatku albo wypłaty. Raporty obejmują dane od 03.11.2026.',
+    );
+    expect(label.toLowerCase()).not.toContain('zysk');
+    expect(label.toLowerCase()).not.toContain('saldo');
   });
 
   it('describes the comparison of a month in progress, a year in progress and other periods', () => {

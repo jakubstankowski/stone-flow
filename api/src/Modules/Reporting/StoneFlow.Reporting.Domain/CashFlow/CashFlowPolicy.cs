@@ -19,6 +19,15 @@ public enum CashDirection
 /// </summary>
 public static class CashFlowPolicy
 {
+    /// <summary>
+    /// Rodzaje wypływów w kolejności podziału „Wypływy według rodzaju” (PRD §5, SF-20): opłacone
+    /// wydatki, wypłaty właścicieli, zwroty. To kolejność prezentacji podziału — inna niż kolejność
+    /// remisu listy „Operacje” (kolejność deklaracji <see cref="CashOperationKind"/>); każda reguła
+    /// ma jedno miejsce. Zawiera każdy rodzaj o kierunku <see cref="CashDirection.Outflow"/>.
+    /// </summary>
+    public static IReadOnlyList<CashOperationKind> OutflowKinds { get; } =
+        [CashOperationKind.PaidExpense, CashOperationKind.OwnerWithdrawal, CashOperationKind.Refund];
+
     /// <summary>Wpłata to wpływ; zwrot, opłacony wydatek i wypłata właściciela to wypływy.</summary>
     public static CashDirection DirectionOf(CashOperationKind kind) => kind switch
     {

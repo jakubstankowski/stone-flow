@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { formatDate, formatPln } from '../../shared/format/pl-format';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
+import { NO_DATA, formatDate, formatPln } from '../../shared/format/pl-format';
 import { Button } from '../../shared/ui/button';
 import { DataTable, DataTableColumn, SortState } from '../../shared/ui/data-table';
 import { Field } from '../../shared/ui/field';
@@ -18,10 +18,37 @@ import {
   methodLabel,
   sourceLink,
 } from './operation-models';
-import { OperationsService } from './operations.service';
+import { OperationFilters, OperationsService, currentMonth } from './operations.service';
 import { OwnerWithdrawalsService } from './owner-withdrawals.service';
 
 const EMPTY_TITLE = 'Brak operacji w wybranym okresie';
+
+/** Parametry przejścia z Pulpitu (SF-20): okres i powtarzalny rodzaj. */
+const DASHBOARD_PARAMS = ['od', 'do', 'rodzaj'] as const;
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Filtr z adresu `/operacje?od=…&do=…&rodzaj=…` (przejście z Pulpitu); `null`, gdy w adresie nie
+ * ma żadnego z tych parametrów. Okres to całe okno: brak, niepoprawna albo nieistniejąca
+ * którakolwiek data albo `od` > `do` daje bieżący miesiąc (obie daty). Nieznane rodzaje są
+ * pomijane; brak rodzajów oznacza wszystkie.
+ */
+export function dashboardFilterFromParams(params: ParamMap): OperationFilters | null {
+  if (!DASHBOARD_PARAMS.some((name) => params.has(name))) {
+    return null;
+  }
+  const from = validDate(params.get('od'));
+  const to = validDate(params.get('do'));
+  // Daty `yyyy-MM-dd` porównują się poprawnie jako tekst.
+  const period = from !== null && to !== null && from <= to ? { from, to } : currentMonth();
+  const requested = params.getAll('rodzaj');
+  return { ...period, kinds: OPERATION_KINDS.filter((kind) => requested.includes(kind)) };
+}
+
+function validDate(value: string | null): string | null {
+  return value !== null && ISO_DATE.test(value) && formatDate(value) !== NO_DATA ? value : null;
+}
 
 const COLUMNS: readonly DataTableColumn<OperationItem>[] = [
   { key: 'date', header: 'Data', value: (row) => formatDate(row.date), sortable: true },
@@ -35,6 +62,9 @@ const COLUMNS: readonly DataTableColumn<OperationItem>[] = [
 /**
  * Ekran `/operacje`: operacje pieniężne z Orders i Expenses w wybranym okresie, z sumami dla
  * całego filtra. Lista, sumy i efektywny początek pochodzą z API; strona tylko je formatuje.
+ * Parametry przejścia z Pulpitu (`od`, `do`, `rodzaj`, SF-20) są czytane raz, ustawiają filtr w
+ * serwisie i znikają z adresu (`replaceUrl`), więc „Wstecz” ze źródła operacji wraca do listy z
+ * filtrem zmienionym na liście, a nie do parametrów z Pulpitu.
  */
 @Component({
   selector: 'app-operations-list-page',
@@ -72,7 +102,14 @@ export class OperationsListPage {
   );
 
   constructor() {
-    void this.operations.load();
+    const route = inject(ActivatedRoute);
+    const filter = dashboardFilterFromParams(route.snapshot.queryParamMap);
+    if (filter) {
+      void this.operations.filterFromDashboard(filter);
+      void this.router.navigate([], { relativeTo: route, queryParams: {}, replaceUrl: true });
+    } else {
+      void this.operations.load();
+    }
   }
 
   protected add(): void {

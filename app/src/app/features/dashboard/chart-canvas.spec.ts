@@ -57,7 +57,7 @@ const CHANNELS: ChartSpec = {
   type: 'horizontalBar',
   labels: ['Sklep', 'OLX'],
   series: [{ label: 'Sprzedaż', values: ['0.00', '800.00'], token: '--sf-accent', shape: 'bar' }],
-  ariaLabel: 'Sprzedaż według kanałów. Wartości na liście obok.',
+  ariaLabel: 'Sprzedaż według kanałów. Wartości są też na liście przy wykresie.',
 };
 
 describe('ChartCanvas', () => {

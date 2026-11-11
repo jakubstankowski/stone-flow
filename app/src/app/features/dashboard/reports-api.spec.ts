@@ -1,7 +1,11 @@
 import { HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideTestHttp } from '../../../testing/auth-testing';
-import { salesComponentsPage, salesReport } from '../../../testing/dashboard-testing';
+import {
+  cashFlowReport,
+  salesComponentsPage,
+  salesReport,
+} from '../../../testing/dashboard-testing';
 import { ReportsApi } from './reports-api';
 
 describe('ReportsApi', () => {
@@ -70,5 +74,33 @@ describe('ReportsApi', () => {
     expect(plain.request.params.has('kind')).toBe(false);
     plain.flush(salesComponentsPage());
     await unfiltered;
+  });
+  it('reads the cash flow report with only the period parameters the period kind needs', async () => {
+    const month = api.cashFlowReport({ kind: 'previousMonth', year: '2026', from: 'x', to: 'y' });
+    const monthRequest = http.expectOne((r) => r.url === '/api/reports/cash-flow');
+    expect(monthRequest.request.method).toBe('GET');
+    expect(monthRequest.request.params.keys()).toEqual(['period']);
+    expect(monthRequest.request.params.get('period')).toBe('previousMonth');
+    monthRequest.flush(cashFlowReport());
+    expect(await month).toEqual(cashFlowReport());
+
+    const year = api.cashFlowReport({ kind: 'year', year: '2025', from: 'x', to: 'y' });
+    const yearRequest = http.expectOne((r) => r.url === '/api/reports/cash-flow');
+    expect(yearRequest.request.params.keys()).toEqual(['period', 'year']);
+    yearRequest.flush(cashFlowReport());
+    await year;
+
+    const custom = api.cashFlowReport({
+      kind: 'custom',
+      year: '2026',
+      from: '2026-09-01',
+      to: '2026-11-15',
+    });
+    const customRequest = http.expectOne((r) => r.url === '/api/reports/cash-flow');
+    expect(customRequest.request.params.keys()).toEqual(['period', 'from', 'to']);
+    expect(customRequest.request.params.get('from')).toBe('2026-09-01');
+    expect(customRequest.request.params.get('to')).toBe('2026-11-15');
+    customRequest.flush(cashFlowReport());
+    await custom;
   });
 });

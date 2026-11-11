@@ -1,14 +1,17 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ExpensesLink } from './dashboard.service';
+import { ListLink } from './dashboard.service';
 import { CardComparisonText } from './report-text';
 
-export type KpiIcon = 'sales' | 'costs' | 'result' | 'orders';
+export type KpiIcon = 'sales' | 'costs' | 'result' | 'orders' | 'inflows' | 'outflows' | 'change';
 
-/** Akcja karty: link (Koszty), przycisk (Sprzedaż, Liczba zamówień) albo brak (Wynik). */
+/**
+ * Akcja karty: link (Koszty; karty przepływów do listy „Operacje”), przycisk (Sprzedaż, Liczba
+ * zamówień) albo brak (Wynik).
+ */
 export type KpiAction =
-  { readonly kind: 'link'; readonly target: ExpensesLink } | { readonly kind: 'button' } | null;
+  { readonly kind: 'link'; readonly target: ListLink } | { readonly kind: 'button' } | null;
 
 /**
  * Karta KPI (design guide §4): ikona na stonowanym tle, etykieta, duża wartość, opis podstawy i

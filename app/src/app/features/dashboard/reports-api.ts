@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
+  CashFlowReport,
   ComponentsQuery,
   PeriodSelection,
   SalesComponentsPage,
@@ -9,9 +10,9 @@ import {
 } from './report-models';
 
 /**
- * Endpointy raportu sprzedaży (Reporting, SF-19): `GET /api/reports/sales` i
- * `GET /api/reports/sales/components`. Oba dostają ten sam wybór okresu. Błędy jako
- * `HttpErrorResponse`.
+ * Endpointy raportów Pulpitu (Reporting): `GET /api/reports/sales` i
+ * `GET /api/reports/sales/components` (SF-19) oraz `GET /api/reports/cash-flow` (SF-20). Wszystkie
+ * dostają ten sam wybór okresu. Błędy jako `HttpErrorResponse`.
  */
 @Injectable({ providedIn: 'root' })
 export class ReportsApi {
@@ -20,6 +21,12 @@ export class ReportsApi {
   salesReport(selection: PeriodSelection): Promise<SalesReport> {
     return firstValueFrom(
       this.http.get<SalesReport>('/api/reports/sales', { params: periodParams(selection) }),
+    );
+  }
+
+  cashFlowReport(selection: PeriodSelection): Promise<CashFlowReport> {
+    return firstValueFrom(
+      this.http.get<CashFlowReport>('/api/reports/cash-flow', { params: periodParams(selection) }),
     );
   }
 

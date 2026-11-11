@@ -1,0 +1,177 @@
+@if (dashboard.cashFlowLoading()) {
+  <app-loading-state [rows]="6" label="Wczytywanie raportu…" />
+} @else if (dashboard.cashFlowError(); as message) {
+  <app-error-state [message]="message" (retry)="dashboard.loadCashFlow()" />
+} @else if (beforeLaunch(); as message) {
+  <p role="status" class="rounded-box border border-(--sf-info) bg-base-100 p-4 font-medium">
+    {{ message }}
+  </p>
+} @else if (report(); as data) {
+  @if (data.kpis; as kpis) {
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="karty">
+      @for (card of cards(); track card.key) {
+        <app-kpi-card
+          [class]="card.key === 'change' ? 'md:col-span-2 xl:col-span-1' : ''"
+          [label]="card.label"
+          [value]="card.value"
+          [description]="card.description"
+          [comparison]="card.comparison"
+          [icon]="card.key"
+          [action]="card.action"
+          [hint]="card.hint"
+        />
+      }
+    </div>
+
+    <div class="grid gap-4 xl:grid-cols-[2fr_1fr]">
+      @if (timeline(); as spec) {
+        <section
+          class="flex min-w-0 flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+          aria-labelledby="pulpit-przeplywy-czas"
+        >
+          <div>
+            <h2 id="pulpit-przeplywy-czas" class="text-lg font-semibold">
+              Wpływy i wypływy w czasie
+            </h2>
+            <p class="text-sm text-(--sf-muted)">{{ periodText() }}, kwoty w zł</p>
+          </div>
+          <app-chart-canvas [spec]="spec" />
+          <div>
+            <button
+              type="button"
+              class="btn btn-sm min-h-11 border-(--sf-border-strong) bg-base-100 font-medium"
+              [attr.aria-expanded]="tableOpen()"
+              [attr.aria-controls]="tableId"
+              (click)="tableOpen.set(!tableOpen())"
+            >
+              {{ tableOpen() ? 'Ukryj dane w tabeli' : 'Pokaż dane w tabeli' }}
+            </button>
+          </div>
+          <div
+            class="overflow-x-auto rounded-box border border-(--sf-secondary)"
+            [id]="tableId"
+            [hidden]="!tableOpen()"
+          >
+            @if (tableOpen()) {
+              <table class="table table-sm">
+                <caption class="sr-only">
+                  Wpływy i wypływy w czasie, dane wykresu
+                </caption>
+                <thead>
+                  <tr class="bg-base-200">
+                    <th scope="col">Okres</th>
+                    <th scope="col" class="text-right">Wpływy</th>
+                    <th scope="col" class="text-right">Wypływy</th>
+                    <th scope="col" class="text-right">Zmiana środków</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (point of data.series; track point.from) {
+                    <tr>
+                      <th scope="row" class="font-normal">{{ bucketRange(point) }}</th>
+                      <td class="text-right tabular-nums whitespace-nowrap">
+                        {{ formatPln(point.inflows) }}
+                      </td>
+                      <td class="text-right tabular-nums whitespace-nowrap">
+                        {{ formatPln(point.outflows) }}
+                      </td>
+                      <td class="text-right tabular-nums whitespace-nowrap">
+                        {{ formatPln(point.change) }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+                <tfoot>
+                  <tr class="font-semibold" data-testid="razem">
+                    <th scope="row">Razem</th>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.inflows.value) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.outflows.value) }}
+                    </td>
+                    <td class="text-right tabular-nums whitespace-nowrap">
+                      {{ formatPln(kpis.change.value) }}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            }
+          </div>
+        </section>
+      }
+
+      @if (outflowsChart(); as spec) {
+        <section
+          class="flex min-w-0 flex-col gap-3 rounded-box border border-(--sf-secondary) bg-base-100 p-4"
+          aria-labelledby="pulpit-przeplywy-rodzaje"
+        >
+          <div>
+            <h2 id="pulpit-przeplywy-rodzaje" class="text-lg font-semibold">
+              Wypływy według rodzaju
+            </h2>
+            <p class="text-sm text-(--sf-muted)">{{ periodText() }}, kwoty w zł</p>
+          </div>
+          <app-chart-canvas [spec]="spec" />
+          <ul class="flex flex-col" data-testid="wyplywy-rodzaje">
+            @for (item of data.outflowsByKind; track item.kind) {
+              <li>
+                @if (outflowKindLink(item.kind); as target) {
+                  <a
+                    class="flex min-h-11 items-center justify-between gap-3 rounded-field px-2 hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-(--sf-accent)"
+                    [routerLink]="target.link"
+                    [queryParams]="target.queryParams"
+                  >
+                    <span>{{ outflowKindLabels[item.kind] }}</span>
+                    <span class="tabular-nums">{{ formatPln(item.amount) }}</span>
+                  </a>
+                }
+              </li>
+            }
+          </ul>
+          <p class="text-sm text-(--sf-muted)" data-testid="suma-pozycji">{{ breakdownLabel }}</p>
+        </section>
+      }
+    </div>
+
+    <section class="flex flex-col gap-3" aria-labelledby="pulpit-ostatnie-operacje">
+      <h2 id="pulpit-ostatnie-operacje" class="text-lg font-semibold">Ostatnie operacje</h2>
+      <app-data-table
+        caption="Ostatnie operacje"
+        [columns]="columns"
+        [rows]="data.recentOperations"
+        [rowKey]="rowKey"
+        [total]="data.recentOperations.length"
+        [page]="1"
+        [pageSize]="10"
+        [mobileCards]="true"
+        emptyTitle="Brak operacji w wybranym okresie"
+      >
+        <ng-template appTableCell="description" [appTableCellOf]="data.recentOperations" let-row>
+          <a class="link font-medium text-(--sf-accent-text)" [routerLink]="sourceLink(row)">{{
+            row.sourceLabel
+          }}</a>
+        </ng-template>
+        <ng-template appTableCell="amount" [appTableCellOf]="data.recentOperations" let-row>
+          {{ formatPln(row.amount) }}
+          @if (row.kind === 'expense' && isNegative(row.amount)) {
+            <span class="mt-1 block text-sm whitespace-normal text-(--sf-muted)">{{
+              negativeLabel
+            }}</span>
+          }
+        </ng-template>
+      </app-data-table>
+      @if (links(); as target) {
+        <p>
+          <a
+            class="link font-medium text-(--sf-accent-text)"
+            [routerLink]="target.all.link"
+            [queryParams]="target.all.queryParams"
+            data-testid="wszystkie-operacje"
+            >Pokaż wszystkie operacje</a
+          >
+        </p>
+      }
+    </section>
+  }
+}

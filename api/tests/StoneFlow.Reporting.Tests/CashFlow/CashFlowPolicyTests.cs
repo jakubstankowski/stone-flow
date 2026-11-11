@@ -43,4 +43,16 @@ public sealed class CashFlowPolicyTests
         Assert.Equal(Launch, effectiveFrom);
         Assert.True(effectiveFrom > to);
     }
+
+    [Fact]
+    public void Outflow_kinds_follow_the_breakdown_order_and_cover_every_outflow()
+    {
+        Assert.Equal(
+            [CashOperationKind.PaidExpense, CashOperationKind.OwnerWithdrawal, CashOperationKind.Refund],
+            CashFlowPolicy.OutflowKinds);
+        Assert.All(CashFlowPolicy.OutflowKinds, kind => Assert.Equal(CashDirection.Outflow, CashFlowPolicy.DirectionOf(kind)));
+        Assert.Equal(
+            Enum.GetValues<CashOperationKind>().Where(kind => CashFlowPolicy.DirectionOf(kind) == CashDirection.Outflow).Order(),
+            CashFlowPolicy.OutflowKinds.Order());
+    }
 }

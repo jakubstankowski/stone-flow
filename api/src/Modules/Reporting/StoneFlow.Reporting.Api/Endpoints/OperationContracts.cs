@@ -45,7 +45,8 @@ internal static class OperationContracts
         OperationCodes.FormatDate(page.EffectiveFrom),
         OperationCodes.FormatDate(page.LaunchDate));
 
-    private static OperationItemResponse ToResponse(OperationItemDto item)
+    /// <summary>Pozycja operacji; współdzielona z raportem przepływów (SF-20).</summary>
+    internal static OperationItemResponse ToResponse(OperationItemDto item)
     {
         var operation = item.Operation;
         return new OperationItemResponse(

@@ -65,6 +65,18 @@
             <path d="M3 7l9-4 9 4-9 4-9-4Z" />
             <path d="M3 7v10l9 4 9-4V7M12 11v10" />
           }
+          @case ('inflows') {
+            <path d="M12 3v12M7 10l5 5 5-5" />
+            <path d="M4 19h16" />
+          }
+          @case ('outflows') {
+            <path d="M12 15V3M7 8l5-5 5 5" />
+            <path d="M4 19h16" />
+          }
+          @case ('change') {
+            <path d="M7 4v14M3 14l4 4 4-4" />
+            <path d="M17 20V6M13 10l4-4 4 4" />
+          }
         }
       </svg>
     </span>

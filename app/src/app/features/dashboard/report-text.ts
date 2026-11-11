@@ -10,9 +10,10 @@ import {
 } from './report-models';
 
 /**
- * Teksty widoku „Sprzedaż” z danych API (SF-19): etykiety okresów, opis porównania, tekst
- * porównania karty i etykiety przedziałów. Wyłącznie operacje na tekście dat i kwot — bez
- * arytmetyki pieniędzy (kwoty, różnice i procenty liczy backend).
+ * Teksty widoków Pulpitu z danych API („Sprzedaż” SF-19, „Przepływy pieniężne” SF-20): etykiety
+ * okresów i podstawy kwot, opis porównania, tekst porównania karty i etykiety przedziałów.
+ * Wyłącznie operacje na tekście dat i kwot — bez arytmetyki pieniędzy (kwoty, różnice i procenty
+ * liczy backend).
  */
 
 const monthShort = new Intl.DateTimeFormat('pl-PL', {
@@ -63,6 +64,11 @@ export function beforeLaunchMessage(period: ReportPeriod): string {
 /** Ogólna etykieta podstawy kwot pod wyborem okresu. */
 export function basisLabel(launchDate: string): string {
   return `Kwoty brutto w PLN. Raporty obejmują dane od ${formatDate(launchDate)}.`;
+}
+
+/** Etykieta podstawy kwot widoku „Przepływy pieniężne” (SF-20). */
+export function cashFlowBasisLabel(launchDate: string): string {
+  return `Kwoty brutto w PLN według daty operacji pieniężnej: wpłaty, zwrotu, zapłaty wydatku albo wypłaty. Raporty obejmują dane od ${formatDate(launchDate)}.`;
 }
 
 /** Nazwa okresu bazowego do tekstu karty: miesiąc, rok, odcinek roku albo zakres dat. */
