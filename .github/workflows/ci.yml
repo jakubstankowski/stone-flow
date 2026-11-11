@@ -115,7 +115,7 @@ jobs:
   deploy-dry-run:
     name: deploy-dry-run
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       # Jednorazowe hasło kontenera testowego (nie jest sekretem środowiska).
       SA_PASSWORD: Ci-${{ github.run_id }}-${{ github.run_attempt }}-Aa
@@ -165,3 +165,13 @@ jobs:
           export STONEFLOW_TEST_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
           export SQLCMD="docker exec -i ${MSSQL_CONTAINER} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ${SA_PASSWORD}"
           deploy/scripts/test-migrate.sh
+
+      - name: Próba odtworzenia kopii (pełna, częściowa, uszkodzona, brak pliku)
+        env:
+          MSSQL_CONTAINER: ${{ job.services.mssql.id }}
+        run: |
+          export STONEFLOW_TEST_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+          export SQLCMD="docker exec -i ${MSSQL_CONTAINER} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ${SA_PASSWORD}"
+          export SQL_HOST_EXEC="docker exec -i ${MSSQL_CONTAINER}"
+          export RESTORE_TEST_DIR=/var/opt/mssql/data/
+          deploy/scripts/test-verify-restore.sh
