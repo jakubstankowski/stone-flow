@@ -41,12 +41,13 @@ configuration.
 
 | Path | What | Stack |
 |---|---|---|
-| `docs/` | PRD, design guide, task artifacts | Markdown |
+| `docs/` | PRD, design guide, task artifacts; operating procedures and the MVP acceptance checklist in `docs/operations/` (SF-21) | Markdown |
 | `documents/` | Source requirements, DEMO workbooks, reference dashboard | docx, xlsx, webp |
 | `app/` | Frontend application | Angular, Tailwind CSS, daisyUI |
+| `app/e2e/` | End-to-end tests (`*.e2e.ts`, outside Vitest), `app/playwright.config.ts` (SF-21) | Playwright, axe-core |
 | `api/src/` | Backend application | ASP.NET Core, EF Core |
 | `api/tests/` | Backend tests; frontend unit tests live next to the code in `app/src` | xUnit v3 (Microsoft.Testing.Platform), NetArchTest, Testcontainers; Vitest |
-| `deploy/` | Local SQL Server, example variables, deployment scripts (`deploy/scripts/`, SF-4); procedure in `docs/wdrozenia.md` | bash, GitHub Actions, Vercel, SmarterASP.NET |
+| `deploy/` | Local SQL Server, example variables, deployment scripts (`deploy/scripts/`, SF-4; backup check `verify-restore.sh`, SF-21); procedure in `wdrozenia.md` (repository root) | bash, GitHub Actions, Vercel, SmarterASP.NET |
 | `stone-flow.slnx` | Solution for Visual Studio and the `dotnet` CLI | |
 
 Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
@@ -443,7 +444,46 @@ npm run lint
 npm run typecheck
 npm run build
 npm test -- --watch=false
+npm run test:scripts
+node scripts/check-bundle-secrets.mjs dist
 ```
+
+`npm run typecheck` also checks `app/e2e/` and `playwright.config.ts` (`tsconfig.e2e.json`).
+`check-bundle-secrets.mjs` fails on server configuration key names and secret patterns in the
+built bundle (and on an empty directory); its rules are listed in the script.
+
+Deployment scripts (Git Bash on Windows; CI job `deploy-dry-run`), after a Release build, with
+`STONEFLOW_TEST_SQLSERVER` (server connection string) and `SQLCMD` (authenticated `sqlcmd` command,
+e.g. `sqlcmd -S (localdb)\MSSQLLocalDB -E`):
+
+```
+deploy/scripts/test-migrate.sh
+RESTORE_TEST_DIR='<directory the SQL Server can write, ending with a separator>' deploy/scripts/test-verify-restore.sh
+```
+
+`RESTORE_TEST_DIR` is needed on LocalDB (no default backup path); in CI the container's
+`/var/opt/mssql/data/` with `SQL_HOST_EXEC="docker exec -i <container>"`.
+
+End-to-end tests (SF-21; CI job `e2e`), from `app/`: they start the built API
+(`api/src/StoneFlow.Api/bin/Release/net10.0`, environment Development, e-mail in log mode) and
+`ng serve --configuration production`, and use the database `StoneFlowE2E` on the server given in
+`STONEFLOW_E2E_SQLSERVER` (connection string without a database). Locally, Chromium only:
+
+```
+dotnet build stone-flow.slnx -c Release
+ConnectionStrings__StoneFlow='<server>;Database=StoneFlowE2E;…' deploy/scripts/migrate.sh   # from the repository root
+npx playwright install chromium
+STONEFLOW_E2E_SQLSERVER='<server connection string>' npm run e2e
+```
+
+- Ports default to 5080 (API) and 4200 (app); when a development server is running, set
+  `STONEFLOW_E2E_API_PORT` and `STONEFLOW_E2E_APP_PORT`. The run fails rather than reuse a running
+  server.
+- One file: `npx playwright test e2e/orders.e2e.ts`; the session test alone:
+  `npx playwright test --project=session --no-deps` (it logs out every session, so it runs last).
+- The owner account gets at most 3 reset links per 15 minutes, so more frequent runs on the same
+  database fail in global setup — wait or recreate `StoneFlowE2E`.
+- Report: `app/playwright-report/index.html`; traces in `app/test-results/` (both ignored by git).
 
 CI must check builds of both applications, types, formatting and the relevant tests.
 

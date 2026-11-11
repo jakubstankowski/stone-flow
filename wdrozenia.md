@@ -22,6 +22,11 @@ wszystkie punkty są spełnione:
 - [ ] GitHub: environment `production`, sekrety i zmienne (sekcja 3), wymagane kontrole PR.
 - [ ] Vercel: projekt z katalogiem `app`, wyłączone wdrożenia z Git (sekcja 5).
 - [ ] Better Stack: monitory z sekcji 9.
+- [ ] Procedury z `docs/operations/` przeczytane (kopie i odtworzenie, powrót do wersji, data
+  uruchomienia), a pozycje hostingowe checklisty `docs/operations/odbior-mvp.md` (konfiguracja kopii,
+  próba odtworzenia) wypełnione przed ustawieniem `DEPLOY_ENABLED`.
+- [ ] Kopia ręczna bazy produkcyjnej przed pierwszą publikacją
+  (`docs/operations/kopie-i-odtworzenie.md` §4).
 
 ## 2. Przebieg publikacji
 
@@ -86,7 +91,7 @@ nieosiągalny serwer.
 - konto FTP ograniczone do katalogu witryny API; token Vercel ograniczony do zespołu projektu.
 
 **Wymagane kontrole PR** (ochrona gałęzi `main`): `backend`, `frontend`, `secrets`,
-`deploy-dry-run`.
+`deploy-dry-run`, `e2e` (SF-21; ustawia administrator repozytorium).
 
 ## 4. Konfiguracja serwera API
 
@@ -137,7 +142,8 @@ Wdrożenie go nie nadpisuje i nie usuwa. Klucze jak w `deploy/api.env.example`:
 3. Ustal przyczynę z logu kroku (nazwa kontekstu w komunikacie `::error::`).
 4. **Nie edytuj zastosowanych migracji.** Napraw nową migracją (fix forward), przejdź PR i
    CI; publikacja uruchomi się po merge.
-5. Gdy dane są uszkodzone — odtwórz kopię bazy (procedura kopii: zadanie SF-21), potem
+5. Gdy dane są uszkodzone — odtwórz kopię bazy
+   ([`docs/operations/kopie-i-odtworzenie.md`](docs/operations/kopie-i-odtworzenie.md) §7), potem
    ponownie uruchom workflow.
 
 **Wariant awaryjny bez zdalnego SQL:** `dotnet ef migrations script --idempotent` dla każdego
@@ -156,7 +162,8 @@ sprawdzeniu, że pliki są kompletne.
 
 **Rollback kodu:** revert na `main` i zwykła publikacja. Rollback kodu **nie cofa migracji**
 (PRD sekcja 10) — dlatego obowiązuje expand/contract. Frontend można też przywrócić w panelu
-Vercel (Promote poprzedniego wdrożenia).
+Vercel (Promote poprzedniego wdrożenia). Pełna procedura, w tym częściowy revert commitu z
+migracją: [`docs/operations/powrot-do-wersji.md`](docs/operations/powrot-do-wersji.md).
 
 ## 8. Logi
 
