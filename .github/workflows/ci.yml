@@ -109,6 +109,19 @@ jobs:
       - uses: ./.github/actions/setup-gitleaks
         id: gitleaks
 
+      # Klucz składany w czasie przebiegu: żaden plik repozytorium nie zawiera pasującego tekstu.
+      - name: Reguła kluczy WooCommerce wykrywa wzorzec
+        env:
+          GITLEAKS: ${{ steps.gitleaks.outputs.path }}
+        run: |
+          dir="${RUNNER_TEMP}/gitleaks-rule"
+          mkdir -p "$dir"
+          printf 'consumer_key=ck_%s\n' "$(printf 'a%.0s' {1..40})" > "$dir/sample.txt"
+          if "$GITLEAKS" dir "$dir" --config .gitleaks.toml --redact --exit-code 1; then
+            echo "::error::Reguła woocommerce-rest-key nie wykryła klucza REST WooCommerce."
+            exit 1
+          fi
+
       - name: Skan całej historii
         run: '"${{ steps.gitleaks.outputs.path }}" git . --config .gitleaks.toml --redact --verbose --exit-code 1'
 

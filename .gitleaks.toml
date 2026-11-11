@@ -4,3 +4,13 @@ title = "Stone Flow"
 
 [extend]
 useDefault = true
+
+# Klucze REST WooCommerce (consumer key ck_…, consumer secret cs_…; SF-21). Ta sama postać wzorca
+# jest regułą woocommerce-rest-key w app/scripts/check-bundle-secrets.mjs — zmieniać oba miejsca.
+# Placeholdery <ck_klucz-rest> w deploy/api.env.example i wdrozenia.md nie pasują (brak 40 znaków
+# szesnastkowych), więc reguła nie ma wyjątków.
+[[rules]]
+id = "woocommerce-rest-key"
+description = "Klucz REST WooCommerce (ck_/cs_ + 40 znaków szesnastkowych)"
+regex = '''\b(?:ck|cs)_[0-9a-f]{40}\b'''
+keywords = ["ck_", "cs_"]
