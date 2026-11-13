@@ -42,3 +42,8 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Playwright (E2E, SF-21)
+/playwright-report
+/test-results
+/e2e/.auth

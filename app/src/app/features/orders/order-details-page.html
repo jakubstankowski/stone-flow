@@ -220,20 +220,18 @@
               aria-labelledby="szczegoly-uwagi"
             >
               <h2 id="szczegoly-uwagi" class="text-xl font-semibold">Uwagi</h2>
-              <dl class="grid gap-3">
-                <div>
+              <dl class="grid gap-3 sm:grid-cols-2">
+                <div class="sm:col-span-2">
                   <dt class="text-sm text-(--sf-muted)">Komentarz</dt>
                   <dd class="break-words whitespace-pre-line">{{ order.comment ?? noData }}</dd>
                 </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <dt class="text-sm text-(--sf-muted)">Utworzono</dt>
-                    <dd>{{ formatDateTime(order.createdAtUtc) }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-sm text-(--sf-muted)">Ostatnia zmiana</dt>
-                    <dd>{{ formatDateTime(order.updatedAtUtc) }}</dd>
-                  </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Utworzono</dt>
+                  <dd>{{ formatDateTime(order.createdAtUtc) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-(--sf-muted)">Ostatnia zmiana</dt>
+                  <dd>{{ formatDateTime(order.updatedAtUtc) }}</dd>
                 </div>
               </dl>
             </section>

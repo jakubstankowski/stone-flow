@@ -1,0 +1,8 @@
+/* Testy E2E (Playwright, app/e2e) i konfiguracja Playwright — tylko kontrola typów (npm run typecheck). */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
+}

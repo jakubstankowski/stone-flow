@@ -97,6 +97,9 @@ jobs:
       - name: Brak sekretów w pakiecie frontendu
         run: '"${{ steps.gitleaks.outputs.path }}" dir dist --config ../.gitleaks.toml --redact --verbose --exit-code 1'
 
+      - name: Brak wzorców sekretów w pakiecie (skrypt)
+        run: node scripts/check-bundle-secrets.mjs dist
+
   secrets:
     name: secrets
     runs-on: ubuntu-latest
@@ -109,13 +112,26 @@ jobs:
       - uses: ./.github/actions/setup-gitleaks
         id: gitleaks
 
+      # Klucz składany w czasie przebiegu: żaden plik repozytorium nie zawiera pasującego tekstu.
+      - name: Reguła kluczy WooCommerce wykrywa wzorzec
+        env:
+          GITLEAKS: ${{ steps.gitleaks.outputs.path }}
+        run: |
+          dir="${RUNNER_TEMP}/gitleaks-rule"
+          mkdir -p "$dir"
+          printf 'consumer_key=ck_%s\n' "$(printf 'a%.0s' {1..40})" > "$dir/sample.txt"
+          if "$GITLEAKS" dir "$dir" --config .gitleaks.toml --redact --exit-code 1; then
+            echo "::error::Reguła woocommerce-rest-key nie wykryła klucza REST WooCommerce."
+            exit 1
+          fi
+
       - name: Skan całej historii
         run: '"${{ steps.gitleaks.outputs.path }}" git . --config .gitleaks.toml --redact --verbose --exit-code 1'
 
   deploy-dry-run:
     name: deploy-dry-run
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       # Jednorazowe hasło kontenera testowego (nie jest sekretem środowiska).
       SA_PASSWORD: Ci-${{ github.run_id }}-${{ github.run_attempt }}-Aa
@@ -165,3 +181,94 @@ jobs:
           export STONEFLOW_TEST_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
           export SQLCMD="docker exec -i ${MSSQL_CONTAINER} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ${SA_PASSWORD}"
           deploy/scripts/test-migrate.sh
+
+      - name: Próba odtworzenia kopii (pełna, częściowa, uszkodzona, brak pliku)
+        env:
+          MSSQL_CONTAINER: ${{ job.services.mssql.id }}
+        run: |
+          export STONEFLOW_TEST_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+          export SQLCMD="docker exec -i ${MSSQL_CONTAINER} /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P ${SA_PASSWORD}"
+          export SQL_HOST_EXEC="docker exec -i ${MSSQL_CONTAINER}"
+          export RESTORE_TEST_DIR=/var/opt/mssql/data/
+          deploy/scripts/test-verify-restore.sh
+
+  # Testy E2E (SF-21): prawdziwa aplikacja Angular, API (Development, e-mail w logu) i SQL Server
+  # z bazą StoneFlowE2E. Bez sekretów i bez environment; dane w raporcie są fikcyjne.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Jednorazowe hasło kontenera testowego (nie jest sekretem środowiska).
+      SA_PASSWORD: E2e-${{ github.run_id }}-${{ github.run_attempt }}-Aa
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: E2e-${{ github.run_id }}-${{ github.run_attempt }}-Aa
+        ports:
+          - 1433:1433
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Narzędzia
+        run: dotnet tool restore
+
+      - name: Restore (lockfile)
+        run: dotnet restore stone-flow.slnx --locked-mode
+
+      - name: Build
+        run: dotnet build stone-flow.slnx -c Release --no-restore
+
+      - name: Oczekiwanie na SQL Server
+        env:
+          MSSQL_CONTAINER: ${{ job.services.mssql.id }}
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec "$MSSQL_CONTAINER" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$SA_PASSWORD" -Q "SELECT 1" >/dev/null 2>&1; then
+              echo "SQL Server gotowy."; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::SQL Server nie wystartował."; exit 1
+
+      - name: Migracje bazy E2E
+        run: |
+          export ConnectionStrings__StoneFlow="Server=localhost,1433;Database=StoneFlowE2E;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+          deploy/scripts/migrate.sh
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Zależności frontendu
+        working-directory: app
+        run: npm ci
+
+      - name: Przeglądarka Chromium
+        working-directory: app
+        run: npx playwright install --with-deps chromium
+
+      - name: Testy E2E
+        working-directory: app
+        run: |
+          export STONEFLOW_E2E_SQLSERVER="Server=localhost,1433;User Id=sa;Password=${SA_PASSWORD};TrustServerCertificate=True"
+          npm run e2e
+
+      - name: Raport E2E
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report
+          path: |
+            app/playwright-report
+            app/test-results
+          retention-days: 7
+          if-no-files-found: ignore
