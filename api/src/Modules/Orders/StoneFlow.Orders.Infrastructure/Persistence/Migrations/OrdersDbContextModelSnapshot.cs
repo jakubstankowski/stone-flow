@@ -29,6 +29,12 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTime?>("AnonymizedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("AnonymizedByAccountId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasMaxLength(16)
@@ -200,6 +206,8 @@ namespace StoneFlow.Orders.Infrastructure.Persistence.Migrations
 
                     b.ToTable("Orders", "orders", t =>
                         {
+                            t.HasCheckConstraint("CK_Orders_Anonymization", "([AnonymizedAtUtc] IS NULL AND [AnonymizedByAccountId] IS NULL) OR ([AnonymizedAtUtc] IS NOT NULL AND [AnonymizedByAccountId] IS NOT NULL)");
+
                             t.HasCheckConstraint("CK_Orders_ShopFields", "[Source] <> N'Manual' OR ([ShopModifiedAtUtc] IS NULL AND [ShopDeletedAtUtc] IS NULL AND [ShopRefundedAmount] = 0)");
 
                             t.HasCheckConstraint("CK_Orders_ShopRefundedAmount", "[ShopRefundedAmount] >= 0");
