@@ -1,7 +1,7 @@
 ---
 id: SF-22
 title: Anonimizacja danych klienta
-status: planned
+status: implemented
 risk: high
 depends_on: [SF-12, D-09]
 parts: []
