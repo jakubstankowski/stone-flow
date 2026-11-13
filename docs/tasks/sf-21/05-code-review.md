@@ -50,8 +50,10 @@ None. (Błąd krytyczny C-1 dotyczy poprawności — sekcja „Correctness Issue
    reguła `woocommerce-rest-key` przestała działać (np. błąd w `regex`), a próbkę złapała reguła
    domyślna (np. `generic-api-key` przy innej próbce), kontrola dalej by przechodziła. Zalecenie:
    `--report-format json --report-path "$RUNNER_TEMP/gitleaks-rule.json"` i `grep` na
-   `"RuleID": "woocommerce-rest-key"`. **Otwarte** — gitleaks nie jest dostępny lokalnie, więc zmiany
-   kroku nie dało się sprawdzić przed CI.
+   `"RuleID": "woocommerce-rest-key"`. **Rozwiązane (PR `sf-21-followups`):** krok zapisuje raport
+   JSON (`--report-format json --report-path "$RUNNER_TEMP/gitleaks-rule.json"`) i przez `jq` wymaga
+   trafienia z `RuleID` = `woocommerce-rest-key`; inna reguła lub brak trafień kończy krok błędem.
+   Sprawdzenie w CI (zadanie `secrets`).
 2. **N-2 — hasło właściciela E2E trafia do raportu HTML Playwright.** **Rozwiązane po przeglądzie:** `fillSecret` w `app/e2e/support/ui.ts` wpisuje hasło przez `evaluate()`; E2E 27/27. Playwright 1.64 zapisuje tytuł
    kroku `Fill "{value}"` (`Frame.fill` w `playwright-core/lib/coreBundle.js`), więc
    `app/e2e/auth.setup.ts:9` i `app/e2e/session.e2e.ts:15,23,32` wpisują hasło jawnym tekstem do
@@ -87,7 +89,7 @@ None. (Błąd krytyczny C-1 dotyczy poprawności — sekcja „Correctness Issue
 | H. Scenariusze 36.1–36.13 | Covered | 13 testów; oczekiwania zgodne z PRD §4/§11 (zwrot do zamówienia sprzed uruchomienia tylko wypływem, wydatek ujemny obniża koszty i wypływy po opłaceniu) |
 | H. Uzgodnienie (pkt 37) | Covered | sumy przeliczone ręcznie: XI 7440/160/1750/845; rok 7210/460/3950/(750+1500+925); 1.10–30.11 7440/160/1950/(700+845) — zgodne |
 | H. Zmiana minionego okresu (pkt 38) | Covered | `updated` zamówienia `value` 1000.00 → 1250.00, `created` wydatku `grossAmount` null → 40.00 |
-| I. Skan pakietu i reguła gitleaks (pkt 39–42) | Covered | kontrola reguły w `secrets` niespecyficzna — N-1 |
+| I. Skan pakietu i reguła gitleaks (pkt 39–42) | Covered | kontrola reguły w `secrets` niespecyficzna — N-1 (rozwiązane po przeglądzie) |
 | Scope 7. Poprawki dostępności | Covered | `order-details-page.html`: pary `dt`/`dd` w `div` bezpośrednio w `dl` — poprawne według HTML (grupowanie `div` w `dl`), wygląd zachowany przez `sm:grid-cols-2` / `sm:col-span-2` |
 | Scope 8. `wdrozenia.md`, `conventions.md` | Covered | |
 | Scope 8. README | Missing | świadomie odłożone (Assumptions 15, niezatwierdzone zmiany innej osoby) — otwarte w `06` |
@@ -138,7 +140,9 @@ czytelnie nieudaną asercję; `Acceptance.Money(string?)` rzuca przy braku pola.
 2. **T-2 — `app/e2e/expenses.e2e.ts:19-20`:** asercja negatywna (brak wiersza w „Operacjach” przed
    opłaceniem) czeka tylko na `app-loading-state` = 0. Jeśli lista nie zdąży zacząć ładowania, obie
    asercje przejdą od razu. Ryzyko niskie (stan ładowania ustawiany przy tworzeniu strony), do
-   rozważenia: czekać na wiersz sum (`operations.totals()`) albo stan pusty. Otwarte.
+   rozważenia: czekać na wiersz sum (`operations.totals()`) albo stan pusty. **Rozwiązane (PR
+   `sf-21-followups`):** test czeka najpierw na widoczne sumy (`data-testid="wyplywy"`), które
+   pojawiają się dopiero po odpowiedzi listy, a dopiero potem sprawdza brak wiersza.
 3. **T-3 — zadania CI `deploy-dry-run` i `e2e` nie były uruchomione** (gałąź niewypchnięta). C-1
    pokazuje, że lokalne przebiegi na LocalDB nie zastępują wariantu z `docker exec -i`. Zielone CI na PR
    jest warunkiem merge.

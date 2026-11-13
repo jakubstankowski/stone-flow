@@ -16,6 +16,8 @@ test('wydatek jednorazowy trafia do „Operacji” dopiero po opłaceniu', async
   const operations = `/operacje?od=${today}&do=${today}&rodzaj=expense`;
   await page.goto(operations);
   await expect(page.getByRole('heading', { level: 1, name: 'Operacje' })).toBeVisible();
+  // Sumy pojawiają się dopiero po odpowiedzi listy, więc asercja braku wiersza nie przejdzie przed wczytaniem.
+  await expect(page.getByTestId('wyplywy')).toBeVisible();
   await expect(page.locator('app-loading-state')).toHaveCount(0);
   await expect(rowWith(page, description)).toHaveCount(0);
 
