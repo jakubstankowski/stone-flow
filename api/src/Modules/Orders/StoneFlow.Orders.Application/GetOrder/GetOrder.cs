@@ -1,4 +1,5 @@
 using StoneFlow.Orders.Application.Abstractions;
+using StoneFlow.Orders.Application.AnonymizeCustomer;
 using StoneFlow.Orders.Domain.Orders;
 using StoneFlow.Orders.Domain.Payments;
 using StoneFlow.Shared.Application.Cqrs;
@@ -78,6 +79,15 @@ public sealed record OrderDetailsDto(
     /// <summary>Suma zwrotów w sklepie — informacja (SF-12).</summary>
     public decimal ShopRefundedAmount { get; init; }
 
+    /// <summary>Czas anonimizacji danych klienta (SF-22) albo <c>null</c>.</summary>
+    public DateTime? AnonymizedAtUtc { get; init; }
+
+    /// <summary>
+    /// Stan akcji anonimizacji (SF-22); ustawia go zapytanie (<see cref="GetOrderHandler"/>), <c>null</c>
+    /// tylko przed jego ustawieniem.
+    /// </summary>
+    public AnonymizationAvailability? Anonymization { get; init; }
+
     /// <summary>Ostrzeżenia ze sklepu (reguły w <see cref="ShopStatuses.WarningsFor"/>).</summary>
     public IReadOnlyList<ShopWarning> ShopWarnings =>
         ShopStatuses.WarningsFor(Source, FulfillmentStatus, ShopStatus, ShopDeletedAtUtc, ShopRefundedAmount);
@@ -85,11 +95,20 @@ public sealed record OrderDetailsDto(
 
 public sealed record GetOrderQuery(Guid Id) : IQuery<OrderDetailsDto?>;
 
-public sealed class GetOrderHandler(IOrderReader reader) : IQueryHandler<GetOrderQuery, OrderDetailsDto?>
+/// <summary>Szczegóły zamówienia ze stanem akcji anonimizacji (SF-22); zapytanie niczego nie zmienia.</summary>
+public sealed class GetOrderHandler(IOrderReader reader, AnonymizationRetention retention) : IQueryHandler<GetOrderQuery, OrderDetailsDto?>
 {
-    public Task<OrderDetailsDto?> HandleAsync(GetOrderQuery query, CancellationToken cancellationToken)
+    public async Task<OrderDetailsDto?> HandleAsync(GetOrderQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return reader.GetAsync(query.Id, cancellationToken);
+        var order = await reader.GetAsync(query.Id, cancellationToken);
+        if (order is null)
+        {
+            return null;
+        }
+
+        var availability = await retention.EvaluateAsync(
+            order.Id, order.OrderDate, order.UpdatedAtUtc, order.AnonymizedAtUtc is not null, cancellationToken);
+        return order with { Anonymization = availability };
     }
 }

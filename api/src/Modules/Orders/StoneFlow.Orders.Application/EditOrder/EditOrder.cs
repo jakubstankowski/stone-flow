@@ -22,6 +22,9 @@ public enum EditOrderOutcome
 
     /// <summary>Nowa wartość byłaby niższa od sumy obniżeń sprzedaży; <c>MinimumValue</c> to ta suma.</summary>
     SalesReductionLimitExceeded,
+
+    /// <summary>Zmiana klienta zamówienia z zanonimizowanymi danymi (SF-22).</summary>
+    CustomerAnonymized,
 }
 
 public sealed record EditOrderResult(
@@ -34,7 +37,7 @@ public sealed record EditOrderResult(
 /// <summary>
 /// Kolejność sprawdzeń (plan SF-8, N1): walidacja niezależna od źródła (400), istnienie (404),
 /// wersja (409), walidacja zależna od źródła — wymagalność w zamówieniu ręcznym (400) albo
-/// porównanie pól sklepu (422) — reguły statusu (422), przy obniżeniu wartości blokada zamówienia
+/// porównanie pól sklepu (422) — klient zanonimizowany (422, SF-22), reguły statusu (422), przy obniżeniu wartości blokada zamówienia
 /// i limit obniżeń sprzedaży (422, SF-10, plan N2), brak zmian (sukces bez zapisu), zapis i audyt
 /// <c>Updated</c>. Całość w jednej jednostce pracy, zatwierdzanej tylko przy zapisie.
 /// </summary>
@@ -117,6 +120,8 @@ public sealed class EditOrderHandler(
                 return new EditOrderResult(EditOrderOutcome.FieldOwnedByShop, Fields: result.Violation.Fields);
             case OrderRuleViolationKind.StatusChangeRequiresAction:
                 return new EditOrderResult(EditOrderOutcome.StatusChangeRequiresAction);
+            case OrderRuleViolationKind.CustomerAnonymized:
+                return new EditOrderResult(EditOrderOutcome.CustomerAnonymized);
             case not null:
                 throw new InvalidOperationException($"Nieoczekiwane naruszenie reguły edycji: {result.Violation.Kind}.");
         }
