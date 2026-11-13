@@ -137,3 +137,6 @@ Decyzję o odtworzeniu podejmuje właściciel. Odtworzenie **cofa dane do chwili
    - wpisy ręczne (zamówienia, wpłaty, wydatki, wypłaty) trzeba wprowadzić ponownie;
    - „Historia zmian” też wraca do chwili kopii — odnotuj odtworzenie (data, kopia, powód) w
      `odbior-mvp.md` albo w dzienniku operacji właściciela, żeby brak wpisów był wyjaśniony.
+8. **Anonimizacje po dacie kopii [właściciel]** (SF-22): odtworzona baza zawiera dane klientów
+   zamówień zanonimizowanych po wykonaniu kopii. Ponów te anonimizacje według rejestru żądań
+   ([`anonimizacja.md`](anonimizacja.md) §9) i odnotuj to w rejestrze.

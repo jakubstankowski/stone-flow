@@ -41,7 +41,7 @@ configuration.
 
 | Path | What | Stack |
 |---|---|---|
-| `docs/` | PRD, design guide, task artifacts; operating procedures and the MVP acceptance checklist in `docs/operations/` (SF-21) | Markdown |
+| `docs/` | PRD, design guide, task artifacts; operating procedures and the MVP acceptance checklist in `docs/operations/` (SF-21; customer data anonymisation `anonimizacja.md`, SF-22) | Markdown |
 | `documents/` | Source requirements, DEMO workbooks, reference dashboard | docx, xlsx, webp |
 | `app/` | Frontend application | Angular, Tailwind CSS, daisyUI |
 | `app/e2e/` | End-to-end tests (`*.e2e.ts`, outside Vitest), `app/playwright.config.ts` (SF-21) | Playwright, axe-core |
@@ -262,6 +262,13 @@ Formatting and naming style live in `.editorconfig` and are enforced in the buil
   object: order — order date; payment, refund, sales correction — own date, parent = the order;
   expense — cost date, parent = the recurring definition for a recurring occurrence;
   recurring definition — cycle start; owner withdrawal — withdrawal date.
+- Audit entries are append-only, with one exception (SF-22, DANE-01): customer data anonymisation
+  replaces the values of selected fields with a marker through `IAuditRedaction`
+  (`Shared.Application/Audit`, rule in `AuditRecord.Redact`, implementation in
+  `Reporting.Infrastructure`), in the caller's `IUnitOfWork` transaction. No other code changes a
+  stored entry. `IAuditActivity` reads the time of the last entry of an object and its children
+  (used for the retention start, so deleted entries count); both ports share one scope definition
+  (`AuditScope`).
 - Financial module contexts share one connection per DI scope (`ModuleConnection`), registered
   with `UseModuleSqlServer<TContext>(serviceProvider, schema)`. Therefore: no `AddDbContextPool`,
   no parallel queries in one scope (no `Task.WhenAll` over queries, no interleaved streaming), no
