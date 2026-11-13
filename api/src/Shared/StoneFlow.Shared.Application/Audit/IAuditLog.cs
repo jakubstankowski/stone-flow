@@ -7,7 +7,9 @@ namespace StoneFlow.Shared.Application.Audit;
 /// dlatego wywołanie jest dozwolone wyłącznie wewnątrz
 /// <see cref="Persistence.IUnitOfWork.ExecuteInTransactionAsync{T}"/>; poza nią kończy się
 /// <see cref="InvalidOperationException"/>. Błąd zapisu wycofuje całą transakcję.
-/// Czas wpisu (UTC) ustala zapis audytu. Wpisy są tylko dodawane.
+/// Czas wpisu (UTC) ustala zapis audytu. Wpisy są tylko dodawane; jedyna dozwolona zmiana zapisanego
+/// wpisu to zastąpienie wartości wskazanych pól znacznikiem przez <see cref="IAuditRedaction"/>
+/// (anonimizacja danych klienta, DANE-01, SF-22).
 /// </summary>
 public interface IAuditLog
 {
