@@ -22,6 +22,12 @@ export default defineConfig({
     baseURL: APP_URL,
     locale: 'pl-PL',
     timezoneId: 'Europe/Warsaw',
+    // Kolejność części pola `type="date"` zależy od języka przeglądarki, nie od `locale` kontekstu.
+    // Na Linuksie Chromium bierze go z LANGUAGE/LANG, na Windows z `--lang`.
+    launchOptions: {
+      args: ['--lang=pl-PL'],
+      env: { ...process.env, LANG: 'pl_PL.UTF-8', LANGUAGE: 'pl_PL:pl' },
+    },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
