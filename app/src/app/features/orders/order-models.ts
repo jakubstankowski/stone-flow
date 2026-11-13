@@ -228,7 +228,26 @@ export interface OrderDetails {
   /** Suma zwrotów w sklepie; tylko informacja, nie tworzy wypływu. */
   readonly shopRefundedAmount: string;
   readonly shopWarnings: readonly ShopWarning[];
+  /** Stan akcji „Anonimizuj dane klienta” (SF-22); wylicza go API. */
+  readonly anonymization: OrderAnonymization;
 }
+
+/** Stan akcji anonimizacji danych klienta (SF-22). */
+export type AnonymizationStatus = 'disabled' | 'retentionPending' | 'available' | 'anonymized';
+
+/**
+ * Anonimizacja danych klienta: daty retencji (`yyyy-MM-dd`) tylko dla `retentionPending` i `available`,
+ * czas anonimizacji (ISO UTC) tylko dla `anonymized`. Frontend dat nie liczy.
+ */
+export interface OrderAnonymization {
+  readonly status: AnonymizationStatus;
+  readonly retentionStartDate: string | null;
+  readonly availableFrom: string | null;
+  readonly anonymizedAtUtc: string | null;
+}
+
+/** Oznaczenie zanonimizowanego zamówienia w nagłówku szczegółów. */
+export const ANONYMIZED_BADGE_LABEL = 'Dane klienta zanonimizowane';
 
 export interface OrderCreated {
   readonly id: string;
@@ -265,6 +284,10 @@ export const ORDER_PROBLEM = {
   alreadyCancelled: 'order_already_cancelled',
   notCancelled: 'order_not_cancelled',
   notFound: 'order_not_found',
+  alreadyAnonymized: 'order_already_anonymized',
+  anonymizationDisabled: 'anonymization_disabled',
+  retentionNotElapsed: 'retention_not_elapsed',
+  customerAnonymized: 'order_customer_anonymized',
 } as const;
 
 /** Kody Problem Details tras wpisów płatności (SF-9). */
