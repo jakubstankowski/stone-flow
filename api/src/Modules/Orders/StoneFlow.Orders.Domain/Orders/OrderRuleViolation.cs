@@ -11,6 +11,12 @@ public enum OrderRuleViolationKind
     AlreadyCancelled,
 
     NotCancelled,
+
+    /// <summary>Dane klienta zamówienia zostały już zanonimizowane (SF-22).</summary>
+    AlreadyAnonymized,
+
+    /// <summary>Zmiana klienta zamówienia zanonimizowanego (SF-22): danych nie można zmienić ani przywrócić.</summary>
+    CustomerAnonymized,
 }
 
 /// <summary>Naruszenie reguły zamówienia; <see cref="Fields"/> tylko dla pól sklepu.</summary>
@@ -21,6 +27,10 @@ public sealed record OrderRuleViolation(OrderRuleViolationKind Kind, IReadOnlyLi
     public static OrderRuleViolation AlreadyCancelled { get; } = new(OrderRuleViolationKind.AlreadyCancelled, []);
 
     public static OrderRuleViolation NotCancelled { get; } = new(OrderRuleViolationKind.NotCancelled, []);
+
+    public static OrderRuleViolation AlreadyAnonymized { get; } = new(OrderRuleViolationKind.AlreadyAnonymized, []);
+
+    public static OrderRuleViolation CustomerAnonymized { get; } = new(OrderRuleViolationKind.CustomerAnonymized, []);
 
     public static OrderRuleViolation FieldOwnedByShop(IReadOnlyList<ShopOwnedField> fields) =>
         new(OrderRuleViolationKind.FieldOwnedByShop, fields);

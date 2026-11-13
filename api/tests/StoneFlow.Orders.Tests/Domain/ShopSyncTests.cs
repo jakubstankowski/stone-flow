@@ -222,6 +222,71 @@ public sealed class ShopSyncTests
     [InlineData("custom-status", false)]
     public void Terminal_statuses(string status, bool terminal) => Assert.Equal(terminal, ShopStatuses.IsTerminal(status, null));
 
+    private static readonly Guid AccountId = Guid.Parse("4c2f8a3e-1b7d-4e55-9a0f-2d6b1c3e5f70");
+
+    private static readonly OrderField[] CustomerFields =
+    [
+        OrderField.CustomerKind,
+        OrderField.CustomerName,
+        OrderField.CustomerPhone,
+        OrderField.CustomerEmail,
+        OrderField.CustomerStreet,
+        OrderField.CustomerPostalCode,
+        OrderField.CustomerCity,
+        OrderField.CustomerTaxId,
+    ];
+
+    [Theory]
+    [InlineData(ShopDelivery.Created)]
+    [InlineData(ShopDelivery.Updated)]
+    [InlineData(ShopDelivery.Restored)]
+    public void Delivery_after_anonymization_keeps_customer_and_applies_other_shop_fields(ShopDelivery delivery)
+    {
+        var order = Imported();
+        order.AnonymizeCustomer(AccountId, T0.AddMinutes(1));
+        var anonymized = order.Customer;
+
+        var result = order.ApplyFromShop(delivery, Data("cancelled", T0.AddMinutes(5), value: 900m, refunded: 50m, name: "Jan Testowy"), T0.AddMinutes(6));
+
+        Assert.Same(anonymized, order.Customer);
+        Assert.Equal(900m, order.Value);
+        Assert.Equal("cancelled", order.ShopStatus);
+        Assert.Equal(50m, order.ShopRefundedAmount);
+        Assert.Equal(FulfillmentStatus.Cancelled, order.FulfillmentStatus);
+        Assert.DoesNotContain(result.Changes, change => CustomerFields.Contains(change.Field));
+    }
+
+    [Fact]
+    public void Deletion_and_restore_after_anonymization_keep_customer()
+    {
+        var order = Imported();
+        order.AnonymizeCustomer(AccountId, T0.AddMinutes(1));
+        var anonymized = order.Customer;
+
+        order.ApplyFromShop(ShopDelivery.Deleted, null, T0.AddMinutes(2));
+        var restored = order.ApplyFromShop(ShopDelivery.Restored, Data(modified: T0.AddMinutes(3)), T0.AddMinutes(3));
+
+        Assert.Null(order.ShopDeletedAtUtc);
+        Assert.Same(anonymized, order.Customer);
+        Assert.DoesNotContain(restored.Changes, change => CustomerFields.Contains(change.Field));
+    }
+
+    [Fact]
+    public void Delivery_differing_only_in_customer_after_anonymization_is_unchanged()
+    {
+        var order = Imported();
+        order.AnonymizeCustomer(AccountId, T0.AddMinutes(1));
+        var updatedAt = order.UpdatedAtUtc;
+
+        var result = order.ApplyFromShop(ShopDelivery.Updated, Data(modified: T0.AddMinutes(5), name: "Jan Testowy"), T0.AddMinutes(6));
+
+        Assert.Empty(result.Changes);
+        Assert.True(result.StateChanged);
+        Assert.Equal(T0.AddMinutes(5), order.ShopModifiedAtUtc);
+        Assert.Equal(updatedAt, order.UpdatedAtUtc);
+        Assert.Equal(CustomerAnonymization.Marker, order.Customer.Name);
+    }
+
     private static IReadOnlyList<ShopWarning> Warnings(Order order) =>
         ShopStatuses.WarningsFor(order.Source, order.FulfillmentStatus, order.ShopStatus, order.ShopDeletedAtUtc, order.ShopRefundedAmount);
 }

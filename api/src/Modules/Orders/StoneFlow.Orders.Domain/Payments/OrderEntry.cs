@@ -65,6 +65,18 @@ public abstract class OrderEntry
         }
     }
 
+    /// <summary>
+    /// Zastępuje skrót żądania utworzenia zerami (SF-22): skrót liczony z treści (np. z powodem) pozwalałby
+    /// potwierdzić zgadywane dane. Ponowienie starego żądania dostaje wtedy „klucz użyty z innymi danymi”.
+    /// </summary>
+    protected void EraseCreationRequestHash()
+    {
+        if (CreationRequestHash is not null)
+        {
+            CreationRequestHash = new byte[32];
+        }
+    }
+
     /// <summary>Zmienione pola względem <paramref name="before"/>; przy zmianie aktualizuje czas zmiany.</summary>
     protected IReadOnlyList<EntryFieldChange> Changed(IReadOnlyList<EntryFieldValue> before, DateTime nowUtc)
     {

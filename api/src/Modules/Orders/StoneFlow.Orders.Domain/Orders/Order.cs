@@ -144,6 +144,15 @@ public sealed class Order
 
     public DateTime UpdatedAtUtc { get; private set; }
 
+    /// <summary>Czas anonimizacji danych klienta (SF-22); fakt nieodwracalny.</summary>
+    public DateTime? AnonymizedAtUtc { get; private set; }
+
+    /// <summary>Konto, które zanonimizowało dane klienta (SF-22).</summary>
+    public Guid? AnonymizedByAccountId { get; private set; }
+
+    /// <summary>Dane klienta zanonimizowano (SF-22): synchronizacja i edycja ich nie przywracają.</summary>
+    public bool IsCustomerAnonymized => AnonymizedAtUtc is not null;
+
     public bool IsCancelled => FulfillmentStatus == FulfillmentStatus.Cancelled;
 
     /// <summary>Pola tylko do odczytu w edycji użytkownika (puste dla zamówienia ręcznego).</summary>
@@ -224,7 +233,8 @@ public sealed class Order
     /// <summary>
     /// Zastosowanie dostawy ze sklepu (SF-12, „Zastosowanie snapshotu”). Zmienia tylko pola sklepu,
     /// a status realizacji wyłącznie jednorazowym przejściem na „Anulowane”, gdy zamówienie przechodzi
-    /// z aktywnego w sklepie na zakończone w sklepie.
+    /// z aktywnego w sklepie na zakończone w sklepie. Zamówienie z zanonimizowanymi danymi klienta
+    /// (SF-22) nie przyjmuje klienta z dostawy, więc synchronizacja nie przywraca jego danych.
     /// </summary>
     /// <param name="delivery">Rodzaj dostawy (temat webhooka).</param>
     /// <param name="data">Dane pełnego zamówienia; <c>null</c> tylko dla <see cref="ShopDelivery.Deleted"/>.</param>
@@ -261,7 +271,11 @@ public sealed class Order
             ShopModifiedAtUtc = data.ModifiedAtUtc;
             OrderDate = data.OrderDate;
             Value = data.Value;
-            Customer = data.Customer;
+            if (!IsCustomerAnonymized)
+            {
+                Customer = data.Customer;
+            }
+
             ShopStatus = data.Status;
             ShopRefundedAmount = data.RefundedAmount;
         }
@@ -276,7 +290,8 @@ public sealed class Order
     }
 
     /// <summary>
-    /// Edycja przez użytkownika. Kolejność: własność pól sklepu, reguły statusu, wyliczenie zmian.
+    /// Edycja przez użytkownika. Kolejność: własność pól sklepu, klient zanonimizowany (SF-22), reguły
+    /// statusu, wyliczenie zmian.
     /// Przy naruszeniu reguły zamówienie się nie zmienia; bez zmian lista jest pusta.
     /// </summary>
     /// <exception cref="ArgumentException">Zamówienie ręczne bez pól wymaganych przy edycji.</exception>
@@ -296,6 +311,11 @@ public sealed class Order
         else if (edit.OrderDate is null || edit.Channel is null || edit.Value is null || edit.Customer is null)
         {
             throw new ArgumentException("Zamówienie ręczne wymaga daty, kanału, wartości i klienta.", nameof(edit));
+        }
+
+        if (IsCustomerAnonymized && edit.Customer is { } customer && customer != Customer)
+        {
+            return OrderChangeResult.Rejected(OrderRuleViolation.CustomerAnonymized);
         }
 
         if (IsCancelled != (edit.FulfillmentStatus == FulfillmentStatus.Cancelled))
@@ -348,6 +368,42 @@ public sealed class Order
         var before = Snapshot();
         FulfillmentStatus = FulfillmentStatus.InProgress;
         return Changed(before, nowUtc);
+    }
+
+    /// <summary>
+    /// Anonimizacja danych klienta (PRD §5, DANE-01, SF-22), nieodwracalna: nazwa klienta → znacznik
+    /// <see cref="CustomerAnonymization.Marker"/>, pozostałe dane klienta, uwagi do realizacji i komentarz →
+    /// brak, skrót żądania utworzenia → zera (skrót z treścią klienta pozwalałby potwierdzić zgadywane dane).
+    /// Rodzaj klienta, kwoty, daty, kanał, status, dostawcy, ZO, faktura, flagi i pola sklepu zostają.
+    /// Zwraca pola, które zmieniły wartość (bez starych wartości w audycie — robi to wywołujący).
+    /// </summary>
+    /// <exception cref="ArgumentException">Brak konta.</exception>
+    public OrderChangeResult AnonymizeCustomer(Guid accountId, DateTime nowUtc)
+    {
+        if (IsCustomerAnonymized)
+        {
+            return OrderChangeResult.Rejected(OrderRuleViolation.AlreadyAnonymized);
+        }
+
+        if (accountId == Guid.Empty)
+        {
+            throw new ArgumentException("Brak identyfikatora konta.", nameof(accountId));
+        }
+
+        var before = Snapshot();
+        Customer = new Customer(Customer.Kind, CustomerAnonymization.Marker, null, null, null, null, null, null);
+        Operational = Operational with { Notes = null };
+        Comment = null;
+        if (CreationRequestHash is not null)
+        {
+            CreationRequestHash = new byte[32];
+        }
+
+        AnonymizedAtUtc = nowUtc;
+        AnonymizedByAccountId = accountId;
+        var result = Changed(before, nowUtc);
+        UpdatedAtUtc = nowUtc;
+        return result;
     }
 
     /// <summary>Wartości wszystkich pól objętych audytem, w stałej kolejności.</summary>
