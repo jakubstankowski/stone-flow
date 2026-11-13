@@ -1,3 +1,5 @@
+using StoneFlow.Orders.Domain.Orders;
+
 namespace StoneFlow.Orders.Domain.Payments;
 
 /// <summary>Dane zwrotu z formularza, już znormalizowane (powód przycięty).</summary>
@@ -65,6 +67,20 @@ public sealed class Refund : OrderEntry
         Date = details.Date;
         Method = details.Method;
         Reason = details.Reason;
+        return Changed(before, nowUtc);
+    }
+
+    /// <summary>
+    /// Anonimizacja powodu zwrotu (SF-22, nieodwracalna): powód zastępuje znacznik
+    /// <see cref="CustomerAnonymization.Marker"/> (powód jest wymagany), a skrót żądania utworzenia —
+    /// zera. Kwota, data i pozostałe pola się nie zmieniają. Zwraca zmienione pola (pusta lista, gdy powód
+    /// był już znacznikiem; czas zmiany się wtedy nie zmienia).
+    /// </summary>
+    public IReadOnlyList<EntryFieldChange> AnonymizeReason(DateTime nowUtc)
+    {
+        var before = Snapshot();
+        Reason = CustomerAnonymization.Marker;
+        EraseCreationRequestHash();
         return Changed(before, nowUtc);
     }
 

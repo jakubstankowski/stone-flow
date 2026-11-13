@@ -350,4 +350,57 @@ describe('ChangeHistoryPage', () => {
     expect((fixture.nativeElement as HTMLElement).querySelector('.skeleton')).not.toBeNull();
     request.flush(changeHistoryPage());
   });
+
+  it('shows an anonymization as a warning with only the new values (SF-22)', async () => {
+    const anonymization = changeHistoryItem({
+      id: '21',
+      operation: 'anonymized',
+      object: { type: 'order', id: 'o1', label: 'ZR-2026-0001' },
+      changes: [
+        {
+          field: 'anonymizedFields',
+          oldValue: null,
+          newValue: '["customerName","notes"]',
+          isPersonalData: false,
+        },
+        { field: 'retentionMonths', oldValue: null, newValue: '60', isPersonalData: false },
+      ],
+    });
+    const earlier = changeHistoryItem({
+      id: '22',
+      operation: 'updated',
+      object: { type: 'order', id: 'o1', label: 'ZR-2026-0001' },
+      changes: [
+        {
+          field: 'customerName',
+          oldValue: '[zanonimizowano]',
+          newValue: '[zanonimizowano]',
+          isPersonalData: true,
+        },
+      ],
+    });
+    const { element, settle } = await render(
+      changeHistoryPage({ items: [anonymization, earlier] }),
+    );
+    const [first, second] = rows(element);
+
+    const badge = cell(first, 3).querySelector('.badge');
+    expect(badge?.textContent?.trim()).toBe('Anonimizacja');
+    expect(badge?.className).toContain('text-(--sf-warning)');
+    expect(cellText(first, 4)).toContain(
+      'Zanonimizowane pola: Imię i nazwisko lub nazwa firmy, Uwagi do realizacji',
+    );
+
+    buttonByText(cell(first, 4), 'Pokaż zmiany')!.click();
+    buttonByText(cell(second, 4), 'Pokaż zmiany')!.click();
+    await settle(() => expect(element.querySelector('#zmiany-22 table')).not.toBeNull());
+    const heads = (id: string) =>
+      Array.from(element.querySelectorAll(`#${id} thead th`)).map((th) => th.textContent?.trim());
+    expect(heads('zmiany-21')).toEqual(['Pole', 'Jest']);
+    expect(heads('zmiany-22')).toEqual(['Pole', 'Było', 'Jest']);
+    expect(element.querySelector('#zmiany-21 tbody')?.textContent).toContain(
+      'Okres retencji (miesiące)',
+    );
+    expect(element.querySelector('#zmiany-22 tbody')?.textContent).toContain('[zanonimizowano]');
+  });
 });

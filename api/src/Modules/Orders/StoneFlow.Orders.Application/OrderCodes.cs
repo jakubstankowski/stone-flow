@@ -74,7 +74,18 @@ public static class OrderCodes
         [PaymentState.Paid] = "paid",
     };
 
+    private static readonly Dictionary<AnonymizationStatus, string> AnonymizationStatuses = new()
+    {
+        [AnonymizationStatus.Disabled] = "disabled",
+        [AnonymizationStatus.RetentionPending] = "retentionPending",
+        [AnonymizationStatus.Available] = "available",
+        [AnonymizationStatus.Anonymized] = "anonymized",
+    };
+
     public static string Of(OrderSource source) => Sources[source];
+
+    /// <summary>Stan akcji anonimizacji danych klienta (SF-22).</summary>
+    public static string Of(AnonymizationStatus status) => AnonymizationStatuses[status];
 
     public static string Of(OrderChannel channel) => Channels[channel];
 

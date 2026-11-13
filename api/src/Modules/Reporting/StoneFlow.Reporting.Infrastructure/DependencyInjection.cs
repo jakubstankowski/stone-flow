@@ -16,6 +16,8 @@ public static class DependencyInjection
             options.UseModuleSqlServer<ReportingDbContext>(serviceProvider, ReportingDbContext.Schema));
 
         services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuditRedaction, AuditRedactor>();
+        services.AddScoped<IAuditActivity, AuditActivity>();
         services.AddScoped<IChangeHistoryReader, ChangeHistoryReader>();
 
         services.AddHandlersFromAssembly(Application.AssemblyReference.Assembly);

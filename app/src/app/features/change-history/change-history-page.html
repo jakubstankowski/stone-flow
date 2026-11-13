@@ -180,7 +180,7 @@
             <thead>
               <tr>
                 <th scope="col">Pole</th>
-                @if (row.operation !== 'created') {
+                @if (showsOldValues(row.operation)) {
                   <th scope="col">Było</th>
                 }
                 @if (row.operation !== 'deleted') {
@@ -194,7 +194,7 @@
                   <th scope="row" class="font-medium">
                     {{ fieldLabel(row.object.type, change.field) }}
                   </th>
-                  @if (row.operation !== 'created') {
+                  @if (showsOldValues(row.operation)) {
                     <td>{{ formatFieldValue(row.object.type, change.field, change.oldValue) }}</td>
                   }
                   @if (row.operation !== 'deleted') {

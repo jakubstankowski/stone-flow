@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using StoneFlow.Orders.Application;
 using StoneFlow.Orders.Application.Abstractions;
+using StoneFlow.Orders.Application.AnonymizeCustomer;
 using StoneFlow.Orders.Application.CancelOrder;
 using StoneFlow.Orders.Application.CreateOrder;
 using StoneFlow.Orders.Application.EditOrder;
@@ -36,6 +37,7 @@ internal static class OrdersEndpoints
         group.MapPut("/{id:guid}", EditAsync).WithName("Orders.Edit");
         group.MapPost("/{id:guid}/cancel", CancelAsync).WithName("Orders.Cancel");
         group.MapPost("/{id:guid}/restore", RestoreAsync).WithName("Orders.Restore");
+        group.MapPost("/{id:guid}/anonymize", AnonymizeAsync).WithName("Orders.AnonymizeCustomer");
     }
 
     private static async Task<Results<Ok<OrderListPageResponse>, ValidationProblem>> ListAsync(
@@ -117,6 +119,7 @@ internal static class OrdersEndpoints
             EditOrderOutcome.Conflict => OrderProblems.Conflict(),
             EditOrderOutcome.FieldOwnedByShop => OrderProblems.FieldOwnedByShop([.. (result.Fields ?? []).Select(OrderCodes.Of)]),
             EditOrderOutcome.StatusChangeRequiresAction => OrderProblems.StatusChangeRequiresAction(),
+            EditOrderOutcome.CustomerAnonymized => OrderProblems.CustomerAnonymized(),
             EditOrderOutcome.SalesReductionLimitExceeded =>
                 OrderProblems.ValueBelowSalesReductions(result.MinimumValue!.Value, OrderInput.FormatValue(result.MinimumValue.Value)),
             _ => ValidationProblem(result.Errors),
@@ -154,6 +157,28 @@ internal static class OrdersEndpoints
             OrderStatusActionOutcome.NotFound => OrderProblems.NotFound(),
             OrderStatusActionOutcome.Conflict => OrderProblems.Conflict(),
             OrderStatusActionOutcome.InvalidState => invalidState(),
+            _ => ValidationProblem(result.Errors),
+        };
+    }
+
+    /// <summary>„Anonimizuj dane klienta” (SF-22); dostępność sprawdza handler niezależnie od UI.</summary>
+    private static async Task<Results<Ok<OrderVersionResponse>, ValidationProblem, ProblemHttpResult, UnauthorizedHttpResult>> AnonymizeAsync(
+        Guid id, OrderVersionRequest? request, IDispatcher dispatcher, HttpContext context, CancellationToken cancellationToken)
+    {
+        if (CurrentAccount(context.User) is not { } accountId)
+        {
+            return TypedResults.Unauthorized();
+        }
+
+        var result = await dispatcher.SendAsync(new AnonymizeCustomerCommand(accountId, id, request?.Version), cancellationToken);
+        return result.Outcome switch
+        {
+            AnonymizeCustomerOutcome.Saved => TypedResults.Ok(new OrderVersionResponse(OrderVersion.Format(result.Version!))),
+            AnonymizeCustomerOutcome.Disabled => OrderProblems.AnonymizationDisabled(),
+            AnonymizeCustomerOutcome.NotFound => OrderProblems.NotFound(),
+            AnonymizeCustomerOutcome.Conflict => OrderProblems.Conflict(),
+            AnonymizeCustomerOutcome.AlreadyAnonymized => OrderProblems.AlreadyAnonymized(),
+            AnonymizeCustomerOutcome.RetentionNotElapsed => OrderProblems.RetentionNotElapsed(result.AvailableFrom!.Value),
             _ => ValidationProblem(result.Errors),
         };
     }

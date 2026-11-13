@@ -129,6 +129,87 @@ public sealed class AuditRecordTests
     public void Undefined_enum_values_are_rejected() =>
         Assert.Throws<ArgumentException>(() => Create(operation: (AuditOperation)99));
 
+    private const string Marker = "[zanonimizowano]";
+
+    private static readonly HashSet<string> PersonalFields = new(StringComparer.Ordinal) { "customerName", "notes" };
+
+    [Fact]
+    public void Redact_replaces_old_and_new_values_of_selected_fields_only()
+    {
+        var record = Create(changes:
+        [
+            new("amount", "100.00", "120.50", false),
+            new("customerName", "Jan Testowy", "Anna Testowa", true),
+            new("notes", "Uwagi przed", "Uwagi po", false),
+        ]);
+
+        Assert.True(record.Redact(PersonalFields, Marker));
+
+        Assert.Equal(
+            [
+                new AuditFieldChange("amount", "100.00", "120.50", false),
+                new AuditFieldChange("customerName", Marker, Marker, true),
+                new AuditFieldChange("notes", Marker, Marker, false),
+            ],
+            record.Changes);
+    }
+
+    [Fact]
+    public void Redact_keeps_null_values_null()
+    {
+        var created = Create(operation: AuditOperation.Created, changes: [new("customerName", null, "Jan Testowy", true)]);
+        var deleted = Create(objectType: AuditObjectType.Refund, parentType: AuditObjectType.Order, parentId: OrderId, operation: AuditOperation.Deleted, changes: [new("reason", "Powód", null, false)]);
+
+        Assert.True(created.Redact(PersonalFields, Marker));
+        Assert.True(deleted.Redact(new HashSet<string>(StringComparer.Ordinal) { "reason" }, Marker));
+
+        Assert.Equal(new AuditFieldChange("customerName", null, Marker, true), Assert.Single(created.Changes));
+        Assert.Equal(new AuditFieldChange("reason", Marker, null, false), Assert.Single(deleted.Changes));
+    }
+
+    [Fact]
+    public void Redact_keeps_the_rest_of_the_entry()
+    {
+        var record = Create(objectType: AuditObjectType.Refund, parentType: AuditObjectType.Order, parentId: OrderId, changes:
+        [
+            new("amount", "10.00", "20.00", false),
+            new("reason", "Stary powód", "Nowy powód", false),
+        ]);
+        var before = (record.Id, record.OccurredAtUtc, record.AuthorKind, record.AuthorAccountId, record.ObjectType, record.ObjectId,
+            record.ObjectBusinessDate, record.ObjectLabel, record.ParentObjectType, record.ParentObjectId, record.Operation);
+
+        record.Redact(new HashSet<string>(StringComparer.Ordinal) { "reason" }, Marker);
+
+        Assert.Equal(before, (record.Id, record.OccurredAtUtc, record.AuthorKind, record.AuthorAccountId, record.ObjectType, record.ObjectId,
+            record.ObjectBusinessDate, record.ObjectLabel, record.ParentObjectType, record.ParentObjectId, record.Operation));
+        Assert.Equal(["amount", "reason"], record.Changes.Select(change => change.Field));
+        Assert.Equal([false, false], record.Changes.Select(change => change.IsPersonalData));
+    }
+
+    [Fact]
+    public void Redact_without_matching_values_changes_nothing()
+    {
+        var unrelated = Create(changes: [new("amount", "100.00", "120.50", false)]);
+        var alreadyRedacted = Create(changes: [new("customerName", Marker, null, true)]);
+        var unrelatedChanges = unrelated.Changes;
+        var redactedChanges = alreadyRedacted.Changes;
+
+        Assert.False(unrelated.Redact(PersonalFields, Marker));
+        Assert.False(alreadyRedacted.Redact(PersonalFields, Marker));
+
+        Assert.Same(unrelatedChanges, unrelated.Changes);
+        Assert.Same(redactedChanges, alreadyRedacted.Changes);
+    }
+
+    [Fact]
+    public void Redact_requires_fields_and_marker()
+    {
+        var record = Create();
+
+        Assert.Throws<ArgumentNullException>(() => record.Redact(null!, Marker));
+        Assert.Throws<ArgumentException>(() => record.Redact(PersonalFields, " "));
+    }
+
     private static AuditRecord Create(
         AuditAuthorKind authorKind = AuditAuthorKind.Account,
         Guid? accountId = null,

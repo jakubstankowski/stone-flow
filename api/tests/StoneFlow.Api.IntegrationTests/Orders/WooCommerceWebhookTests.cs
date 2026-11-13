@@ -326,4 +326,56 @@ public sealed class WooCommerceWebhookTests(SqlServerFixture sqlServer)
         Assert.Equal(["refundedInShop"], details.GetProperty("shopWarnings").EnumerateArray().Select(w => w.GetString()));
         Assert.Equal(0, await test.ScalarAsync<int>("SELECT COUNT(*) FROM orders.Refunds"));
     }
+
+    [Fact]
+    public async Task Deliveries_after_anonymization_do_not_restore_customer_data()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer, settings: AnonymizationTestSupport.Retention(extra: Enabled));
+        await PostAsync(test, "order.created", Order());
+        var id = (await ShopOrderAsync(test)).GetProperty("id").GetGuid();
+        await AnonymizationTestSupport.MoveClockAndLoginAsync(test, new DateTimeOffset(2026, 12, 10, 12, 0, 0, TimeSpan.Zero));
+        await AnonymizationTestSupport.AnonymizeAsync(test, id);
+        var syncAudit = await SyncAuditCountAsync(test);
+
+        Assert.Equal(HttpStatusCode.OK, await PostAsync(test, "order.updated", Order(status: "completed", modified: "2026-12-10T10:00:00", total: "900.00")));
+        var updated = await ShopOrderAsync(test);
+        Assert.Equal(AnonymizationTestSupport.Marker, updated.GetProperty("customer").GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, updated.GetProperty("customer").GetProperty("email").ValueKind);
+        Assert.Equal("900.00", updated.GetProperty("value").GetString());
+        Assert.Equal("completed", updated.GetProperty("shopStatus").GetString());
+        Assert.Equal("anonymized", updated.GetProperty("anonymization").GetProperty("status").GetString());
+        Assert.Equal(syncAudit + 1, await SyncAuditCountAsync(test));
+        var syncEntry = (await AnonymizationTestSupport.AuditAsync(test, id)).Last(row => row.AuthorKind == "WooCommerceSync");
+        Assert.DoesNotContain(AnonymizationTestSupport.Changes(syncEntry.Changes), change => change.Field.StartsWith("customer", StringComparison.Ordinal));
+
+        // Dostawa różna tylko danymi klienta: brak zmian pól, brak wpisu audytu.
+        Assert.Equal(HttpStatusCode.OK, await PostAsync(test, "order.updated", Order(status: "completed", modified: "2026-12-10T10:30:00", total: "900.00")));
+        Assert.Equal(syncAudit + 1, await SyncAuditCountAsync(test));
+
+        Assert.Equal(HttpStatusCode.OK, await PostAsync(test, "order.deleted", """{ "id": 1001 }"""));
+        test.Time.Advance(TimeSpan.FromMinutes(5));
+        var restoredAt = test.Time.GetUtcNow().UtcDateTime.AddMinutes(1).ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(HttpStatusCode.OK, await PostAsync(test, "order.restored", Order(modified: restoredAt, total: "900.00")));
+
+        var restored = await ShopOrderAsync(test);
+        Assert.Equal(AnonymizationTestSupport.Marker, restored.GetProperty("customer").GetProperty("name").GetString());
+        Assert.Equal(0, await AnonymizationTestSupport.OccurrencesAsync(test, "Testowy"));
+        Assert.Equal(0, await AnonymizationTestSupport.OccurrencesAsync(test, "jan.testowy"));
+    }
+
+    [Fact]
+    public async Task Delivery_saved_before_anonymization_makes_a_stale_request_a_conflict()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer, settings: AnonymizationTestSupport.Retention(extra: Enabled));
+        await PostAsync(test, "order.created", Order());
+        var id = (await ShopOrderAsync(test)).GetProperty("id").GetGuid();
+        await AnonymizationTestSupport.MoveClockAndLoginAsync(test, new DateTimeOffset(2026, 12, 10, 12, 0, 0, TimeSpan.Zero));
+        var version = await AnonymizationTestSupport.VersionAsync(test, id);
+
+        Assert.Equal(HttpStatusCode.OK, await PostAsync(test, "order.updated", Order(modified: "2026-12-10T10:00:00", total: "950.00")));
+        using var stale = await AnonymizationTestSupport.SendAnonymizeAsync(test, id, version);
+
+        await OrderEntryRequests.AssertProblemAsync(stale, HttpStatusCode.Conflict, StoneFlow.Orders.Api.OrderProblems.ConflictCode);
+        Assert.Equal("Jan Testowy", (await ShopOrderAsync(test)).GetProperty("customer").GetProperty("name").GetString());
+    }
 }

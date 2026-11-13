@@ -26,6 +26,7 @@ public static class ChangeHistoryCodes
         [AuditOperation.Created] = "created",
         [AuditOperation.Updated] = "updated",
         [AuditOperation.Deleted] = "deleted",
+        [AuditOperation.Anonymized] = "anonymized",
     };
 
     private static readonly Dictionary<AuditAuthorKind, string> Authors = new()

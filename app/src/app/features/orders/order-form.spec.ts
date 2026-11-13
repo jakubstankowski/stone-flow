@@ -13,6 +13,7 @@ import { OrderInput } from './order-models';
     [initial]="initial()"
     [shopOwnedFields]="shopOwned()"
     [cancelled]="cancelled()"
+    [customerAnonymized]="customerAnonymized()"
     [action]="action"
   />`,
 })
@@ -20,6 +21,7 @@ class Host {
   readonly initial = signal<OrderFormModel>(emptyOrderForm('2026-10-28'));
   readonly shopOwned = signal<readonly string[]>([]);
   readonly cancelled = signal(false);
+  readonly customerAnonymized = signal(false);
   readonly submitted: OrderInput[] = [];
   outcome: OrderFormOutcome = null;
   readonly action = async (input: OrderInput): Promise<OrderFormOutcome> => {
@@ -288,5 +290,70 @@ describe('OrderForm', () => {
       '1234,50',
     );
     expect(element.querySelector('#zamowienie-klient-nazwa-blad')).toBeNull();
+  });
+
+  describe('anonymized customer (SF-22)', () => {
+    const anonymizedCustomer = {
+      kind: 'person' as const,
+      name: '[zanonimizowano]',
+      phone: null,
+      email: null,
+      street: null,
+      postalCode: null,
+      city: null,
+      taxId: null,
+    };
+
+    it('shows the customer, also the kind, read-only and sends the stored customer', async () => {
+      const { element, host, submit } = await setup((current) => {
+        current.initial.set(orderFormFrom(orderDetails({ customer: anonymizedCustomer })));
+        current.customerAnonymized.set(true);
+      });
+
+      expect(element.querySelector('#zamowienie-klient-nazwa')).toBeNull();
+      expect(element.querySelector('#zamowienie-klient-rodzaj')).toBeNull();
+      const note = element.querySelector('#zamowienie-klient-zanonimizowany');
+      expect(note?.textContent).toContain('Dane klienta zanonimizowano; nie można ich zmienić.');
+      expect(element.querySelector('fieldset')?.getAttribute('aria-describedby')).toBe(
+        'zamowienie-klient-zanonimizowany',
+      );
+      expect(element.textContent).toContain('[zanonimizowano]');
+      expect(element.textContent).not.toContain('Dane klienta pochodzą ze sklepu');
+
+      await submit();
+      expect(host.submitted).toHaveLength(1);
+      expect(host.submitted[0].customer).toEqual(anonymizedCustomer);
+    });
+
+    it('shows the API rejection of a changed customer in the summary', async () => {
+      const { element, host, submit } = await setup((current) => {
+        current.initial.set(orderFormFrom(orderDetails({ customer: anonymizedCustomer })));
+        current.customerAnonymized.set(true);
+      });
+      host.outcome = {
+        error: {
+          kind: 'problem',
+          status: 422,
+          code: 'order_customer_anonymized',
+          detail: 'Dane klienta zanonimizowano. Nie można ich zmienić ani przywrócić.',
+        },
+      };
+
+      await submit();
+
+      expect(summary(element)?.textContent).toContain(
+        'Dane klienta zanonimizowano. Nie można ich zmienić ani przywrócić.',
+      );
+    });
+
+    it('keeps the shop note for a shop order that is not anonymized', async () => {
+      const { element } = await setup((current) => {
+        current.initial.set(orderFormFrom(orderDetails({ source: 'wooCommerce' })));
+        current.shopOwned.set(['orderDate', 'value', 'channel', 'customer']);
+      });
+
+      expect(element.textContent).toContain('Dane klienta pochodzą ze sklepu');
+      expect(element.querySelector('#zamowienie-klient-zanonimizowany')).toBeNull();
+    });
   });
 });

@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using StoneFlow.Orders.Application;
 using StoneFlow.Orders.Application.Abstractions;
+using StoneFlow.Orders.Application.AnonymizeCustomer;
 using StoneFlow.Orders.Application.Payments;
 using StoneFlow.Orders.Application.ShopSync;
 using StoneFlow.Orders.Domain.Payments;
+using StoneFlow.Orders.Infrastructure.Options;
 using StoneFlow.Orders.Infrastructure.Persistence;
 using StoneFlow.Shared.Application.Operations;
 using StoneFlow.Shared.Application.Sales;
@@ -34,6 +37,15 @@ public static class DependencyInjection
         services.AddScoped<OrderEntryWriter<Payment>>();
         services.AddScoped<OrderEntryWriter<Refund>>();
         services.AddScoped<OrderEntryWriter<SalesCorrection>>();
+
+        // Anonimizacja danych klienta (SF-22): okres retencji z konfiguracji, bez wartości domyślnej (D-09).
+        services.AddSingleton<IValidateOptions<AnonymizationOptions>, AnonymizationOptionsValidator>();
+        services.AddOptions<AnonymizationOptions>()
+            .BindConfiguration(AnonymizationOptions.SectionName)
+            .ValidateOnStart();
+        services.AddSingleton<IAnonymizationSettings, ConfiguredAnonymizationSettings>();
+        services.AddScoped<IOrderAnonymizationStore, OrderAnonymizationStore>();
+        services.AddScoped<AnonymizationRetention>();
 
         // Kontrakt z wieloma implementacjami (Orders, Expenses): zwykłe AddScoped, aby rejestracje się sumowały.
         services.AddScoped<ICashOperationSource, OrderCashOperationSource>();

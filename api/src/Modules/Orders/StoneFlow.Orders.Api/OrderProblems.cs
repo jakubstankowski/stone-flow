@@ -23,6 +23,10 @@ public static class OrderProblems
     public const string PaidWouldBeNegativeCode = "paid_would_be_negative";
     public const string RefundExceedsPaidCode = "refund_exceeds_paid";
     public const string SalesReductionLimitExceededCode = "sales_reduction_limit_exceeded";
+    public const string AnonymizationDisabledCode = "anonymization_disabled";
+    public const string RetentionNotElapsedCode = "retention_not_elapsed";
+    public const string AlreadyAnonymizedCode = "order_already_anonymized";
+    public const string CustomerAnonymizedCode = "order_customer_anonymized";
 
     public const string NotFoundDetail = "Nie znaleziono zamówienia.";
     public const string ConflictDetail = "Zamówienie zostało zmienione w międzyczasie. Wczytaj aktualne dane.";
@@ -35,6 +39,9 @@ public static class OrderProblems
     public const string EntryNotFoundDetail = "Nie znaleziono wpisu. Mógł zostać usunięty.";
     public const string EntryConflictDetail = "Wpis został zmieniony w międzyczasie. Wczytaj aktualne dane.";
     public const string PaidWouldBeNegativeDetail = "Zapłacono nie może spaść poniżej 0 zł. Najpierw popraw lub usuń zwrot.";
+    public const string AnonymizationDisabledDetail = "Anonimizacja jest wyłączona do czasu ustalenia okresu retencji danych.";
+    public const string AlreadyAnonymizedDetail = "Dane klienta tego zamówienia zostały już zanonimizowane.";
+    public const string CustomerAnonymizedDetail = "Dane klienta zanonimizowano. Nie można ich zmienić ani przywrócić.";
 
     private static readonly CultureInfo Polish = CultureInfo.GetCultureInfo("pl-PL");
 
@@ -105,6 +112,24 @@ public static class OrderProblems
             $"Wartość nie może być niższa niż suma zwrotów sprzedaży i korekt ({minimumValue.ToString("N2", Polish)} zł).",
             SalesReductionLimitExceededCode,
             new Dictionary<string, object?> { ["minimumValue"] = minimumValueText });
+
+    /// <summary>Funkcja anonimizacji wyłączona: brak okresu retencji w konfiguracji (SF-22, D-09).</summary>
+    public static ProblemHttpResult AnonymizationDisabled() =>
+        Problem(StatusCodes.Status422UnprocessableEntity, AnonymizationDisabledDetail, AnonymizationDisabledCode);
+
+    /// <summary>Okres retencji nie upłynął; <c>availableFrom</c> to pierwszy dzień dostępności (<c>yyyy-MM-dd</c>).</summary>
+    public static ProblemHttpResult RetentionNotElapsed(DateOnly availableFrom) =>
+        Problem(
+            StatusCodes.Status422UnprocessableEntity,
+            $"Anonimizacja będzie dostępna od {availableFrom.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)}, po upływie okresu retencji.",
+            RetentionNotElapsedCode,
+            new Dictionary<string, object?> { ["availableFrom"] = availableFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) });
+
+    public static ProblemHttpResult AlreadyAnonymized() =>
+        Problem(StatusCodes.Status409Conflict, AlreadyAnonymizedDetail, AlreadyAnonymizedCode);
+
+    public static ProblemHttpResult CustomerAnonymized() =>
+        Problem(StatusCodes.Status422UnprocessableEntity, CustomerAnonymizedDetail, CustomerAnonymizedCode);
 
     private static ProblemHttpResult Problem(int status, string detail, string code, Dictionary<string, object?>? extensions = null)
     {

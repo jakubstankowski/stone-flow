@@ -184,4 +184,55 @@ describe('objectLink', () => {
   it('has no link for an entry without the expected parent', () => {
     expect(objectLink(changeHistoryItem({ object: { type: 'refund', parent: null } }))).toBeNull();
   });
+
+  describe('anonymization entries (SF-22)', () => {
+    it('labels the operation fields of an order and of its entries', () => {
+      expect(fieldLabel('order', 'anonymizedFields')).toBe('Zanonimizowane pola');
+      expect(fieldLabel('order', 'anonymizedReasons')).toBe(
+        'Zanonimizowane powody zwrotów i korekt',
+      );
+      expect(fieldLabel('order', 'retentionStartDate')).toBe('Początek okresu retencji');
+      expect(fieldLabel('order', 'retentionMonths')).toBe('Okres retencji (miesiące)');
+      expect(fieldLabel('refund', 'anonymizedFields')).toBe('Zanonimizowane pola');
+      expect(fieldLabel('salesCorrection', 'anonymizedFields')).toBe('Zanonimizowane pola');
+    });
+
+    it('shows anonymized field codes as field labels', () => {
+      expect(
+        formatFieldValue('order', 'anonymizedFields', '["customerName","customerEmail","notes"]'),
+      ).toBe('Imię i nazwisko lub nazwa firmy, E-mail, Uwagi do realizacji');
+      expect(formatFieldValue('refund', 'anonymizedFields', '["reason"]')).toBe('Powód');
+      expect(formatFieldValue('order', 'anonymizedFields', '[]')).toBe(NO_DATA);
+      expect(formatFieldValue('order', 'anonymizedFields', '["futureField"]')).toBe('futureField');
+      expect(formatFieldValue('order', 'anonymizedFields', 'nie-json')).toBe('nie-json');
+      expect(formatFieldValue('order', 'retentionStartDate', '2021-03-15')).toBe('15.03.2021');
+      expect(formatFieldValue('order', 'retentionMonths', '60')).toBe('60');
+      expect(formatFieldValue('order', 'customerName', '[zanonimizowano]')).toBe(
+        '[zanonimizowano]',
+      );
+    });
+
+    it('summarizes an anonymization with the new values only', () => {
+      const summary = changeSummary(
+        changeHistoryItem({
+          operation: 'anonymized',
+          object: { type: 'order' },
+          changes: [
+            {
+              field: 'anonymizedFields',
+              oldValue: null,
+              newValue: '["customerName"]',
+              isPersonalData: false,
+            },
+            { field: 'anonymizedReasons', oldValue: null, newValue: '2', isPersonalData: false },
+          ],
+        }),
+      );
+
+      expect(summary.lines).toEqual([
+        'Zanonimizowane pola: Imię i nazwisko lub nazwa firmy',
+        'Zanonimizowane powody zwrotów i korekt: 2',
+      ]);
+    });
+  });
 });

@@ -24,6 +24,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 
     public const string ShopRefundedAmountConstraint = "CK_Orders_ShopRefundedAmount";
 
+    /// <summary>Fakt anonimizacji (SF-22): czas i konto razem albo żadne.</summary>
+    public const string AnonymizationConstraint = "CK_Orders_Anonymization";
+
     private const int CodeMaxLength = 16;
 
     public void Configure(EntityTypeBuilder<Order> builder)
@@ -38,6 +41,9 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
                 ShopFieldsConstraint,
                 "[Source] <> N'Manual' OR ([ShopModifiedAtUtc] IS NULL AND [ShopDeletedAtUtc] IS NULL AND [ShopRefundedAmount] = 0)");
             table.HasCheckConstraint(ShopRefundedAmountConstraint, "[ShopRefundedAmount] >= 0");
+            table.HasCheckConstraint(
+                AnonymizationConstraint,
+                "([AnonymizedAtUtc] IS NULL AND [AnonymizedByAccountId] IS NULL) OR ([AnonymizedAtUtc] IS NOT NULL AND [AnonymizedByAccountId] IS NOT NULL)");
         });
 
         builder.HasKey(order => order.Id);
@@ -88,11 +94,14 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(order => order.CreationRequestHash).HasColumnType("binary(32)");
         builder.Property(order => order.CreatedAtUtc).HasColumnType("datetime2");
         builder.Property(order => order.UpdatedAtUtc).HasColumnType("datetime2");
+        builder.Property(order => order.AnonymizedAtUtc).HasColumnType("datetime2");
+        builder.Property(order => order.AnonymizedByAccountId);
         builder.Property<byte[]>(VersionProperty).IsRowVersion().IsRequired();
 
         builder.Ignore(order => order.IsCancelled);
         builder.Ignore(order => order.ShopOwnedFields);
         builder.Ignore(order => order.IsTerminalInShop);
+        builder.Ignore(order => order.IsCustomerAnonymized);
 
         builder.HasIndex(order => order.Number).IsUnique();
         builder.HasIndex(order => new { order.Source, order.ExternalId }).IsUnique().HasFilter("[ExternalId] IS NOT NULL");

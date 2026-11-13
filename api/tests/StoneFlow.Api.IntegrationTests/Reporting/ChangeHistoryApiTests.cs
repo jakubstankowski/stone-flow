@@ -248,6 +248,33 @@ public sealed class ChangeHistoryApiTests(SqlServerFixture sqlServer)
         Assert.Equal(1, count);
     }
 
+    [Fact]
+    public async Task Anonymization_is_listed_with_its_scope_for_the_order_and_the_refund()
+    {
+        await using var test = await OrdersTest.CreateAsync(sqlServer, settings: AnonymizationTestSupport.Retention());
+        var order = await test.CreateOrderAsync(OrderEntryRequests.Order("100.00"));
+        await OrderEntryRequests.AddPaymentAsync(test, order.Id, "100.00");
+        await OrderEntryRequests.AddRefundAsync(test, order.Id, "10.00", reason: "Zwrot dla Jana");
+        await AnonymizationTestSupport.MoveClockAndLoginAsync(test, new DateTimeOffset(2026, 12, 10, 12, 0, 0, TimeSpan.Zero));
+        await AnonymizationTestSupport.AnonymizeAsync(test, order.Id);
+        const string December = "/api/change-history?changedFrom=2026-12-10&changedTo=2026-12-10";
+
+        var orderEntry = Assert.Single(Items(await test.GetJsonAsync($"{December}&objectType=order")));
+        var refundEntry = Assert.Single(Items(await test.GetJsonAsync($"{December}&objectType=refund")));
+
+        Assert.Equal("anonymized", orderEntry.GetProperty("operation").GetString());
+        Assert.Equal("account", orderEntry.GetProperty("author").GetProperty("kind").GetString());
+        Assert.Equal(order.Number, orderEntry.GetProperty("object").GetProperty("label").GetString());
+        Assert.Equal(
+            ["anonymizedFields", "anonymizedReasons", "retentionStartDate", "retentionMonths"],
+            orderEntry.GetProperty("changes").EnumerateArray().Select(c => c.GetProperty("field").GetString()));
+        Assert.Equal("anonymized", refundEntry.GetProperty("operation").GetString());
+        Assert.Equal("""["reason"]""", refundEntry.GetProperty("changes")[0].GetProperty("newValue").GetString());
+        var november = await test.GetJsonAsync("/api/change-history?changedFrom=2026-11-05&changedTo=2026-11-05&objectType=refund");
+        Assert.Contains("[zanonimizowano]", november.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Zwrot dla Jana", november.GetRawText(), StringComparison.Ordinal);
+    }
+
     private static List<JsonElement> Items(JsonElement page) => [.. page.GetProperty("items").EnumerateArray()];
 
     private static async Task<string?[]> LabelsAsync(OrdersTest test, string path) =>

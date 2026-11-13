@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Domain\StoneFlow.Orders.Domain.csproj" />
     <ProjectReference Include="..\..\src\Modules\Orders\StoneFlow.Orders.Application\StoneFlow.Orders.Application.csproj" />
   </ItemGroup>
