@@ -19,6 +19,7 @@ import {
   OBJECT_TYPE_LABELS,
   OPERATION_LABELS,
   OPERATION_TONES,
+  showsOldValues,
   objectLink,
 } from './change-history-models';
 import { ChangeHistoryFilters, ChangeHistoryService } from './change-history.service';
@@ -66,6 +67,7 @@ export class ChangeHistoryPage {
   protected readonly changeSummary = changeSummary;
   protected readonly fieldLabel = fieldLabel;
   protected readonly formatFieldValue = formatFieldValue;
+  protected readonly showsOldValues = showsOldValues;
   protected readonly formatDate = formatDate;
   protected readonly formatDateTime = formatDateTime;
 

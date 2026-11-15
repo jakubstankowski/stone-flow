@@ -122,6 +122,36 @@ public interface IOrderEntryStore<TEntry>
 }
 
 /// <summary>
+/// Okres retencji danych zamówień z konfiguracji wdrożenia (SF-22, D-09). <c>null</c> = funkcja
+/// anonimizacji wyłączona; brak wartości zastępczej.
+/// </summary>
+public interface IAnonymizationSettings
+{
+    /// <summary>Liczba miesięcy kalendarzowych (1–1200) albo <c>null</c>.</summary>
+    int? RetentionMonths { get; }
+}
+
+/// <summary>
+/// Fakty retencji z wpłat, zwrotów i korekt zamówienia: najpóźniejsza data biznesowa wpisu i najpóźniejszy
+/// czas zmiany wpisu (UTC); <c>null</c>, gdy zamówienie nie ma wpisów.
+/// </summary>
+public sealed record EntryRetentionFacts(DateOnly? LastEntryDate, DateTime? LastEntryChangeUtc);
+
+/// <summary>Zwroty i korekty sprzedaży zamówienia wczytane do zmiany (anonimizacja powodu).</summary>
+public sealed record ReasonEntries(IReadOnlyList<Refund> Refunds, IReadOnlyList<SalesCorrection> SalesCorrections);
+
+/// <summary>
+/// Dane wpisów zamówienia potrzebne do anonimizacji (SF-22). Wpisy do zmiany są śledzone i zapisuje je
+/// <see cref="IOrderStore.SaveAsync"/> (ten sam kontekst, jedno <c>SaveChanges</c>).
+/// </summary>
+public interface IOrderAnonymizationStore
+{
+    Task<EntryRetentionFacts> GetRetentionFactsAsync(Guid orderId, CancellationToken cancellationToken);
+
+    Task<ReasonEntries> LoadReasonEntriesAsync(Guid orderId, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// Zamówienia ze sklepu i znaczniki usunięcia (SF-12), w transakcji jednostki pracy. Blokada po ID
 /// zewnętrznym obejmuje też zamówienie, którego jeszcze nie ma, więc równoczesne dostawy tego samego
 /// zamówienia się szeregują.

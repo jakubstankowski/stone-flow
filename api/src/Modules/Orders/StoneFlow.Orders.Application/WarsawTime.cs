@@ -10,6 +10,9 @@ internal static class WarsawTime
     /// <summary>Dzisiejsza data w Polsce (o 23:30 UTC zimą to już następny dzień).</summary>
     public static DateOnly Today(DateTimeOffset instant) => DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, Zone).DateTime);
 
+    /// <summary>Data w Polsce dla znacznika czasu UTC (np. ostatniej zmiany zamówienia).</summary>
+    public static DateOnly DateOf(DateTime utc) => Today(new DateTimeOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc)));
+
     private static TimeZoneInfo Find() =>
         TimeZoneInfo.TryFindSystemTimeZoneById("Europe/Warsaw", out var zone)
             ? zone

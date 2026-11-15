@@ -52,6 +52,7 @@ projekcie; zależności npm są przypięte dokładnie w `app/package.json` i `ap
    dotnet ef database update --project api/src/Modules/Expenses/StoneFlow.Expenses.Infrastructure --startup-project api/src/StoneFlow.Api --context ExpensesDbContext
    dotnet ef database update --project api/src/Modules/Reporting/StoneFlow.Reporting.Infrastructure --startup-project api/src/StoneFlow.Api --context ReportingDbContext
    dotnet ef database update --project api/src/Modules/Integrations/StoneFlow.Integrations.Infrastructure --startup-project api/src/StoneFlow.Api --context IntegrationsDbContext
+   dotnet ef database update --project api/src/Shared/StoneFlow.Shared.Infrastructure --startup-project api/src/StoneFlow.Api --context SchedulingDbContext
    dotnet run --project api/src/StoneFlow.Api --launch-profile http
    ```
 

@@ -5,6 +5,8 @@ namespace StoneFlow.Reporting.Domain.Audit;
 /// <summary>
 /// Wpis audytu zmiany finansowej (AUD-01): autor, czas UTC, obiekt z datą biznesową, operacja i
 /// zakres zmiany. Wpis jest tylko dodawany; zakres usunięcia zawiera ostatnie wartości obiektu.
+/// Jedyna dozwolona zmiana zapisanego wpisu to <see cref="Redact"/>: zastąpienie wartości wskazanych
+/// pól znacznikiem przy anonimizacji danych klienta (DANE-01, SF-22).
 /// </summary>
 public sealed class AuditRecord
 {
@@ -128,6 +130,47 @@ public sealed class AuditRecord
             parentObjectId,
             operation,
             [.. changes]);
+    }
+
+    /// <summary>
+    /// Anonimizacja (DANE-01, SF-22): w polach z <paramref name="fields"/> (porównanie dokładne) wartość
+    /// stara i nowa różna od <c>null</c> zostaje zastąpiona <paramref name="marker"/>, a <c>null</c>
+    /// zostaje <c>null</c>. Nazwy pól, flaga danych osobowych, kolejność, pozostałe pola, autor, czas,
+    /// obiekt, etykieta, data biznesowa, obiekt nadrzędny i operacja się nie zmieniają.
+    /// </summary>
+    /// <returns><c>true</c>, gdy zmieniła się co najmniej jedna wartość; inaczej zakres zmiany zostaje bez zmian.</returns>
+    /// <exception cref="ArgumentNullException">Brak zbioru pól.</exception>
+    /// <exception cref="ArgumentException">Pusty znacznik.</exception>
+    public bool Redact(IReadOnlySet<string> fields, string marker)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        ArgumentException.ThrowIfNullOrWhiteSpace(marker);
+
+        var changed = false;
+        var redacted = new List<AuditFieldChange>(Changes.Count);
+        foreach (var change in Changes)
+        {
+            if (!fields.Contains(change.Field))
+            {
+                redacted.Add(change);
+                continue;
+            }
+
+            var result = change with
+            {
+                OldValue = change.OldValue is null ? null : marker,
+                NewValue = change.NewValue is null ? null : marker,
+            };
+            changed |= result != change;
+            redacted.Add(result);
+        }
+
+        if (changed)
+        {
+            Changes = redacted;
+        }
+
+        return changed;
     }
 
     /// <summary>

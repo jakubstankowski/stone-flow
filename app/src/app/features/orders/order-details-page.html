@@ -47,6 +47,9 @@
               [marker]="order.fulfillmentStatus === 'cancelled'"
             />
             <app-status-badge [label]="'Źródło: ' + sourceLabels[order.source]" />
+            @if (anonymized()) {
+              <app-status-badge [label]="anonymizedBadge" tone="neutral" [marker]="true" />
+            }
           </div>
         </header>
 
@@ -70,6 +73,7 @@
             [initial]="initial"
             [shopOwnedFields]="order.shopOwnedFields"
             [cancelled]="cancelled()"
+            [customerAnonymized]="anonymized()"
             [action]="save"
           >
             <app-button formActions (pressed)="stopEdit()">Zamknij bez zapisu</app-button>
@@ -139,6 +143,29 @@
                   <dd>{{ order.customer.taxId ?? noData }}</dd>
                 </div>
               </dl>
+              <div
+                class="flex flex-col items-start gap-3 border-t border-(--sf-secondary) pt-3"
+                data-anonymization
+              >
+                <h3 id="dane-osobowe-naglowek" class="text-lg font-semibold">
+                  Dane osobowe klienta
+                </h3>
+                <p id="anonimizacja-opis" class="break-words text-(--sf-muted)">
+                  {{ anonymizationText() }}
+                </p>
+                @if (!anonymized()) {
+                  <app-button
+                    variant="danger"
+                    busyLabel="Anonimizowanie…"
+                    describedBy="anonimizacja-opis"
+                    [busy]="actionBusy() === 'anonymize'"
+                    [disabled]="!canAnonymize() && actionBusy() !== 'anonymize'"
+                    (pressed)="anonymizeCustomer()"
+                  >
+                    Anonimizuj dane klienta
+                  </app-button>
+                }
+              </div>
             </section>
 
             <section
@@ -244,6 +271,25 @@
           [reload]="reloadOrder"
           (activeChange)="onEntryActive($event)"
         />
+
+        @if (!anonymized()) {
+          <app-confirm-dialog
+            #anonymizeDialog
+            [heading]="'Zanonimizować dane klienta zamówienia ' + order.number + '?'"
+            confirmLabel="Anonimizuj dane klienta"
+            tone="danger"
+          >
+            <p>
+              Operacji nie można cofnąć. Dane klienta (imię i nazwisko lub nazwa firmy, telefon,
+              e-mail, adres, NIP), uwagi do realizacji, komentarz oraz powody zwrotów i korekt
+              zostaną zastąpione znacznikiem „[zanonimizowano]” w zamówieniu i w historii zmian.
+            </p>
+            <p class="mt-3">
+              Kwoty, daty, wpłaty, zwroty, korekty, kanał i numer zamówienia zostają, a raporty się
+              nie zmienią. Synchronizacja ze sklepem nie przywróci danych klienta.
+            </p>
+          </app-confirm-dialog>
+        }
 
         @if (cancelled()) {
           <app-confirm-dialog

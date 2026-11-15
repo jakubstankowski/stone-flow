@@ -16,7 +16,9 @@ import { AuditObjectTypeCode, ChangeHistoryItem } from './change-history-models'
  * nazwa i surowa wartość. Formatowanie niczego nie liczy — kwoty formatuje `formatPln` z tekstu.
  */
 
-export type FieldFormat = 'text' | 'amount' | 'date' | 'dictionary' | 'boolean' | 'list' | 'number';
+/** `fields`: tablica JSON kodów pól obiektu (anonimizacja, SF-22), pokazywana jako etykiety pól. */
+export type FieldFormat =
+  'text' | 'amount' | 'date' | 'dictionary' | 'boolean' | 'list' | 'number' | 'fields';
 
 export interface AuditFieldDefinition {
   readonly label: string;
@@ -35,6 +37,8 @@ const date = (label: string): AuditFieldDefinition => ({ label, format: 'date' }
 const yesNo = (label: string): AuditFieldDefinition => ({ label, format: 'boolean' });
 const list = (label: string): AuditFieldDefinition => ({ label, format: 'list' });
 const number = (label: string): AuditFieldDefinition => ({ label, format: 'number' });
+const fieldList = (label: string): AuditFieldDefinition => ({ label, format: 'fields' });
+const ANONYMIZED_FIELDS = 'Zanonimizowane pola';
 const dictionary = (
   label: string,
   labels: Readonly<Record<string, string>> | ((code: string) => string),
@@ -73,6 +77,10 @@ export const AUDIT_FIELD_CATALOG: Readonly<
     shopStatus: dictionary('Status w sklepie', shopStatusLabel),
     shopDeleted: yesNo('Usunięte w sklepie'),
     shopRefundedAmount: amount('Kwota zwrócona w sklepie'),
+    anonymizedFields: fieldList(ANONYMIZED_FIELDS),
+    anonymizedReasons: number('Zanonimizowane powody zwrotów i korekt'),
+    retentionStartDate: date('Początek okresu retencji'),
+    retentionMonths: number('Okres retencji (miesiące)'),
   },
   payment: {
     amount: amount('Kwota'),
@@ -86,11 +94,13 @@ export const AUDIT_FIELD_CATALOG: Readonly<
     date: date('Data zwrotu'),
     method: dictionary('Metoda', methods),
     reason: text('Powód'),
+    anonymizedFields: fieldList(ANONYMIZED_FIELDS),
   },
   salesCorrection: {
     amount: amount('Kwota'),
     date: date('Data korekty'),
     reason: text('Powód'),
+    anonymizedFields: fieldList(ANONYMIZED_FIELDS),
   },
   expense: {
     description: text('Opis'),
@@ -159,6 +169,8 @@ export function formatFieldValue(
       return value === 'true' ? 'tak' : value === 'false' ? 'nie' : value;
     case 'list':
       return formatList(value);
+    case 'fields':
+      return formatFields(type, value);
     default:
       return value;
   }
@@ -177,6 +189,24 @@ function formatList(value: string): string {
   return value;
 }
 
+/**
+ * Tablica JSON kodów pól jako etykiety pól obiektu („Imię i nazwisko lub nazwa firmy, E-mail”); pusta
+ * tablica to „Brak danych”, nieznany kod pokazuje się jako kod, nieczytelna wartość bez zmian.
+ */
+function formatFields(type: AuditObjectTypeCode, value: string): string {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed) && parsed.every((entry) => typeof entry === 'string')) {
+      return parsed.length > 0
+        ? parsed.map((code: string) => fieldLabel(type, code)).join(', ')
+        : NO_DATA;
+    }
+  } catch {
+    // Wartość nie jest JSON-em: pokazujemy ją surowo.
+  }
+  return value;
+}
+
 export interface ChangeSummary {
   readonly lines: readonly string[];
   /** Liczba pól poza skrótem („i N więcej”). */
@@ -186,8 +216,8 @@ export interface ChangeSummary {
 const SUMMARY_LENGTH = 2;
 
 /**
- * Skrót zakresu zmiany: pierwsze dwa pola w kolejności z audytu. Utworzenie pokazuje wartość
- * „jest”, usunięcie wartość „było”, a zmiana „było → jest” (te same kolumny co rozwinięcie).
+ * Skrót zakresu zmiany: pierwsze dwa pola w kolejności z audytu. Utworzenie i anonimizacja
+ * pokazują wartość „jest”, usunięcie wartość „było”, a zmiana „było → jest” (te same kolumny co rozwinięcie).
  */
 export function changeSummary(
   item: Pick<ChangeHistoryItem, 'object' | 'operation' | 'changes'>,
@@ -199,6 +229,7 @@ export function changeSummary(
     const is = formatFieldValue(type, change.field, change.newValue);
     switch (item.operation) {
       case 'created':
+      case 'anonymized':
         return `${label}: ${is}`;
       case 'deleted':
         return `${label}: ${was}`;

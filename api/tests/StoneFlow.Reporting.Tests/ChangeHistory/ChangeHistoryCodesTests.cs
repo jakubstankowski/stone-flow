@@ -64,8 +64,13 @@ public sealed class ChangeHistoryCodesTests
     public void Operation_and_author_codes_match_the_contract()
     {
         Assert.Equal(
-            ["created", "updated", "deleted"],
-            [ChangeHistoryCodes.Of(AuditOperation.Created), ChangeHistoryCodes.Of(AuditOperation.Updated), ChangeHistoryCodes.Of(AuditOperation.Deleted)]);
+            ["created", "updated", "deleted", "anonymized"],
+            [
+                ChangeHistoryCodes.Of(AuditOperation.Created),
+                ChangeHistoryCodes.Of(AuditOperation.Updated),
+                ChangeHistoryCodes.Of(AuditOperation.Deleted),
+                ChangeHistoryCodes.Of(AuditOperation.Anonymized),
+            ]);
         Assert.Equal(
             ["account", "wooCommerceSync", "automatedJob"],
             [ChangeHistoryCodes.Of(AuditAuthorKind.Account), ChangeHistoryCodes.Of(AuditAuthorKind.WooCommerceSync), ChangeHistoryCodes.Of(AuditAuthorKind.AutomatedJob)]);

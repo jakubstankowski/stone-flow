@@ -30,4 +30,7 @@ public enum AuditOperation
     Created,
     Updated,
     Deleted,
+
+    /// <summary>Anonimizacja danych klienta zamówienia (SF-22); zakres zmiany bez danych osobowych.</summary>
+    Anonymized,
 }

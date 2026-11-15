@@ -9,10 +9,12 @@ import { EmptyState } from '../../shared/ui/empty-state';
 import { ErrorState } from '../../shared/ui/error-state';
 import { LoadingState } from '../../shared/ui/loading-state';
 import { StatusBadge } from '../../shared/ui/status-badge';
+import { anonymizationText } from './order-anonymization';
 import { OrderForm, OrderFormOutcome } from './order-form';
 import { OrderPayments } from './order-payments';
 import { OrderFormModel, orderErrorMessage, orderFormFrom } from './order-form-model';
 import {
+  ANONYMIZED_BADGE_LABEL,
   CHANNEL_LABELS,
   CUSTOMER_KIND_LABELS,
   OrderDetails,
@@ -27,6 +29,9 @@ import { shopStatusLabel } from '../../shared/dictionaries/shop-status';
 
 export const CONFLICT_MESSAGE = 'Zamówienie zostało zmienione w międzyczasie.';
 const STATE_CHANGED_MESSAGE = 'Stan zamówienia zmienił się w międzyczasie.';
+export const ANONYMIZE_FAILED_MESSAGE = 'Nie udało się zanonimizować danych. Spróbuj ponownie.';
+
+type OrderAction = 'cancel' | 'restore' | 'anonymize';
 
 type ViewStatus = 'loading' | 'notFound' | 'error' | 'loaded';
 
@@ -67,7 +72,8 @@ interface Alert {
 
 /**
  * Ekran `/zamowienia/:id`: szczegóły, edycja z `version`, konflikt `409 order_conflict`
- * z „Wczytaj aktualne dane” oraz anulowanie i przywracanie po potwierdzeniu. Zamówień się nie
+ * z „Wczytaj aktualne dane”, anulowanie i przywracanie po potwierdzeniu oraz anonimizacja danych
+ * klienta po upływie okresu retencji (SF-22). Zamówień się nie
  * usuwa; usuwać można tylko wpisy płatności w sekcji „Płatności” (SF-9). Edycja zamówienia
  * i formularz wpisu wykluczają się, żeby odświeżenie po zapisie wpisu nie skasowało
  * niezapisanych zmian zamówienia.
@@ -102,7 +108,7 @@ export class OrderDetailsPage {
   protected readonly notice = signal<string | null>(this.orders.takeNotice());
   protected readonly alert = signal<Alert | null>(null);
   protected readonly reloading = signal(false);
-  protected readonly actionBusy = signal<'cancel' | 'restore' | null>(null);
+  protected readonly actionBusy = signal<OrderAction | null>(null);
   /**
    * W sekcji „Płatności” trwa praca z wpisem: formularz, usuwanie albo odświeżenie po zapisie
    * (wtedy „Edytuj” jest wyłączone).
@@ -110,6 +116,20 @@ export class OrderDetailsPage {
   protected readonly entryActive = signal(false);
 
   protected readonly cancelled = computed(() => this.order()?.fulfillmentStatus === 'cancelled');
+  /** Stan akcji „Anonimizuj dane klienta” z odczytu szczegółów (SF-22). */
+  protected readonly anonymization = computed(() => this.order()?.anonymization ?? null);
+  protected readonly anonymized = computed(() => this.anonymization()?.status === 'anonymized');
+  protected readonly canAnonymize = computed(
+    () =>
+      this.anonymization()?.status === 'available' &&
+      !this.entryActive() &&
+      this.actionBusy() === null,
+  );
+  protected readonly anonymizationText = computed(() => {
+    const anonymization = this.anonymization();
+    return anonymization ? anonymizationText(anonymization) : '';
+  });
+  protected readonly anonymizedBadge = ANONYMIZED_BADGE_LABEL;
   /** Ostrzeżenia ze sklepu w stałej kolejności, niezależnie od kolejności z API. */
   protected readonly shopWarnings = computed<readonly ShopWarningView[]>(() => {
     const order = this.order();
@@ -134,6 +154,7 @@ export class OrderDetailsPage {
 
   private readonly cancelDialog = viewChild<ConfirmDialog>('cancelDialog');
   private readonly restoreDialog = viewChild<ConfirmDialog>('restoreDialog');
+  private readonly anonymizeDialog = viewChild<ConfirmDialog>('anonymizeDialog');
 
   protected readonly save = (input: OrderInput): Promise<OrderFormOutcome> => this.update(input);
   /** Odświeżenie po zmianie wpisu płatności; zwraca wczytane zamówienie albo `null`. */
@@ -208,6 +229,42 @@ export class OrderDetailsPage {
     await this.runAction('restore', () => this.orders.restore(order.id, order.version));
   }
 
+  /**
+   * „Anonimizuj dane klienta” (SF-22) po potwierdzeniu. Przy niedostępności (zmiana stanu w innym
+   * oknie) ponowny odczyt pokazuje aktualny stan, a komunikat z API zostaje w alercie.
+   */
+  protected async anonymizeCustomer(): Promise<void> {
+    const order = this.order();
+    if (!order || !this.canAnonymize() || !(await this.anonymizeDialog()?.open())) {
+      return;
+    }
+    this.actionBusy.set('anonymize');
+    this.notice.set(null);
+    this.alert.set(null);
+    try {
+      const outcome = await this.orders.anonymize(order.id, order.version);
+      switch (outcome.kind) {
+        case 'error':
+          this.alert.set({
+            text:
+              outcome.error.kind === 'network'
+                ? ANONYMIZE_FAILED_MESSAGE
+                : orderErrorMessage(outcome.error),
+            reload: false,
+          });
+          return;
+        case 'stateChanged':
+          await this.load(this.id(), { keepView: true });
+          this.alert.set({ text: outcome.detail ?? STATE_CHANGED_MESSAGE, reload: false });
+          return;
+        default:
+          await this.handleChange(outcome);
+      }
+    } finally {
+      this.actionBusy.set(null);
+    }
+  }
+
   protected list(items: readonly string[]): string {
     return items.length > 0 ? items.join(', ') : NO_DATA;
   }
@@ -234,7 +291,7 @@ export class OrderDetailsPage {
   }
 
   private async runAction(
-    action: 'cancel' | 'restore',
+    action: OrderAction,
     call: () => Promise<ChangeOrderOutcome>,
   ): Promise<void> {
     this.actionBusy.set(action);

@@ -81,6 +81,13 @@ export class OrdersApi {
     );
   }
 
+  /** „Anonimizuj dane klienta” (SF-22): `POST …/anonymize` z wersją zamówienia. */
+  anonymize(id: string, version: string): Promise<OrderVersion> {
+    return firstValueFrom(
+      this.http.post<OrderVersion>(`${BASE}/${encodeURIComponent(id)}/anonymize`, { version }),
+    );
+  }
+
   /** `POST …/payments|refunds` z `Idempotency-Key`: `201` nowy wpis, `200` powtórzenie. */
   addEntry<T extends EntryType>(
     type: T,

@@ -12,6 +12,9 @@ Kroki właściciela lub administratora oznaczono **[właściciel]**; dowody traf
 - Schemat cofa wyłącznie odtworzenie kopii bazy ([`kopie-i-odtworzenie.md`](kopie-i-odtworzenie.md)
   §7), z utratą danych zapisanych po kopii. To ostateczność.
 - Zastosowanych migracji nigdy się nie edytuje ani nie usuwa (fix forward).
+- **Wyjątek SF-22:** po pierwszej anonimizacji danych klienta nie wraca się do wersji sprzed SF-22
+  (stara synchronizacja nadpisałaby znacznik danymi ze sklepu, a stara „Historia zmian” nie zna
+  operacji `Anonymized`) — [`anonimizacja.md`](anonimizacja.md) §10.
 
 ## 2. Frontend (Vercel) — natychmiast
 

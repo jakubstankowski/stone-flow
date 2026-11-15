@@ -15,7 +15,8 @@ export type AuditObjectTypeCode =
   | 'recurringExpenseDefinition'
   | 'ownerWithdrawal';
 
-export type AuditOperationCode = 'created' | 'updated' | 'deleted';
+/** `anonymized`: anonimizacja danych klienta zamówienia (SF-22), tylko nowe wartości bez danych osobowych. */
+export type AuditOperationCode = 'created' | 'updated' | 'deleted' | 'anonymized';
 
 export type AuditAuthorKindCode = 'account' | 'wooCommerceSync' | 'automatedJob';
 
@@ -100,13 +101,20 @@ export const OPERATION_LABELS: Readonly<Record<AuditOperationCode, string>> = {
   created: 'Utworzenie',
   updated: 'Zmiana',
   deleted: 'Usunięcie',
+  anonymized: 'Anonimizacja',
 };
 
 export const OPERATION_TONES: Readonly<Record<AuditOperationCode, StatusTone>> = {
   created: 'neutral',
   updated: 'info',
   deleted: 'warning',
+  anonymized: 'warning',
 };
+
+/** Kolumna „Było”: utworzenie i anonimizacja zapisują tylko nowe wartości. */
+export function showsOldValues(operation: AuditOperationCode): boolean {
+  return operation !== 'created' && operation !== 'anonymized';
+}
 
 export const DELETED_LABEL = 'Usunięto';
 export const DELETED_TONE: StatusTone = 'warning';

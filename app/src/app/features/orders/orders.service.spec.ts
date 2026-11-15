@@ -198,6 +198,55 @@ describe('OrdersService', () => {
     expect((await cancelling).kind).toBe(kind);
   });
 
+  it('anonymizes and leaves a notice for the details', async () => {
+    const anonymizing = service.anonymize('a1', 'v1');
+    const request = await nextRequest('/api/orders/a1/anonymize');
+    expect(request.request.body).toEqual({ version: 'v1' });
+    request.flush({ version: 'v2' });
+
+    expect(await anonymizing).toEqual({ kind: 'saved', version: 'v2' });
+    expect(service.takeNotice()).toBe('Dane klienta zanonimizowane.');
+  });
+
+  it.each([
+    [409, 'order_conflict', 'conflict'],
+    [409, 'order_already_anonymized', 'stateChanged'],
+    [422, 'anonymization_disabled', 'stateChanged'],
+    [422, 'retention_not_elapsed', 'stateChanged'],
+    [404, 'order_not_found', 'notFound'],
+  ])('maps %i %s on anonymize to %s', async (status, code, kind) => {
+    const anonymizing = service.anonymize('a1', 'v1');
+    respondProblem(await nextRequest('/api/orders/a1/anonymize'), status, {
+      code,
+      detail: 'Opis z API.',
+    });
+
+    const outcome = await anonymizing;
+    expect(outcome.kind).toBe(kind);
+    if (outcome.kind === 'stateChanged') {
+      expect(outcome.detail).toBe('Opis z API.');
+    }
+  });
+
+  it('reports a network failure of anonymization as an error', async () => {
+    const anonymizing = service.anonymize('a1', 'v1');
+    respondNetworkError(await nextRequest('/api/orders/a1/anonymize'));
+
+    const outcome = await anonymizing;
+    expect(outcome.kind === 'error' && outcome.error.kind).toBe('network');
+  });
+
+  it('leaves a changed anonymized customer on update as an error for the form', async () => {
+    const updating = service.update('a1', INPUT, 'v1');
+    respondProblem(await nextRequest('/api/orders/a1'), 422, {
+      code: 'order_customer_anonymized',
+      detail: 'Dane klienta zanonimizowano. Nie można ich zmienić ani przywrócić.',
+    });
+
+    const outcome = await updating;
+    expect(outcome.kind === 'error' && outcome.error.kind).toBe('problem');
+  });
+
   it('maps a version conflict on update', async () => {
     const updating = service.update('a1', INPUT, 'v1');
     const request = await nextRequest('/api/orders/a1');

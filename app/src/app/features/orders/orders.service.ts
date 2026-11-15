@@ -70,7 +70,10 @@ export type ChangeOrderOutcome =
   | { readonly kind: 'saved'; readonly version: string }
   | { readonly kind: 'conflict' }
   | { readonly kind: 'notFound' }
-  /** Akcja niezgodna ze stanem (`order_already_cancelled` / `order_not_cancelled`). */
+  /**
+   * Akcja niezgodna ze stanem (`order_already_cancelled` / `order_not_cancelled`) albo niedostępna
+   * anonimizacja (`order_already_anonymized`, `anonymization_disabled`, `retention_not_elapsed`).
+   */
   | { readonly kind: 'stateChanged'; readonly detail: string | null }
   | { readonly kind: 'error'; readonly error: ApiError };
 
@@ -309,6 +312,11 @@ export class OrdersService {
     return this.change(() => this.api.restore(id, version), 'Zamówienie przywrócone.');
   }
 
+  /** „Anonimizuj dane klienta” (SF-22); dostępność sprawdza API. */
+  anonymize(id: string, version: string): Promise<ChangeOrderOutcome> {
+    return this.change(() => this.api.anonymize(id, version), 'Dane klienta zanonimizowane.');
+  }
+
   /** Dodanie wpłaty albo zwrotu; `200` (powtórzenie z tym samym kluczem) też jest zapisem. */
   addEntry<T extends EntryType>(
     type: T,
@@ -365,7 +373,10 @@ export class OrdersService {
         }
         if (
           apiError.code === ORDER_PROBLEM.alreadyCancelled ||
-          apiError.code === ORDER_PROBLEM.notCancelled
+          apiError.code === ORDER_PROBLEM.notCancelled ||
+          apiError.code === ORDER_PROBLEM.alreadyAnonymized ||
+          apiError.code === ORDER_PROBLEM.anonymizationDisabled ||
+          apiError.code === ORDER_PROBLEM.retentionNotElapsed
         ) {
           return { kind: 'stateChanged', detail: apiError.detail };
         }

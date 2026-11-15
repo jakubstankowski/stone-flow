@@ -1,4 +1,4 @@
-import { HttpTestingController } from '@angular/common/http/testing';
+import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
@@ -30,6 +30,12 @@ function buttonByText(root: ParentNode, text: string): HTMLButtonElement {
     throw new Error(`Brak przycisku „${text}”`);
   }
   return button;
+}
+
+function dialogsWith(root: ParentNode, heading: string): number {
+  return Array.from(root.querySelectorAll('dialog')).filter((candidate) =>
+    candidate.querySelector('h2')?.textContent?.includes(heading),
+  ).length;
 }
 
 function dialogWith(root: ParentNode, heading: string): HTMLDialogElement {
@@ -529,5 +535,243 @@ describe('OrderDetailsPage', () => {
     expect(page.element().querySelector('app-order-payments')?.textContent).toContain(
       formatPln('300.00'),
     );
+  });
+
+  describe('customer anonymization (SF-22)', () => {
+    const available = orderDetails({
+      anonymization: {
+        status: 'available',
+        retentionStartDate: '2021-03-15',
+        availableFrom: '2026-03-15',
+        anonymizedAtUtc: null,
+      },
+    });
+    const anonymizedCustomer = {
+      kind: 'person' as const,
+      name: '[zanonimizowano]',
+      phone: null,
+      email: null,
+      street: null,
+      postalCode: null,
+      city: null,
+      taxId: null,
+    };
+    const anonymized = orderDetails({
+      customer: anonymizedCustomer,
+      comment: null,
+      version: 'v2',
+      anonymization: {
+        status: 'anonymized',
+        retentionStartDate: null,
+        availableFrom: null,
+        anonymizedAtUtc: '2026-11-13T10:15:00Z',
+      },
+    });
+
+    const block = (root: HTMLElement) => root.querySelector<HTMLElement>('[data-anonymization]');
+    const actionButton = (root: HTMLElement) =>
+      block(root)?.querySelector<HTMLButtonElement>('button') ?? null;
+    const description = (root: HTMLElement) => root.querySelector('#anonimizacja-opis');
+
+    it.each([
+      ['disabled', 'Funkcja wyłączona do decyzji o okresie retencji.'],
+      [
+        'retentionPending',
+        'Dostępne po upływie okresu retencji, od 05.12.2026. Okres liczy się od 05.11.2026',
+      ],
+    ] as const)('disables the action with a visible explanation when %s', async (status, text) => {
+      const page = await open(
+        orderDetails({
+          anonymization: {
+            status,
+            retentionStartDate: status === 'retentionPending' ? '2026-11-05' : null,
+            availableFrom: status === 'retentionPending' ? '2026-12-05' : null,
+            anonymizedAtUtc: null,
+          },
+        }),
+      );
+
+      const button = actionButton(page.element());
+      expect(button?.textContent?.trim()).toBe('Anonimizuj dane klienta');
+      expect(button?.disabled).toBe(true);
+      expect(button?.getAttribute('aria-describedby')).toBe('anonimizacja-opis');
+      expect(description(page.element())?.textContent).toContain(text);
+      expect(block(page.element())?.querySelector('h3')?.textContent?.trim()).toBe(
+        'Dane osobowe klienta',
+      );
+      expect(page.element().textContent).not.toContain('Dane klienta zanonimizowane');
+    });
+
+    it('enables the action when the retention period has passed', async () => {
+      const page = await open(available);
+
+      expect(actionButton(page.element())?.disabled).toBe(false);
+      expect(description(page.element())?.textContent).toContain(
+        'Okres retencji upłynął 15.03.2026.',
+      );
+    });
+
+    it('shows the anonymized state without the action and with the header marker', async () => {
+      const page = await open(anonymized);
+      const text = page.element().textContent ?? '';
+
+      expect(actionButton(page.element())).toBeNull();
+      expect(description(page.element())?.textContent).toContain(
+        'Dane klienta zanonimizowano 13.11.2026, 11:15 (Europe/Warsaw). Operacji nie można cofnąć.',
+      );
+      expect(page.element().querySelector('header')?.textContent).toContain(
+        'Dane klienta zanonimizowane',
+      );
+      expect(text).toContain('[zanonimizowano]');
+      expect(text).toContain('Brak danych');
+      expect(dialogsWith(page.element(), 'Zanonimizować')).toBe(0);
+    });
+
+    it('asks with the irreversibility text and sends nothing when dismissed', async () => {
+      const page = await open(available);
+      const dialog = () => dialogWith(page.element(), 'Zanonimizować dane klienta');
+
+      actionButton(page.element())?.click();
+      await page.stable();
+      expect(dialog().open).toBe(true);
+      expect(dialog().querySelector('h2')?.textContent).toContain(
+        'Zanonimizować dane klienta zamówienia ZR-2026-0001?',
+      );
+      expect(dialog().textContent).toContain('Operacji nie można cofnąć.');
+      expect(dialog().textContent).toContain('a raporty się nie zmienią');
+      expect(dialog().textContent).toContain('Synchronizacja ze sklepem nie przywróci danych');
+      buttonByText(dialog(), 'Anuluj').click();
+      await page.stable();
+
+      http.expectNone('/api/orders/a1/anonymize');
+      expect(dialog().open).toBe(false);
+    });
+
+    it('confirms, blocks a second click, reloads and marks the order', async () => {
+      const page = await open(available);
+      actionButton(page.element())?.click();
+      await page.stable();
+      buttonByText(dialogWith(page.element(), 'Zanonimizować'), 'Anonimizuj dane klienta').click();
+
+      const request = await nextRequest({ method: 'POST', url: '/api/orders/a1/anonymize' });
+      expect(request.request.body).toEqual({ version: 'AAAAAAAAB9E=' });
+      await page.stable();
+      const busy = actionButton(page.element());
+      expect(busy?.getAttribute('aria-busy')).toBe('true');
+      expect(busy?.textContent).toContain('Anonimizowanie…');
+      busy?.click();
+      http.expectNone('/api/orders/a1/anonymize');
+
+      request.flush({ version: 'v2' });
+      (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(anonymized);
+      await page.settle(() =>
+        expect(page.element().querySelector('[role="status"]')?.textContent).toContain(
+          'Dane klienta zanonimizowane.',
+        ),
+      );
+      expect(page.element().querySelector('header')?.textContent).toContain(
+        'Dane klienta zanonimizowane',
+      );
+      expect(actionButton(page.element())).toBeNull();
+    });
+
+    async function confirmAnd(respond: (request: TestRequest) => void) {
+      const page = await open(available);
+      actionButton(page.element())?.click();
+      await page.stable();
+      buttonByText(dialogWith(page.element(), 'Zanonimizować'), 'Anonimizuj dane klienta').click();
+      respond(await nextRequest({ method: 'POST', url: '/api/orders/a1/anonymize' }));
+      return page;
+    }
+
+    it('reloads and shows the API detail when the action is no longer available', async () => {
+      const page = await confirmAnd((request) =>
+        respondProblem(request, 422, {
+          code: 'retention_not_elapsed',
+          detail: 'Anonimizacja będzie dostępna od 20.12.2026, po upływie okresu retencji.',
+        }),
+      );
+      (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(
+        orderDetails({
+          anonymization: {
+            status: 'retentionPending',
+            retentionStartDate: '2026-11-20',
+            availableFrom: '2026-12-20',
+            anonymizedAtUtc: null,
+          },
+        }),
+      );
+
+      await page.settle(() =>
+        expect(page.element().querySelector('[role="alert"]')?.textContent).toContain(
+          'Anonimizacja będzie dostępna od 20.12.2026',
+        ),
+      );
+      expect(actionButton(page.element())?.disabled).toBe(true);
+    });
+
+    it('shows the conflict with the reload action', async () => {
+      const page = await confirmAnd((request) =>
+        respondProblem(request, 409, { code: 'order_conflict' }),
+      );
+
+      await page.settle(() =>
+        expect(page.element().querySelector('[role="alert"]')?.textContent).toContain(
+          'Zamówienie zostało zmienione w międzyczasie.',
+        ),
+      );
+      expect(buttonByText(page.element(), 'Wczytaj aktualne dane')).toBeTruthy();
+    });
+
+    it('shows a retry message on a network failure', async () => {
+      const page = await confirmAnd((request) => request.error(new ProgressEvent('error')));
+
+      await page.settle(() =>
+        expect(page.element().querySelector('[role="alert"]')?.textContent).toContain(
+          'Nie udało się zanonimizować danych. Spróbuj ponownie.',
+        ),
+      );
+    });
+
+    it('is unavailable while an entry form is open', async () => {
+      const page = await open(available);
+      buttonByText(page.element(), 'Dodaj wpłatę').click();
+      await page.stable();
+
+      expect(actionButton(page.element())?.disabled).toBe(true);
+
+      buttonByText(page.element(), 'Zamknij bez zapisu').click();
+      await page.stable();
+      expect(actionButton(page.element())?.disabled).toBe(false);
+    });
+
+    it('is unavailable while cancelling is in progress', async () => {
+      const page = await open(available);
+      buttonByText(page.element(), 'Anuluj zamówienie').click();
+      await page.stable();
+      buttonByText(dialogWith(page.element(), 'Anulować zamówienie'), 'Anuluj zamówienie').click();
+      const cancel = await nextRequest({ method: 'POST', url: '/api/orders/a1/cancel' });
+      await page.stable();
+
+      expect(actionButton(page.element())?.disabled).toBe(true);
+
+      cancel.flush({ version: 'v2' });
+      (await nextRequest({ method: 'GET', url: '/api/orders/a1' })).flush(
+        orderDetails({ ...available, fulfillmentStatus: 'cancelled', version: 'v2' }),
+      );
+      await page.settle(() => expect(actionButton(page.element())?.disabled).toBe(false));
+    });
+
+    it('passes the anonymized customer to the edit form as read-only', async () => {
+      const page = await open(anonymized);
+      buttonByText(page.element(), 'Edytuj').click();
+      await page.stable();
+
+      expect(page.element().querySelector('#zamowienie-klient-nazwa')).toBeNull();
+      expect(
+        page.element().querySelector('#zamowienie-klient-zanonimizowany')?.textContent,
+      ).toContain('Dane klienta zanonimizowano; nie można ich zmienić.');
+      expect(actionButton(page.element())).toBeNull();
+    });
   });
 });

@@ -71,6 +71,7 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
                 o.ShopModifiedAtUtc,
                 o.ShopDeletedAtUtc,
                 o.ShopRefundedAmount,
+                o.AnonymizedAtUtc,
                 Version = EF.Property<byte[]>(o, OrderConfiguration.VersionProperty),
             })
             .SingleOrDefaultAsync(cancellationToken);
@@ -142,6 +143,7 @@ internal sealed class OrderReader(OrdersDbContext context) : IOrderReader
             ShopModifiedAtUtc = Utc(row.ShopModifiedAtUtc),
             ShopDeletedAtUtc = Utc(row.ShopDeletedAtUtc),
             ShopRefundedAmount = row.ShopRefundedAmount,
+            AnonymizedAtUtc = Utc(row.AnonymizedAtUtc),
         };
     }
 

@@ -395,6 +395,39 @@ public sealed class WooCommerceBackfillTests(SqlServerFixture sqlServer)
         }
     }
 
+    [Fact]
+    public async Task Backfill_and_retry_after_anonymization_do_not_restore_customer_data()
+    {
+        await using var test = await OrdersTest.CreateAsync(
+            sqlServer, configureServices: UseShop, settings: AnonymizationTestSupport.Retention(extra: Configured));
+        _shop.Put(1001, modified: "2026-11-05T10:00:00");
+        Assert.Equal(JobRunStatus.Succeeded, await RunAsync(test));
+        var id = (await ShopOrderAsync(test, "WC-1001")).GetProperty("id").GetGuid();
+        await AnonymizationTestSupport.MoveClockAndLoginAsync(test, new DateTimeOffset(2026, 12, 10, 12, 0, 0, TimeSpan.Zero));
+        await AnonymizationTestSupport.AnonymizeAsync(test, id);
+
+        _shop.Put(1001, status: "completed", modified: "2026-12-10T10:00:00");
+        Assert.Equal(JobRunStatus.Succeeded, await RunAsync(test));
+
+        var backfilled = await ShopOrderAsync(test, "WC-1001");
+        Assert.Equal("completed", backfilled.GetProperty("shopStatus").GetString());
+        Assert.Equal(AnonymizationTestSupport.Marker, backfilled.GetProperty("customer").GetProperty("name").GetString());
+
+        _shop.Put(1001, status: "completed", modified: "2026-12-10T12:00:00", unreadable: true);
+        test.Time.Advance(TimeSpan.FromHours(1));
+        Assert.Equal(JobRunStatus.Succeeded, await RunAsync(test));
+        var errorId = await OpenErrorIdAsync(test, "1001");
+        _shop.Put(1001, status: "on-hold", modified: "2026-12-10T12:30:00");
+        using var retry = await test.SendAsync(HttpMethod.Post, $"{Base}/errors/{errorId}/retry");
+
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal("closed", (await AuthClient.ProblemAsync(retry)).GetProperty("status").GetString());
+        var retried = await ShopOrderAsync(test, "WC-1001");
+        Assert.Equal("on-hold", retried.GetProperty("shopStatus").GetString());
+        Assert.Equal(AnonymizationTestSupport.Marker, retried.GetProperty("customer").GetProperty("name").GetString());
+        Assert.Equal(0, await AnonymizationTestSupport.OccurrencesAsync(test, "Testowy"));
+    }
+
     private Task<OrdersTest> CreateAsync() => OrdersTest.CreateAsync(sqlServer, configureServices: UseShop, settings: Configured);
 
     private void UseShop(IServiceCollection services) =>

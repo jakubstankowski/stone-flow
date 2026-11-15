@@ -62,6 +62,12 @@ export function orderDetails(overrides: Partial<OrderDetails> = {}): OrderDetail
     shopDeletedAtUtc: null,
     shopRefundedAmount: '0.00',
     shopWarnings: [],
+    anonymization: {
+      status: 'disabled',
+      retentionStartDate: null,
+      availableFrom: null,
+      anonymizedAtUtc: null,
+    },
     ...overrides,
   };
 }

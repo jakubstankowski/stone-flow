@@ -2,6 +2,7 @@ using System.Globalization;
 using StoneFlow.Orders.Application;
 using StoneFlow.Orders.Application.GetOrder;
 using StoneFlow.Orders.Application.ListOrders;
+using StoneFlow.Orders.Domain.Orders;
 using StoneFlow.Orders.Domain.Payments;
 
 namespace StoneFlow.Orders.Api.Endpoints;
@@ -103,7 +104,15 @@ public sealed record OrderDetailsResponse(
     DateTime? ShopModifiedAtUtc,
     DateTime? ShopDeletedAtUtc,
     string ShopRefundedAmount,
-    IReadOnlyList<string> ShopWarnings);
+    IReadOnlyList<string> ShopWarnings,
+    OrderAnonymizationResponse Anonymization);
+
+/// <summary>
+/// Stan akcji anonimizacji (SF-22): <c>disabled</c>, <c>retentionPending</c>, <c>available</c> albo
+/// <c>anonymized</c>; daty retencji (<c>yyyy-MM-dd</c>) tylko dla <c>retentionPending</c> i <c>available</c>,
+/// czas anonimizacji (UTC) tylko dla <c>anonymized</c>. Konto wykonawcy nie trafia do odpowiedzi.
+/// </summary>
+public sealed record OrderAnonymizationResponse(string Status, string? RetentionStartDate, string? AvailableFrom, DateTime? AnonymizedAtUtc);
 
 public sealed record SalesCorrectionEntryResponse(Guid Id, string Amount, string Date, string Reason, DateTime CreatedAtUtc, string Version);
 
@@ -253,7 +262,14 @@ internal static class OrderContracts
         order.ShopModifiedAtUtc,
         order.ShopDeletedAtUtc,
         OrderInput.FormatValue(order.ShopRefundedAmount),
-        [.. order.ShopWarnings.Select(OrderCodes.Of)]);
+        [.. order.ShopWarnings.Select(OrderCodes.Of)],
+        ToResponse(order.Anonymization ?? throw new InvalidOperationException("Szczegóły zamówienia bez stanu anonimizacji."), order.AnonymizedAtUtc));
+
+    private static OrderAnonymizationResponse ToResponse(AnonymizationAvailability anonymization, DateTime? anonymizedAtUtc) => new(
+        OrderCodes.Of(anonymization.Status),
+        anonymization.RetentionStartDate is { } start ? Date(start) : null,
+        anonymization.AvailableFrom is { } from ? Date(from) : null,
+        anonymization.Status == AnonymizationStatus.Anonymized ? anonymizedAtUtc : null);
 
     private static OrderPaymentSummaryResponse ToResponse(PaymentSummary summary) => new(
         OrderInput.FormatValue(summary.Paid),

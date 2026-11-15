@@ -102,8 +102,8 @@ function listRule(path: StringPath, itemLimit: number, tooMany: string, tooLong:
 
 /**
  * Wspólny formularz dodawania i edycji zamówienia (sekcje „Klient”, „Zamówienie”,
- * „Realizacja”, „Uwagi”). Pola należące do sklepu (`shopOwnedFields`) i status anulowanego
- * zamówienia są tylko do odczytu. Po nieudanym zapisie fokus trafia na podsumowanie błędów.
+ * „Realizacja”, „Uwagi”). Pola należące do sklepu (`shopOwnedFields`), dane klienta po
+ * anonimizacji (SF-22) i status anulowanego zamówienia są tylko do odczytu. Po nieudanym zapisie fokus trafia na podsumowanie błędów.
  */
 @Component({
   selector: 'app-order-form',
@@ -117,6 +117,11 @@ export class OrderForm {
   readonly submitLabel = input('Zapisz');
   /** Edycja istniejącego zamówienia: pole wartości wyjaśnia różnicę korekty wartości (SF-10). */
   readonly editingExisting = input(false);
+  /**
+   * Dane klienta zanonimizowano (SF-22): pola klienta, także rodzaj, są tylko do odczytu, a zapis
+   * wysyła zapisanego klienta bez zmian.
+   */
+  readonly customerAnonymized = input(false);
   readonly action = input.required<OrderFormAction>();
 
   protected readonly channels = CHANNELS;
@@ -280,6 +285,9 @@ export class OrderForm {
 
   protected readonly busy = computed(() => this.form().submitting());
   protected readonly ownsCustomer = computed(() => this.owns('customer'));
+  protected readonly customerReadOnly = computed(
+    () => this.ownsCustomer() || this.customerAnonymized(),
+  );
   protected readonly ownsOrderDate = computed(() => this.owns('orderDate'));
   protected readonly ownsChannel = computed(() => this.owns('channel'));
   protected readonly ownsValue = computed(() => this.owns('value'));

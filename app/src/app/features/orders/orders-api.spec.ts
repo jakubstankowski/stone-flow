@@ -136,6 +136,16 @@ describe('OrdersApi', () => {
     expect((await repeated).created).toBe(false);
   });
 
+  it('anonymizes the customer with the order version and an encoded id', async () => {
+    const anonymizing = api.anonymize('a/1', 'v1');
+    const request = http.expectOne('/api/orders/a%2F1/anonymize');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ version: 'v1' });
+    request.flush({ version: 'v2' });
+
+    expect(await anonymizing).toEqual({ version: 'v2' });
+  });
+
   it('updates, cancels and restores with the version', async () => {
     const update = api.update('a1', { ...INPUT, version: 'v1' });
     const put = http.expectOne('/api/orders/a1');
