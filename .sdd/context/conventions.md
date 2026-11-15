@@ -63,93 +63,88 @@ Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 
 ## Architecture diagram
 
-Keep these diagrams in step with the code when a task adds a module, a shared port or an
+Keep these diagrams in step with the code when a task adds a module, a cross-module port or an
 external system. The rules behind them are in "Backend" and "Frontend" below.
 
 ### System
 
 ```mermaid
 flowchart LR
-    owner([Owner, browser])
-    shop[(WooCommerce shop)]
-    smtp[SMTP server]
+    owner(["👤 Owner<br/>browser"])
 
-    subgraph vercel [Vercel]
-        app[Angular app<br/>app/]
+    subgraph vercel["☁️ Vercel"]
+        app["<b>Angular SPA</b><br/>app/"]
     end
 
-    subgraph host [SmarterASP.NET]
-        api[ASP.NET Core host<br/>StoneFlow.Api]
-        jobs[Scheduler<br/>BackgroundService]
+    subgraph host["🖥️ SmarterASP.NET"]
+        api["<b>StoneFlow.Api</b><br/>ASP.NET Core<br/>modules + scheduler"]
     end
 
-    db[(SQL Server<br/>schemas: access, orders, expenses,<br/>reporting, integrations, scheduling)]
+    db[("<b>SQL Server</b><br/>one schema per module")]
+    shop["🛒 <b>WooCommerce</b>"]
+    smtp["✉️ <b>SMTP</b>"]
 
-    owner -->|HTTPS| app
-    app -->|rewrite /api/*<br/>cookie session + XSRF| api
-    shop -->|POST /webhooks/woocommerce/orders<br/>HMAC signature| api
-    api -->|REST sync| shop
-    api -->|password reset e-mail| smtp
-    api --> db
-    jobs --> db
-    jobs -.->|runs module jobs| api
+    owner -- HTTPS --> app
+    app -- "/api/* · cookie session + XSRF" --> api
+    api -- EF Core --> db
+    shop -- "webhook · HMAC signature" --> api
+    api -- "REST · order sync" --> shop
+    api -- "password reset" --> smtp
+
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef be fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef data fill:#fef3c7,stroke:#d97706,color:#0f172a
+    class owner,shop,smtp ext
+    class app fe
+    class api be
+    class db data
+    style vercel fill:none,stroke:#2563eb,stroke-dasharray:4 4,color:#2563eb
+    style host fill:none,stroke:#16a34a,stroke-dasharray:4 4,color:#16a34a
 ```
 
-### Backend modules and shared ports
+### Backend modules
 
-Modules never reference each other. They meet only through contracts in
-`StoneFlow.Shared.Application`: an arrow `module → port` means the module implements the port
-(in its Infrastructure or Application), `port → module` means the module consumes it.
+Modules never reference each other. Data crosses a module boundary only through a port in
+`StoneFlow.Shared.Application`; an arrow points from the module that implements the port to the
+module that uses it. Solid: business data, dashed: audit.
 
 ```mermaid
-flowchart TB
-    hostApi[StoneFlow.Api<br/>composition root, security, /api/jobs]
+flowchart LR
+    shop["🛒 WooCommerce"]
+    integrations["<b>Integrations</b><br/>webhook, sync,<br/>error history"]
+    orders["<b>Orders</b><br/>orders, payments,<br/>refunds, corrections"]
+    expenses["<b>Expenses</b><br/>expenses, recurring,<br/>owner withdrawals"]
+    reporting["<b>Reporting</b><br/>dashboard, operations,<br/>change history, audit"]
+    access["<b>Access</b><br/>account, sessions,<br/>password reset"]
 
-    subgraph modules [Modules]
-        access[Access]
-        orders[Orders]
-        expenses[Expenses]
-        reporting[Reporting]
-        integrations[Integrations]
-    end
+    shop --> integrations
+    orders -- "IShopOrderSync<br/>IShopOrderLookup" --> integrations
+    orders -- "ISalesComponentSource<br/>ICashOperationSource" --> reporting
+    expenses -- "ICostSource<br/>ICashOperationSource" --> reporting
+    reporting -. "IAuditLog<br/>IAuditRedaction · IAuditActivity" .-> orders
+    reporting -. "IAuditLog" .-> expenses
 
-    subgraph sharedApp [StoneFlow.Shared.Application]
-        cqrs[Cqrs: IDispatcher]
-        uow[IUnitOfWork]
-        audit[IAuditLog, IAuditRedaction,<br/>IAuditActivity]
-        sources[ISalesComponentSource,<br/>ICashOperationSource, ICostSource]
-        shopPorts[IShopOrderSync,<br/>IShopOrderLookup]
-        sched[Scheduling: IScheduledJob, IJobRunner]
-        launch[ILaunchDate]
-    end
-
-    sharedInfra[StoneFlow.Shared.Infrastructure<br/>UnitOfWork, ModuleConnection,<br/>scheduler, UseModuleSqlServer]
-    kernel[StoneFlow.Shared.Kernel]
-
-    hostApi --> modules
-    hostApi --> sharedInfra
-
-    reporting -->|implements| audit
-    orders -->|implements| sources
-    expenses -->|implements| sources
-    orders -->|implements| shopPorts
-    sharedInfra -->|implements| uow
-    sharedInfra -->|implements| sched
-
-    audit -->|consumed by| orders
-    audit -->|consumed by| expenses
-    sources -->|consumed by| reporting
-    shopPorts -->|consumed by| integrations
-    uow -->|consumed by| orders
-    uow -->|consumed by| expenses
-    uow -->|consumed by| reporting
-
-    sharedApp --> kernel
-    sharedInfra --> sharedApp
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef mod fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef solo fill:#f1f5f9,stroke:#16a34a,color:#0f172a,stroke-dasharray:4 4
+    class shop ext
+    class integrations,orders,expenses,reporting mod
+    class access solo
 ```
 
-`Access` uses only `Cqrs` and its own `IAccessUnitOfWork`. `Integrations` keeps its own
-`IntegrationsDbContext` transactions and changes orders only through `IShopOrderSync`.
+| Port (`Shared.Application`) | Implemented by | Used by |
+|---|---|---|
+| `IShopOrderSync`, `IShopOrderLookup` | Orders | Integrations |
+| `ISalesComponentSource` | Orders | Reporting |
+| `ICashOperationSource` | Orders, Expenses | Reporting |
+| `ICostSource` | Expenses | Reporting |
+| `IAuditLog` | Reporting | Orders, Expenses |
+| `IAuditRedaction`, `IAuditActivity` | Reporting | Orders |
+| `IUnitOfWork` | Shared.Infrastructure | Orders, Expenses, Reporting |
+| `IScheduledJob`, `IJobRunner` | Shared.Infrastructure (runner) | modules registering jobs |
+
+Access stands alone: it uses only CQRS and its own `IAccessUnitOfWork`.
 
 ### Layers inside one module
 
@@ -157,28 +152,79 @@ Project references of `StoneFlow.{Module}.*`; dependencies point inwards and are
 `StoneFlow.Architecture.Tests`.
 
 ```mermaid
-flowchart LR
-    modApi[Module.Api<br/>Minimal API endpoints] --> modApp[Module.Application<br/>commands, queries, handlers, ports]
-    modInfra[Module.Infrastructure<br/>DbContext, migrations, port impl, DI] --> modApp
-    modApp --> modDomain[Module.Domain<br/>entities, rules]
-    modApp --> sApp[Shared.Application]
-    modInfra --> sInfra[Shared.Infrastructure]
-    modDomain --> sKernel[Shared.Kernel]
-    host[StoneFlow.Api] --> modApi
-    host --> modInfra
+flowchart TB
+    host["<b>StoneFlow.Api</b><br/>host, composition root"]
+
+    subgraph module["StoneFlow.{Module}"]
+        direction TB
+        mApi["<b>Api</b><br/>Minimal API endpoints"]
+        mInfra["<b>Infrastructure</b><br/>DbContext, migrations,<br/>port implementations, DI"]
+        mApp["<b>Application</b><br/>commands, queries,<br/>handlers, ports"]
+        mDomain["<b>Domain</b><br/>entities, business rules"]
+    end
+
+    subgraph shared["StoneFlow.Shared"]
+        direction TB
+        sInfra["<b>Shared.Infrastructure</b><br/>UnitOfWork, ModuleConnection,<br/>scheduler"]
+        sApp["<b>Shared.Application</b><br/>CQRS, cross-module ports"]
+        sKernel["<b>Shared.Kernel</b>"]
+    end
+
+    host --> mApi & mInfra
+    mApi --> mApp
+    mInfra --> mApp
+    mApp --> mDomain
+    mInfra --> sInfra
+    mApp --> sApp
+    mDomain --> sKernel
+    sInfra --> sApp --> sKernel
+
+    classDef h fill:#e0e7ff,stroke:#4f46e5,color:#0f172a
+    classDef api fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef infra fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef appl fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef dom fill:#fce7f3,stroke:#db2777,color:#0f172a
+    classDef sh fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    class host h
+    class mApi api
+    class mInfra infra
+    class mApp appl
+    class mDomain dom
+    class sInfra,sApp,sKernel sh
+    style module fill:none,stroke:#16a34a,color:#16a34a
+    style shared fill:none,stroke:#64748b,color:#64748b
 ```
 
 ### Frontend
 
 ```mermaid
 flowchart LR
-    routes[app.routes.ts<br/>lazy routes] --> layout[layout/<br/>shell, nav-items]
-    layout --> features[features/*<br/>auth, dashboard, orders, expenses,<br/>operations, change-history, integration]
-    features --> sharedUi[shared/ui, shared/format,<br/>shared/dictionaries]
-    features --> areaApi[*-api.ts + state services<br/>signals]
-    areaApi --> http[core/http<br/>provideAppHttp, toApiError]
-    core[core/auth<br/>session, guards, 401 interceptor] --> http
-    http -->|relative /api/...| backend[(ASP.NET Core API)]
+    routes["<b>app.routes.ts</b><br/>lazy routes"]
+    layout["<b>layout/</b><br/>shell, navigation"]
+
+    subgraph features["features/"]
+        direction TB
+        f1["auth · dashboard · orders"]
+        f2["expenses · operations"]
+        f3["change-history · integration"]
+    end
+
+    shared["<b>shared/</b><br/>ui · format · dictionaries"]
+    state["<b>*-api.ts + services</b><br/>state in signals"]
+    core["<b>core/</b><br/>http · auth · 401 interceptor"]
+    api[("<b>/api/*</b><br/>backend")]
+
+    routes --> layout --> features
+    features --> shared
+    features --> state --> core -- "relative URLs" --> api
+
+    classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef sh fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef be fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class routes,layout,f1,f2,f3,state,core fe
+    class shared sh
+    class api be
+    style features fill:none,stroke:#2563eb,color:#2563eb
 ```
 
 Feature areas never import each other; shared code goes to `shared/`.
