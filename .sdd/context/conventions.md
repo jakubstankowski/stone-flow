@@ -106,13 +106,14 @@ listed in the table.
 ```mermaid
 flowchart LR
     shop["🛒 WooCommerce"]
-    integrations["<b>Integrations</b>"]
-    orders["<b>Orders</b>"]
-    expenses["<b>Expenses</b>"]
-    reporting["<b>Reporting</b>"]
-    access["<b>Access</b>"]
+    integrations["<b>Integrations</b><br/>webhook, sync"]
+    orders["<b>Orders</b><br/>orders, payments"]
+    expenses["<b>Expenses</b><br/>costs, withdrawals"]
+    reporting["<b>Reporting</b><br/>dashboard, audit"]
+    access["<b>Access</b><br/>account, sessions"]
 
-    shop --> integrations -->|orders| orders
+    shop --> integrations
+    integrations -->|"shop orders"| orders
     orders -->|"sales · cash · audit"| reporting
     expenses -->|"costs · cash · audit"| reporting
 
@@ -145,19 +146,25 @@ the business rules, Infrastructure the `DbContext`, migrations and port implemen
 
 ```mermaid
 flowchart LR
-    host["<b>StoneFlow.Api</b>"]
-    mApi["<b>Api</b>"]
-    mInfra["<b>Infrastructure</b>"]
-    mApp["<b>Application</b>"]
-    mDomain["<b>Domain</b>"]
-    sInfra["Shared.Infrastructure"]
-    sApp["Shared.Application"]
-    sKernel["Shared.Kernel"]
+    host["<b>StoneFlow.Api</b><br/>host"]
+    mApi["<b>Api</b><br/>endpoints"]
+    mInfra["<b>Infrastructure</b><br/>EF Core, DI"]
+    mApp["<b>Application</b><br/>use cases, ports"]
+    mDomain["<b>Domain</b><br/>business rules"]
+    sInfra["<b>Shared</b><br/>Infrastructure"]
+    sApp["<b>Shared</b><br/>Application"]
+    sKernel["<b>Shared</b><br/>Kernel"]
 
-    host --> mApi --> mApp --> mDomain --> sKernel
-    host --> mInfra --> mApp
-    mInfra --> sInfra --> sApp
-    mApp --> sApp --> sKernel
+    host --> mApi
+    mApi --> mApp
+    mApp --> mDomain
+    mDomain --> sKernel
+    host --> mInfra
+    mInfra --> mApp
+    mInfra --> sInfra
+    sInfra --> sApp
+    mApp --> sApp
+    sApp --> sKernel
 
     classDef h fill:#e0e7ff,stroke:#4f46e5,color:#0f172a
     classDef api fill:#dbeafe,stroke:#2563eb,color:#0f172a
@@ -177,13 +184,13 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    routes["<b>app.routes.ts</b>"]
-    layout["<b>layout/</b>"]
-    features["<b>features/*</b>"]
-    shared["<b>shared/</b>"]
+    routes["<b>app.routes.ts</b><br/>lazy routes"]
+    layout["<b>layout/</b><br/>shell, nav"]
+    features["<b>features/</b><br/>screens"]
+    shared["<b>shared/</b><br/>ui, format"]
     state["<b>*-api.ts</b><br/>+ services"]
     core["<b>core/</b><br/>http · auth"]
-    api[("<b>/api/*</b>")]
+    api[("<b>/api</b><br/>backend")]
 
     routes --> layout --> features --> state --> core --> api
     features --> shared
