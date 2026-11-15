@@ -61,6 +61,151 @@ Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 | Node 24.21.0, npm 11 | `app/.nvmrc`, `engines` + `packageManager` in `app/package.json`, `app/.npmrc` (`engine-strict`) |
 | npm dependencies | exact versions in `app/package.json`, `app/package-lock.json` |
 
+## Architecture diagram
+
+Keep these diagrams in step with the code when a task adds a module, a cross-module port or an
+external system. The rules behind them are in "Backend" and "Frontend" below.
+
+### System
+
+The owner uses the Angular app on Vercel, which forwards `/api/*` to the API on SmarterASP.NET
+(cookie session + XSRF). WooCommerce sends signed webhooks and is read over REST; SMTP sends
+password reset e-mails.
+
+```mermaid
+flowchart LR
+    owner(["👤 Owner"])
+    app["<b>Angular SPA</b><br/>Vercel"]
+    api["<b>StoneFlow.Api</b><br/>SmarterASP.NET"]
+    db[("<b>SQL Server</b>")]
+    shop["🛒 <b>WooCommerce</b>"]
+    smtp["✉️ <b>SMTP</b>"]
+
+    owner -->|HTTPS| app
+    app -->|"/api/*"| api
+    api --> db
+    shop <-->|"webhook · REST"| api
+    api -->|e-mail| smtp
+
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef be fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef data fill:#fef3c7,stroke:#d97706,color:#0f172a
+    class owner,shop,smtp ext
+    class app fe
+    class api be
+    class db data
+```
+
+### Backend modules
+
+Modules never reference each other. Data crosses a module boundary only through a port in
+`StoneFlow.Shared.Application`. Arrows show the direction of data; the ports behind them are
+listed in the table.
+
+```mermaid
+flowchart LR
+    shop["🛒 WooCommerce"]
+    integrations["<b>Integrations</b><br/>webhook, sync"]
+    orders["<b>Orders</b><br/>orders, payments"]
+    expenses["<b>Expenses</b><br/>costs, withdrawals"]
+    reporting["<b>Reporting</b><br/>dashboard, audit"]
+    access["<b>Access</b><br/>account, sessions"]
+
+    shop --> integrations
+    integrations -->|"shop orders"| orders
+    orders -->|"sales · cash · audit"| reporting
+    expenses -->|"costs · cash · audit"| reporting
+
+    classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef mod fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef solo fill:#f1f5f9,stroke:#16a34a,color:#0f172a,stroke-dasharray:4 4
+    class shop ext
+    class integrations,orders,expenses,reporting mod
+    class access solo
+```
+
+| Port (`Shared.Application`) | Implemented by | Used by |
+|---|---|---|
+| `IShopOrderSync`, `IShopOrderLookup` | Orders | Integrations |
+| `ISalesComponentSource` | Orders | Reporting |
+| `ICashOperationSource` | Orders, Expenses | Reporting |
+| `ICostSource` | Expenses | Reporting |
+| `IAuditLog` | Reporting | Orders, Expenses |
+| `IAuditRedaction`, `IAuditActivity` | Reporting | Orders |
+| `IUnitOfWork` | Shared.Infrastructure | Orders, Expenses, Reporting |
+| `IScheduledJob`, `IJobRunner` | Shared.Infrastructure (runner) | modules registering jobs |
+
+Access stands alone: it uses only CQRS and its own `IAccessUnitOfWork`.
+
+### Layers inside one module
+
+Project references of `StoneFlow.{Module}.*`; dependencies point inwards and are enforced by
+`StoneFlow.Architecture.Tests`. Api holds endpoints, Application the use cases and ports, Domain
+the business rules, Infrastructure the `DbContext`, migrations and port implementations.
+
+```mermaid
+flowchart LR
+    host["<b>StoneFlow.Api</b><br/>host"]
+    mApi["<b>Api</b><br/>endpoints"]
+    mInfra["<b>Infrastructure</b><br/>EF Core, DI"]
+    mApp["<b>Application</b><br/>use cases, ports"]
+    mDomain["<b>Domain</b><br/>business rules"]
+    sInfra["<b>Shared</b><br/>Infrastructure"]
+    sApp["<b>Shared</b><br/>Application"]
+    sKernel["<b>Shared</b><br/>Kernel"]
+
+    host --> mApi
+    mApi --> mApp
+    mApp --> mDomain
+    mDomain --> sKernel
+    host --> mInfra
+    mInfra --> mApp
+    mInfra --> sInfra
+    sInfra --> sApp
+    mApp --> sApp
+    sApp --> sKernel
+
+    classDef h fill:#e0e7ff,stroke:#4f46e5,color:#0f172a
+    classDef api fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef infra fill:#fef3c7,stroke:#d97706,color:#0f172a
+    classDef appl fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    classDef dom fill:#fce7f3,stroke:#db2777,color:#0f172a
+    classDef sh fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    class host h
+    class mApi api
+    class mInfra infra
+    class mApp appl
+    class mDomain dom
+    class sInfra,sApp,sKernel sh
+```
+
+### Frontend
+
+```mermaid
+flowchart LR
+    routes["<b>app.routes.ts</b><br/>lazy routes"]
+    layout["<b>layout/</b><br/>shell, nav"]
+    features["<b>features/</b><br/>screens"]
+    shared["<b>shared/</b><br/>ui, format"]
+    state["<b>*-api.ts</b><br/>+ services"]
+    core["<b>core/</b><br/>http · auth"]
+    api[("<b>/api</b><br/>backend")]
+
+    routes --> layout --> features --> state --> core --> api
+    features --> shared
+
+    classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
+    classDef sh fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef be fill:#dcfce7,stroke:#16a34a,color:#0f172a
+    class routes,layout,features,state,core fe
+    class shared sh
+    class api be
+```
+
+Feature areas (`auth`, `dashboard`, `orders`, `expenses`, `operations`, `change-history`,
+`integration`) never import each other; shared code goes to `shared/`.
+
 ## Backend
 
 ### Structure
