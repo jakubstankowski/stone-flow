@@ -68,28 +68,24 @@ external system. The rules behind them are in "Backend" and "Frontend" below.
 
 ### System
 
+The owner uses the Angular app on Vercel, which forwards `/api/*` to the API on SmarterASP.NET
+(cookie session + XSRF). WooCommerce sends signed webhooks and is read over REST; SMTP sends
+password reset e-mails.
+
 ```mermaid
 flowchart LR
-    owner(["👤 Owner<br/>browser"])
-
-    subgraph vercel["☁️ Vercel"]
-        app["<b>Angular SPA</b><br/>app/"]
-    end
-
-    subgraph host["🖥️ SmarterASP.NET"]
-        api["<b>StoneFlow.Api</b><br/>ASP.NET Core<br/>modules + scheduler"]
-    end
-
-    db[("<b>SQL Server</b><br/>one schema per module")]
+    owner(["👤 Owner"])
+    app["<b>Angular SPA</b><br/>Vercel"]
+    api["<b>StoneFlow.Api</b><br/>SmarterASP.NET"]
+    db[("<b>SQL Server</b>")]
     shop["🛒 <b>WooCommerce</b>"]
     smtp["✉️ <b>SMTP</b>"]
 
-    owner -- HTTPS --> app
-    app -- "/api/* · cookie session + XSRF" --> api
-    api -- EF Core --> db
-    shop -- "webhook · HMAC signature" --> api
-    api -- "REST · order sync" --> shop
-    api -- "password reset" --> smtp
+    owner -->|HTTPS| app
+    app -->|"/api/*"| api
+    api --> db
+    shop <-->|"webhook · REST"| api
+    api -->|e-mail| smtp
 
     classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
     classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
@@ -99,31 +95,26 @@ flowchart LR
     class app fe
     class api be
     class db data
-    style vercel fill:none,stroke:#2563eb,stroke-dasharray:4 4,color:#2563eb
-    style host fill:none,stroke:#16a34a,stroke-dasharray:4 4,color:#16a34a
 ```
 
 ### Backend modules
 
 Modules never reference each other. Data crosses a module boundary only through a port in
-`StoneFlow.Shared.Application`; an arrow points from the module that implements the port to the
-module that uses it. Solid: business data, dashed: audit.
+`StoneFlow.Shared.Application`. Arrows show the direction of data; the ports behind them are
+listed in the table.
 
 ```mermaid
 flowchart LR
     shop["🛒 WooCommerce"]
-    integrations["<b>Integrations</b><br/>webhook, sync,<br/>error history"]
-    orders["<b>Orders</b><br/>orders, payments,<br/>refunds, corrections"]
-    expenses["<b>Expenses</b><br/>expenses, recurring,<br/>owner withdrawals"]
-    reporting["<b>Reporting</b><br/>dashboard, operations,<br/>change history, audit"]
-    access["<b>Access</b><br/>account, sessions,<br/>password reset"]
+    integrations["<b>Integrations</b>"]
+    orders["<b>Orders</b>"]
+    expenses["<b>Expenses</b>"]
+    reporting["<b>Reporting</b>"]
+    access["<b>Access</b>"]
 
-    shop --> integrations
-    orders -- "IShopOrderSync<br/>IShopOrderLookup" --> integrations
-    orders -- "ISalesComponentSource<br/>ICashOperationSource" --> reporting
-    expenses -- "ICostSource<br/>ICashOperationSource" --> reporting
-    reporting -. "IAuditLog<br/>IAuditRedaction · IAuditActivity" .-> orders
-    reporting -. "IAuditLog" .-> expenses
+    shop --> integrations -->|orders| orders
+    orders -->|"sales · cash · audit"| reporting
+    expenses -->|"costs · cash · audit"| reporting
 
     classDef ext fill:#f1f5f9,stroke:#64748b,color:#0f172a
     classDef mod fill:#dcfce7,stroke:#16a34a,color:#0f172a
@@ -149,35 +140,24 @@ Access stands alone: it uses only CQRS and its own `IAccessUnitOfWork`.
 ### Layers inside one module
 
 Project references of `StoneFlow.{Module}.*`; dependencies point inwards and are enforced by
-`StoneFlow.Architecture.Tests`.
+`StoneFlow.Architecture.Tests`. Api holds endpoints, Application the use cases and ports, Domain
+the business rules, Infrastructure the `DbContext`, migrations and port implementations.
 
 ```mermaid
-flowchart TB
-    host["<b>StoneFlow.Api</b><br/>host, composition root"]
+flowchart LR
+    host["<b>StoneFlow.Api</b>"]
+    mApi["<b>Api</b>"]
+    mInfra["<b>Infrastructure</b>"]
+    mApp["<b>Application</b>"]
+    mDomain["<b>Domain</b>"]
+    sInfra["Shared.Infrastructure"]
+    sApp["Shared.Application"]
+    sKernel["Shared.Kernel"]
 
-    subgraph module["StoneFlow.{Module}"]
-        direction TB
-        mApi["<b>Api</b><br/>Minimal API endpoints"]
-        mInfra["<b>Infrastructure</b><br/>DbContext, migrations,<br/>port implementations, DI"]
-        mApp["<b>Application</b><br/>commands, queries,<br/>handlers, ports"]
-        mDomain["<b>Domain</b><br/>entities, business rules"]
-    end
-
-    subgraph shared["StoneFlow.Shared"]
-        direction TB
-        sInfra["<b>Shared.Infrastructure</b><br/>UnitOfWork, ModuleConnection,<br/>scheduler"]
-        sApp["<b>Shared.Application</b><br/>CQRS, cross-module ports"]
-        sKernel["<b>Shared.Kernel</b>"]
-    end
-
-    host --> mApi & mInfra
-    mApi --> mApp
-    mInfra --> mApp
-    mApp --> mDomain
-    mInfra --> sInfra
-    mApp --> sApp
-    mDomain --> sKernel
-    sInfra --> sApp --> sKernel
+    host --> mApi --> mApp --> mDomain --> sKernel
+    host --> mInfra --> mApp
+    mInfra --> sInfra --> sApp
+    mApp --> sApp --> sKernel
 
     classDef h fill:#e0e7ff,stroke:#4f46e5,color:#0f172a
     classDef api fill:#dbeafe,stroke:#2563eb,color:#0f172a
@@ -191,43 +171,33 @@ flowchart TB
     class mApp appl
     class mDomain dom
     class sInfra,sApp,sKernel sh
-    style module fill:none,stroke:#16a34a,color:#16a34a
-    style shared fill:none,stroke:#64748b,color:#64748b
 ```
 
 ### Frontend
 
 ```mermaid
 flowchart LR
-    routes["<b>app.routes.ts</b><br/>lazy routes"]
-    layout["<b>layout/</b><br/>shell, navigation"]
+    routes["<b>app.routes.ts</b>"]
+    layout["<b>layout/</b>"]
+    features["<b>features/*</b>"]
+    shared["<b>shared/</b>"]
+    state["<b>*-api.ts</b><br/>+ services"]
+    core["<b>core/</b><br/>http · auth"]
+    api[("<b>/api/*</b>")]
 
-    subgraph features["features/"]
-        direction TB
-        f1["auth · dashboard · orders"]
-        f2["expenses · operations"]
-        f3["change-history · integration"]
-    end
-
-    shared["<b>shared/</b><br/>ui · format · dictionaries"]
-    state["<b>*-api.ts + services</b><br/>state in signals"]
-    core["<b>core/</b><br/>http · auth · 401 interceptor"]
-    api[("<b>/api/*</b><br/>backend")]
-
-    routes --> layout --> features
+    routes --> layout --> features --> state --> core --> api
     features --> shared
-    features --> state --> core -- "relative URLs" --> api
 
     classDef fe fill:#dbeafe,stroke:#2563eb,color:#0f172a
     classDef sh fill:#f1f5f9,stroke:#64748b,color:#0f172a
     classDef be fill:#dcfce7,stroke:#16a34a,color:#0f172a
-    class routes,layout,f1,f2,f3,state,core fe
+    class routes,layout,features,state,core fe
     class shared sh
     class api be
-    style features fill:none,stroke:#2563eb,color:#2563eb
 ```
 
-Feature areas never import each other; shared code goes to `shared/`.
+Feature areas (`auth`, `dashboard`, `orders`, `expenses`, `operations`, `change-history`,
+`integration`) never import each other; shared code goes to `shared/`.
 
 ## Backend
 
