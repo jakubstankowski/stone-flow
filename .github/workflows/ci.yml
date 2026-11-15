@@ -120,7 +120,10 @@ jobs:
           dir="${RUNNER_TEMP}/gitleaks-rule"
           mkdir -p "$dir"
           printf 'consumer_key=ck_%s\n' "$(printf 'a%.0s' {1..40})" > "$dir/sample.txt"
-          if "$GITLEAKS" dir "$dir" --config .gitleaks.toml --redact --exit-code 1; then
+          report="${RUNNER_TEMP}/gitleaks-rule.json"
+          # Raport JSON zamiast kodu wyjścia: liczy się trafienie właśnie tej reguły, nie dowolnej.
+          "$GITLEAKS" dir "$dir" --config .gitleaks.toml --redact --exit-code 0 --report-format json --report-path "$report"
+          if ! jq -e 'any(.[]; .RuleID == "woocommerce-rest-key")' "$report" > /dev/null; then
             echo "::error::Reguła woocommerce-rest-key nie wykryła klucza REST WooCommerce."
             exit 1
           fi

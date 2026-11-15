@@ -1,7 +1,7 @@
 ---
 id: SF-21
 title: Kopie zapasowe, procedura powrotu i odbiór MVP
-status: code_reviewed
+status: done
 risk: high
 depends_on: [SF-4, SF-18, SF-20]
 parts: []
@@ -9,7 +9,7 @@ spec_review: PASS WITH ISSUES
 code_review: PASS WITH ISSUES
 source: https://standev.youtrack.cloud/issue/SF-21
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-13
 archived_at: null
 ---
 

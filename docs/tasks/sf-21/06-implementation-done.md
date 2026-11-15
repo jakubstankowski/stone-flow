@@ -2,7 +2,7 @@
 
 > Manifest zaktualizowany po przeglądzie kodu (`05-code-review.md`: **PASS WITH ISSUES**). Przegląd
 > znalazł jeden błąd krytyczny (C-1, `docker exec -i` w pętli `verify-restore.sh`), poprawiony razem z
-> T-1, N-3 i N-4, a po przeglądzie także N-2 (`fillSecret`); uwagi N-1 i T-2 zostają otwarte (Open Items).
+> T-1, N-3 i N-4, a po przeglądzie także N-2 (`fillSecret`); uwagi N-1 i T-2 rozwiązano w PR `sf-21-followups`.
 
 ## Summary
 
@@ -197,9 +197,10 @@ Additional implementation not covered by the original documents:
 1. **Human review required before merge** (risk `high`): procedury `docs/operations/*` (zwłaszcza
    odtworzenie do właściwej bazy i częściowy revert), `verify-restore.sh` (brak `REPLACE`, sprzątanie,
    brak wypisywania danych), zadanie `e2e` bez sekretów, brak danych identyfikujących.
-2. Uwagi otwarte z przeglądu kodu (`05-code-review.md`): **N-1** kontrola reguły gitleaks w `secrets`
-   nie sprawdza `RuleID` (zalecenie: raport JSON i `grep` na `woocommerce-rest-key`); **N-2** poprawione (`fillSecret`); **T-2**
-   asercja negatywna w `expenses.e2e.ts` przed opłaceniem może przejść przed wczytaniem listy.
+2. Uwagi z przeglądu kodu (`05-code-review.md`) — wszystkie rozwiązane: **N-1** krok `secrets`
+   sprawdza w raporcie JSON gitleaks trafienie `RuleID` = `woocommerce-rest-key` (`jq`), PR
+   `sf-21-followups`; **N-2** poprawione (`fillSecret`); **T-2** `expenses.e2e.ts` czeka na sumy listy
+   (`data-testid="wyplywy"`) przed asercją braku wiersza, PR `sf-21-followups`.
 3. Push gałęzi, PR i zielone CI: `backend`, `frontend`, `secrets`, `deploy-dry-run`, `e2e` — nie
    uruchomione. W CI odnotować testy E2E zielone dopiero przy ponowieniu (niestabilne).
 4. Linki do przebiegów CI w `odbior-mvp.md` (placeholder `<link do przebiegu CI — uzupełnia właściciel po merge>`).
