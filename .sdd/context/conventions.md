@@ -61,6 +61,128 @@ Pinned in the repository: SDK, runtime and Node versions, the frontend lockfile,
 | Node 24.21.0, npm 11 | `app/.nvmrc`, `engines` + `packageManager` in `app/package.json`, `app/.npmrc` (`engine-strict`) |
 | npm dependencies | exact versions in `app/package.json`, `app/package-lock.json` |
 
+## Architecture diagram
+
+Keep these diagrams in step with the code when a task adds a module, a shared port or an
+external system. The rules behind them are in "Backend" and "Frontend" below.
+
+### System
+
+```mermaid
+flowchart LR
+    owner([Owner, browser])
+    shop[(WooCommerce shop)]
+    smtp[SMTP server]
+
+    subgraph vercel [Vercel]
+        app[Angular app<br/>app/]
+    end
+
+    subgraph host [SmarterASP.NET]
+        api[ASP.NET Core host<br/>StoneFlow.Api]
+        jobs[Scheduler<br/>BackgroundService]
+    end
+
+    db[(SQL Server<br/>schemas: access, orders, expenses,<br/>reporting, integrations, scheduling)]
+
+    owner -->|HTTPS| app
+    app -->|rewrite /api/*<br/>cookie session + XSRF| api
+    shop -->|POST /webhooks/woocommerce/orders<br/>HMAC signature| api
+    api -->|REST sync| shop
+    api -->|password reset e-mail| smtp
+    api --> db
+    jobs --> db
+    jobs -.->|runs module jobs| api
+```
+
+### Backend modules and shared ports
+
+Modules never reference each other. They meet only through contracts in
+`StoneFlow.Shared.Application`: an arrow `module → port` means the module implements the port
+(in its Infrastructure or Application), `port → module` means the module consumes it.
+
+```mermaid
+flowchart TB
+    hostApi[StoneFlow.Api<br/>composition root, security, /api/jobs]
+
+    subgraph modules [Modules]
+        access[Access]
+        orders[Orders]
+        expenses[Expenses]
+        reporting[Reporting]
+        integrations[Integrations]
+    end
+
+    subgraph sharedApp [StoneFlow.Shared.Application]
+        cqrs[Cqrs: IDispatcher]
+        uow[IUnitOfWork]
+        audit[IAuditLog, IAuditRedaction,<br/>IAuditActivity]
+        sources[ISalesComponentSource,<br/>ICashOperationSource, ICostSource]
+        shopPorts[IShopOrderSync,<br/>IShopOrderLookup]
+        sched[Scheduling: IScheduledJob, IJobRunner]
+        launch[ILaunchDate]
+    end
+
+    sharedInfra[StoneFlow.Shared.Infrastructure<br/>UnitOfWork, ModuleConnection,<br/>scheduler, UseModuleSqlServer]
+    kernel[StoneFlow.Shared.Kernel]
+
+    hostApi --> modules
+    hostApi --> sharedInfra
+
+    reporting -->|implements| audit
+    orders -->|implements| sources
+    expenses -->|implements| sources
+    orders -->|implements| shopPorts
+    sharedInfra -->|implements| uow
+    sharedInfra -->|implements| sched
+
+    audit -->|consumed by| orders
+    audit -->|consumed by| expenses
+    sources -->|consumed by| reporting
+    shopPorts -->|consumed by| integrations
+    uow -->|consumed by| orders
+    uow -->|consumed by| expenses
+    uow -->|consumed by| reporting
+
+    sharedApp --> kernel
+    sharedInfra --> sharedApp
+```
+
+`Access` uses only `Cqrs` and its own `IAccessUnitOfWork`. `Integrations` keeps its own
+`IntegrationsDbContext` transactions and changes orders only through `IShopOrderSync`.
+
+### Layers inside one module
+
+Project references of `StoneFlow.{Module}.*`; dependencies point inwards and are enforced by
+`StoneFlow.Architecture.Tests`.
+
+```mermaid
+flowchart LR
+    modApi[Module.Api<br/>Minimal API endpoints] --> modApp[Module.Application<br/>commands, queries, handlers, ports]
+    modInfra[Module.Infrastructure<br/>DbContext, migrations, port impl, DI] --> modApp
+    modApp --> modDomain[Module.Domain<br/>entities, rules]
+    modApp --> sApp[Shared.Application]
+    modInfra --> sInfra[Shared.Infrastructure]
+    modDomain --> sKernel[Shared.Kernel]
+    host[StoneFlow.Api] --> modApi
+    host --> modInfra
+```
+
+### Frontend
+
+```mermaid
+flowchart LR
+    routes[app.routes.ts<br/>lazy routes] --> layout[layout/<br/>shell, nav-items]
+    layout --> features[features/*<br/>auth, dashboard, orders, expenses,<br/>operations, change-history, integration]
+    features --> sharedUi[shared/ui, shared/format,<br/>shared/dictionaries]
+    features --> areaApi[*-api.ts + state services<br/>signals]
+    areaApi --> http[core/http<br/>provideAppHttp, toApiError]
+    core[core/auth<br/>session, guards, 401 interceptor] --> http
+    http -->|relative /api/...| backend[(ASP.NET Core API)]
+```
+
+Feature areas never import each other; shared code goes to `shared/`.
+
 ## Backend
 
 ### Structure
